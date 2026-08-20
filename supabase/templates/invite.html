@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#ecefe9;color:#17324a;font-family:Arial,sans-serif">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ecefe9;padding:32px 16px">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fbf7ef;border:1px solid #d9d8ce">
+          <tr><td style="padding:42px 44px 18px">
+            <p style="margin:0;color:#17324a;font-family:Georgia,serif;font-size:22px;font-weight:bold;letter-spacing:1px">VERITAS VILLAGE</p>
+            <div style="width:44px;height:3px;margin:20px 0 34px;background:#b5674f"></div>
+            <p style="margin:0 0 8px;color:#708274;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase">You’re invited</p>
+            <h1 style="margin:0 0 26px;color:#17324a;font-family:Georgia,serif;font-size:38px;line-height:1.08">There is a place for your family at the table.</h1>
+            <p style="margin:0 0 16px;color:#4f6257;font-size:15px;line-height:1.7">Hello {{ .Data.display_name }},</p>
+            <p style="margin:0 0 16px;color:#4f6257;font-size:15px;line-height:1.7">You have been invited to join Family Village, the private home for Veritas Village families.</p>
+            {{ if .Data.note }}<div style="margin:24px 0;padding:16px 18px;border-left:3px solid #b5674f;background:#f2e5de;color:#17324a;font-family:Georgia,serif;font-size:16px;font-style:italic;line-height:1.55">{{ .Data.note }}</div>{{ end }}
+            <p style="margin:30px 0"><a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 20px;background:#b5674f;color:#ffffff;font-size:13px;font-weight:bold;text-decoration:none">Accept your invitation</a></p>
+            <p style="margin:0;color:#708274;font-size:12px;line-height:1.6">This private link expires in one hour. If you were not expecting this invitation, you may safely ignore this message.</p>
+          </td></tr>
+          <tr><td style="padding:22px 44px;background:#17324a;color:#d9e0db;font-size:11px;line-height:1.6">Veritas Village · Family Village<br>Central Texas homeschool community</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>
