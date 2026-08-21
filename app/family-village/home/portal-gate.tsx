@@ -34,15 +34,29 @@ export default function PortalGate() {
       if (result.error || !result.data) { setState("error"); return; }
       setProfile(result.data as Profile);
       if (result.data.status !== "active") { setState("pending"); return; }
-      const [children, classes, assignments, posts, events, documents, roles] = await Promise.all([
-        supabase.from("children").select("id,first_name,last_initial").order("first_name"),
-        supabase.from("classes").select("id,title,description,meeting_time").order("title"),
-        supabase.from("assignments").select("id,title,due_at,class_id").order("due_at", { ascending: true }).limit(8),
+      const membership = await supabase.from("family_members").select("family_id").eq("user_id", data.user.id);
+      if (membership.error) { setState("error"); return; }
+      const familyIds = (membership.data ?? []).map((row) => row.family_id);
+      const safeFamilyIds = familyIds.length ? familyIds : ["00000000-0000-0000-0000-000000000000"];
+
+      const childrenResult = await supabase.from("children").select("id,first_name,last_initial").in("family_id", safeFamilyIds).order("first_name");
+      if (childrenResult.error) { setState("error"); return; }
+      const childIds = (childrenResult.data ?? []).map((row) => row.id);
+      const safeChildIds = childIds.length ? childIds : ["00000000-0000-0000-0000-000000000000"];
+
+      const enrollmentResult = await supabase.from("enrollments").select("class_id").in("child_id", safeChildIds).eq("status", "active");
+      const classIds = [...new Set((enrollmentResult.data ?? []).map((row) => row.class_id))];
+      const safeClassIds = classIds.length ? classIds : ["00000000-0000-0000-0000-000000000000"];
+
+      const [classes, assignments, posts, events, documents, roles] = await Promise.all([
+        supabase.from("classes").select("id,title,description,meeting_time").in("id", safeClassIds).order("title"),
+        supabase.from("assignments").select("id,title,due_at,class_id").in("class_id", safeClassIds).order("due_at", { ascending: true }).limit(8),
         supabase.from("posts").select("id,title,body,published_at,image_storage_path").order("published_at", { ascending: false }).limit(6),
         supabase.from("events").select("id,title,starts_at,location").gte("starts_at", new Date().toISOString()).order("starts_at").limit(8),
-        supabase.from("documents").select("id,title,kind,signature_status").order("created_at", { ascending: false }).limit(8),
-        supabase.from("user_roles").select("role"),
+        supabase.from("documents").select("id,title,kind,signature_status").or(`family_id.in.(${safeFamilyIds.join(",")}),class_id.in.(${safeClassIds.join(",")})`).order("created_at", { ascending: false }).limit(8),
+        supabase.from("user_roles").select("role").eq("user_id", data.user.id),
       ]);
+      const children = childrenResult;
       const failed = [children, classes, assignments, posts, events, documents, roles].find((item) => item.error);
       if (failed?.error) { setState("error"); return; }
       setPortal({ children: children.data ?? [], classes: classes.data ?? [], assignments: assignments.data ?? [], posts: posts.data ?? [], events: events.data ?? [], documents: documents.data ?? [], roles: (roles.data ?? []).map((item) => item.role) } as PortalData);
