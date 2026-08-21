@@ -1,7 +1,7 @@
-export const metadata = { title: "Teacher Workspace Preview | Family Village" };
+import TeacherWorkspace from "./workspace";
 
-export default function TeacherPreview() { return <main className="workspace-preview">
-  <header><div><p className="eyebrow">Teacher workspace preview</p><h1>Teach with the whole<br/><em>week in view.</em></h1></div><nav><a href="/family-village/preview">Family view</a><a href="/family-village/admin">Admin view</a></nav></header>
-  <div className="preview-banner"><b>No student records are shown.</b> Teachers see only classes and learners assigned to them.</div>
-  <section className="workspace-grid"><article className="workspace-nav"><p className="card-kicker">My teaching</p><a className="active" href="#classes">Classes</a><a href="#assignments">Assignments</a><a href="#notes">Student notes</a><a href="#resources">Resources</a></article><div className="workspace-main"><section id="classes"><p className="card-kicker">Friday classes</p><h2>Your classroom, organized.</h2><div className="teacher-class"><div><b>Assigned classes appear here</b><span>Lead and assistant roles are managed separately.</span></div><button disabled>Open roster</button></div></section><section id="assignments"><p className="card-kicker">Weekly plan</p><h2>Assignments families can find.</h2><div className="editor-placeholder"><label>Assignment title<input disabled placeholder="Add a title"/></label><label>Instructions<textarea disabled placeholder="Reading, supplies, or work for the week"/></label><button disabled>Publish to class</button></div></section><section id="notes"><p className="card-kicker">Student notes</p><h2>Thoughtful, controlled communication.</h2><div className="note-rules"><span>Family visible</span><span>Teaching team only</span><span>Administrators only</span></div><p>Every note has an author, class, child, visibility level, and timestamp. Teachers cannot browse children outside their assigned classes.</p></section></div></section>
-  </main> }
+export const metadata = { title: "Teacher Workspace | Family Village" };
+
+export default function TeacherPage() {
+  return <TeacherWorkspace />;
+}
