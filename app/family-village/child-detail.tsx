@@ -5,7 +5,7 @@ import { getSupabaseBrowserClient } from "../../lib/supabase";
 
 type ClassInfo = { id: string; title: string; meeting_time: string | null; teachers: string[] };
 type AssignmentInfo = { id: string; title: string; due_at: string | null; class_title: string };
-type NoteInfo = { id: string; body: string; visibility: string; created_at: string };
+type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
 
 type ChildRecord = { id: string; first_name: string; last_name: string | null };
 
@@ -14,15 +14,20 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [assignments, setAssignments] = useState<AssignmentInfo[]>([]);
   const [notes, setNotes] = useState<NoteInfo[]>([]);
+  const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id ?? "";
+    setUserId(uid);
+
     const [{ data: childRow }, { data: enrollments }, { data: noteRows }] = await Promise.all([
       supabase.from("children").select("id,first_name,last_name").eq("id", childId).single(),
       supabase.from("enrollments").select("class_id,status,classes(id,title,meeting_time,teacher_assignments(profiles(display_name,email)))").eq("child_id", childId).eq("status", "active"),
-      supabase.from("teacher_notes").select("id,body,visibility,created_at").eq("child_id", childId).order("created_at", { ascending: false }),
+      supabase.from("teacher_notes").select("id,body,visibility,created_at,author_user_id,class_id").eq("child_id", childId).order("created_at", { ascending: false }),
     ]);
     setChild(childRow as ChildRecord | null);
     const rows = (enrollments ?? []) as unknown as { classes: { id: string; title: string; meeting_time: string | null; teacher_assignments: { profiles: { display_name: string | null; email: string } | null }[] } }[];
@@ -33,7 +38,32 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
       teachers: row.classes.teacher_assignments.map((assignment) => assignment.profiles?.display_name || assignment.profiles?.email || "").filter(Boolean),
     }));
     setClasses(classInfos);
-    setNotes((noteRows ?? []) as NoteInfo[]);
+
+    const noteBaseRows = (noteRows ?? []) as Omit<NoteInfo, "author_name" | "class_title" | "read_count" | "read_by_me">[];
+    const authorIds = [...new Set(noteBaseRows.map((row) => row.author_user_id))];
+    const noteClassIds = [...new Set(noteBaseRows.map((row) => row.class_id))];
+    const noteIds = noteBaseRows.map((row) => row.id);
+    const [{ data: authorRows }, { data: classRows }, { data: readRows }] = await Promise.all([
+      authorIds.length ? supabase.from("profiles").select("id,display_name,email").in("id", authorIds) : Promise.resolve({ data: [] }),
+      noteClassIds.length ? supabase.from("classes").select("id,title").in("id", noteClassIds) : Promise.resolve({ data: [] }),
+      noteIds.length ? supabase.from("teacher_note_reads").select("note_id,user_id").in("note_id", noteIds) : Promise.resolve({ data: [] }),
+    ]);
+    const authorMap = new Map((authorRows ?? []).map((row) => [row.id, row.display_name || row.email]));
+    const classMap = new Map((classRows ?? []).map((row) => [row.id, row.title]));
+    const readCounts = new Map<string, number>();
+    const readByMe = new Set<string>();
+    (readRows ?? []).forEach((row) => {
+      readCounts.set(row.note_id, (readCounts.get(row.note_id) ?? 0) + 1);
+      if (row.user_id === uid) readByMe.add(row.note_id);
+    });
+    setNotes(noteBaseRows.map((row) => ({
+      ...row,
+      author_name: authorMap.get(row.author_user_id) ?? "Teacher",
+      class_title: classMap.get(row.class_id) ?? "",
+      read_count: readCounts.get(row.id) ?? 0,
+      read_by_me: readByMe.has(row.id),
+    })));
+
     const classIds = classInfos.map((info) => info.id);
     if (classIds.length) {
       const { data: assignmentRows } = await supabase.from("assignments").select("id,title,due_at,class_id,classes(title)").in("class_id", classIds).order("due_at", { ascending: true }).limit(10);
@@ -50,6 +80,21 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
+
+  async function markRead(noteId: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !userId) return;
+    const { error } = await supabase.from("teacher_note_reads").insert({ note_id: noteId, user_id: userId });
+    if (!error) await load();
+  }
+
+  async function deleteNote(noteId: string) {
+    if (!confirm("Delete this note? This cannot be undone.")) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("teacher_notes").delete().eq("id", noteId);
+    if (!error) await load();
+  }
 
   return <div className="child-detail-overlay" role="dialog" aria-modal="true">
     {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- decorative backdrop; Escape and the close button provide keyboard access */}
@@ -72,7 +117,17 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
 
         <section>
           <p className="card-kicker">Teacher notes</p>
-          {notes.length ? <ul className="child-detail-list">{notes.map((row) => <li key={row.id}><span>{new Date(row.created_at).toLocaleDateString()} · {row.visibility}</span><p>{row.body}</p></li>)}</ul> : <p className="portal-empty">No notes yet.</p>}
+          {notes.length ? <ul className="child-detail-list note-list">{notes.map((row) => <li key={row.id}>
+            <span>{row.author_name} · {row.class_title} · {new Date(row.created_at).toLocaleDateString()} · {row.visibility}</span>
+            <p>{row.body}</p>
+            <div className="note-actions">
+              {row.read_by_me
+                ? <span className="note-read-pill">Marked as read</span>
+                : <button onClick={() => markRead(row.id)}>Mark as read</button>}
+              {row.read_count > 0 && <span className="note-read-count">Read by {row.read_count}</span>}
+              {row.author_user_id === userId && <button className="danger" onClick={() => deleteNote(row.id)}>Delete</button>}
+            </div>
+          </li>)}</ul> : <p className="portal-empty">No notes yet.</p>}
         </section>
       </>}
     </div>
