@@ -6,16 +6,19 @@ import FamiliesTab from "./families-tab";
 import NewsTab from "./news-tab";
 import ClassesTab from "./classes-tab";
 import IntegrationsTab from "./integrations-tab";
+import DocumentsTab from "./documents-tab";
+import ActivityTab from "./activity-tab";
+import AdminDashboard from "./dashboard";
 
 type AccessState = "loading" | "denied" | "ready";
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-type Tab = "invitations" | "families" | "classes" | "news" | "integrations";
+type Tab = "dashboard" | "invitations" | "families" | "classes" | "documents" | "news" | "activity" | "integrations";
 
 export default function AdminWorkspace() {
   const [access, setAccess] = useState<AccessState>(() => getSupabaseBrowserClient() ? "loading" : "denied");
   const [userId, setUserId] = useState<string>("");
   const [roles, setRoles] = useState<string[]>([]);
-  const [tab, setTab] = useState<Tab>("invitations");
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [familyName, setFamilyName] = useState(""); const [adminName, setAdminName] = useState(""); const [email, setEmail] = useState(""); const [note, setNote] = useState("");
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
@@ -45,12 +48,17 @@ export default function AdminWorkspace() {
       <PortalNav current="admin" roles={roles} />
     </header>
     <nav className="admin-tabs">
+      <button className={tab === "dashboard" ? "active" : ""} onClick={() => setTab("dashboard")}>Dashboard</button>
       <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}>Invitations</button>
       <button className={tab === "families" ? "active" : ""} onClick={() => setTab("families")}>Families</button>
       <button className={tab === "classes" ? "active" : ""} onClick={() => setTab("classes")}>Classes</button>
+      <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>Documents</button>
       <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>Village news</button>
+      <button className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}>Activity</button>
       <button className={tab === "integrations" ? "active" : ""} onClick={() => setTab("integrations")}>Integrations</button>
     </nav>
+
+    {tab === "dashboard" && <AdminDashboard onNavigate={setTab} />}
 
     {tab === "invitations" && <>
       <div className="admin-invite-layout"><section className="admin-invite-card"><p className="card-kicker">New household invitation</p><h2>Who are we welcoming?</h2><form onSubmit={invite} className="admin-invite-form"><label>Family or household name<input required value={familyName} onChange={event => setFamilyName(event.target.value)} placeholder="The Lewis family" disabled={busy}/></label><label>Family administrator’s name<input required value={adminName} onChange={event => setAdminName(event.target.value)} placeholder="Jordan Lewis" disabled={busy}/></label><label>Email address<input required type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="jordan@example.com" disabled={busy}/></label><label>Personal note <span>optional</span><textarea value={note} onChange={event => setNote(event.target.value)} placeholder="A short welcome from the Village…" disabled={busy}/></label><button disabled={busy}>{busy ? "Preparing invitation…" : "Send family invitation"}</button></form><p className="admin-form-status" role="status">{message || "The recipient will set a private password and enter as the administrator for this household."}</p></section><aside className="invitation-letter-preview"><p className="card-kicker">Email preview</p><div className="email-paper"><p className="email-vv">VERITAS VILLAGE</p><span className="email-rule"/><p>You’re invited</p><h2>There is a place for your family at the table.</h2><p>Hello {adminName || "friend"},</p><p>You have been invited to join Family Village, the private home for Veritas Village families.</p>{note && <blockquote>{note}</blockquote>}<span className="email-button">Accept your invitation</span><small>This private link expires in one hour.</small></div></aside></div>
@@ -59,7 +67,9 @@ export default function AdminWorkspace() {
 
     {tab === "families" && <FamiliesTab actorUserId={userId} />}
     {tab === "classes" && <ClassesTab />}
+    {tab === "documents" && <DocumentsTab actorUserId={userId} />}
     {tab === "news" && <NewsTab actorUserId={userId} />}
+    {tab === "activity" && <ActivityTab />}
     {tab === "integrations" && <IntegrationsTab actorUserId={userId} />}
   </main>;
 }

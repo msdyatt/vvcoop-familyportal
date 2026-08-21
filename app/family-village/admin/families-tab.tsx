@@ -8,8 +8,11 @@ type Child = { id: string; first_name: string; last_name: string | null; last_in
 type Member = { user_id: string; relationship: string | null; profiles: { email: string; display_name: string | null; status: string } | null };
 type Family = { id: string; display_name: string; last_name: string | null; children: Child[]; family_members: Member[] };
 
+const ASSIGNABLE_ROLES = ["teacher", "admin"];
+
 export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   const [families, setFamilies] = useState<Family[]>([]);
+  const [roleMap, setRoleMap] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
 
@@ -21,6 +24,14 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
       .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,active,last_name_override),family_members(user_id,relationship,profiles(email,display_name,status))")
       .order("display_name");
     if (!error) setFamilies((data ?? []) as unknown as Family[]);
+
+    const userIds = [...new Set(((data ?? []) as unknown as Family[]).flatMap((family) => family.family_members?.map((member) => member.user_id) ?? []))];
+    if (userIds.length) {
+      const { data: roleRows } = await supabase.from("user_roles").select("user_id,role").in("user_id", userIds);
+      const map: Record<string, string[]> = {};
+      (roleRows ?? []).forEach((row) => { map[row.user_id] = [...(map[row.user_id] ?? []), row.role]; });
+      setRoleMap(map);
+    }
     setLoading(false);
   }
 
@@ -81,22 +92,43 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     await load();
   }
 
+  async function grantRole(userId: string, role: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
+    if (error) { setStatus(error.message); return; }
+    await log("role_granted", "profile", userId, { role });
+    await load();
+  }
+
+  async function revokeRole(userId: string, role: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role);
+    if (error) { setStatus(error.message); return; }
+    await log("role_revoked", "profile", userId, { role });
+    await load();
+  }
+
   if (loading) return <p>Loading households…</p>;
 
   return <section className="family-manage">
     <p className="admin-form-status" role="status">{status || "Editing a family's name updates every child who hasn't been given a custom last name."}</p>
     <div className="family-manage-list">
-      {families.map((family) => <FamilyCard key={family.id} family={family} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onRemoveUser={removeUser} />)}
+      {families.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
     </div>
   </section>;
 }
 
-function FamilyCard({ family, onSaveFamily, onSaveChild, onAddChild, onRemoveUser }: {
+function FamilyCard({ family, roleMap, onSaveFamily, onSaveChild, onAddChild, onRemoveUser, onGrantRole, onRevokeRole }: {
   family: Family;
+  roleMap: Record<string, string[]>;
   onSaveFamily: (f: Family) => void;
   onSaveChild: (c: Child) => void;
   onAddChild: (familyId: string, firstName: string) => void;
   onRemoveUser: (familyId: string, userId: string, displayName: string) => void;
+  onGrantRole: (userId: string, role: string) => void;
+  onRevokeRole: (userId: string, role: string) => void;
 }) {
   const [displayName, setDisplayName] = useState(family.display_name);
   const [lastName, setLastName] = useState(family.last_name ?? "");
@@ -134,13 +166,20 @@ function FamilyCard({ family, onSaveFamily, onSaveChild, onAddChild, onRemoveUse
       <div className="row-actions"><button onClick={() => { onAddChild(family.id, newChildName); setNewChildName(""); }}>Add child</button></div>
     </div>
 
-    {family.family_members?.map((member) => <div className="member-row" key={member.user_id}>
-      <div><b>{member.profiles?.display_name || member.profiles?.email}</b><span style={{ display: "block", fontSize: 11, color: "var(--sage)" }}>{member.relationship} · {member.profiles?.status}</span></div>
-      <div className="row-actions">
-        {member.profiles?.status !== "removed"
-          ? <button className="danger" onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
-          : <span className="status-pill cancelled">Removed</span>}
-      </div>
-    </div>)}
+    {family.family_members?.map((member) => {
+      const roles = roleMap[member.user_id] ?? [];
+      return <div className="member-row" key={member.user_id}>
+        <div><b>{member.profiles?.display_name || member.profiles?.email}</b><span style={{ display: "block", fontSize: 11, color: "var(--sage)" }}>{member.relationship} · {member.profiles?.status}</span></div>
+        <div className="role-chips">
+          {ASSIGNABLE_ROLES.map((role) => <button key={role} className={`role-chip${roles.includes(role) ? " active" : ""}`}
+            onClick={() => (roles.includes(role) ? onRevokeRole(member.user_id, role) : onGrantRole(member.user_id, role))}>{role}</button>)}
+        </div>
+        <div className="row-actions">
+          {member.profiles?.status !== "removed"
+            ? <button className="danger" onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
+            : <span className="status-pill cancelled">Removed</span>}
+        </div>
+      </div>;
+    })}
   </article>;
 }

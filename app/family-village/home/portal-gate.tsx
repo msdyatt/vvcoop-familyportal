@@ -156,6 +156,7 @@ function ProfileNameForm({ profile, onSaved }: { profile: Profile; onSaved: () =
 }
 
 function AddChildForm({ familyId, onAdded }: { familyId: string; onAdded: () => void }) {
+  const [adding, setAdding] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [busy, setBusy] = useState(false); const [status, setStatus] = useState("");
 
@@ -168,13 +169,16 @@ function AddChildForm({ familyId, onAdded }: { familyId: string; onAdded: () => 
     const { error } = await supabase.from("children").insert({ family_id: familyId, first_name: firstName.trim() });
     setBusy(false);
     if (error) { setStatus(error.message); return; }
-    setFirstName(""); setStatus(`Added ${firstName.trim()}.`);
+    setFirstName(""); setAdding(false); setStatus(`Added ${firstName.trim()}.`);
     onAdded();
   }
+
+  if (!adding) return <button className="add-child-trigger" onClick={() => setAdding(true)} style={{ marginTop: 18 }}>+ Add a child</button>;
 
   return <form onSubmit={submit} className="household-form" style={{ marginTop: 18 }}>
     <label>Add a child<input value={firstName} onChange={(event) => setFirstName(event.target.value)} placeholder="First name" disabled={busy} /></label>
     <button disabled={busy}>{busy ? "Adding…" : "Add child"}</button>
+    <button type="button" onClick={() => { setAdding(false); setFirstName(""); }} style={{ background: "transparent", color: "var(--ink)", border: "1px solid rgba(7,43,73,.25)" }}>Cancel</button>
     <p className="admin-form-status" role="status">{status}</p>
   </form>;
 }
