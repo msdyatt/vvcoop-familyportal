@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import ChildDetail from "../child-detail";
 
 type Child = { id: string; first_name: string; last_name: string | null; last_initial: string | null; age_band: string | null; active: boolean; last_name_override: boolean };
 type Member = { user_id: string; relationship: string | null; profiles: { email: string; display_name: string | null; status: string } | null };
@@ -90,7 +91,6 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   </section>;
 }
 
-
 function FamilyCard({ family, onSaveFamily, onSaveChild, onAddChild, onRemoveUser }: {
   family: Family;
   onSaveFamily: (f: Family) => void;
@@ -102,6 +102,7 @@ function FamilyCard({ family, onSaveFamily, onSaveChild, onAddChild, onRemoveUse
   const [lastName, setLastName] = useState(family.last_name ?? "");
   const [newChildName, setNewChildName] = useState("");
   const [children, setChildren] = useState(family.children ?? []);
+  const [viewingChildId, setViewingChildId] = useState<string | null>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- resync local edit buffer when parent data reloads
   useEffect(() => { setDisplayName(family.display_name); setLastName(family.last_name ?? ""); setChildren(family.children ?? []); }, [family]);
@@ -124,8 +125,9 @@ function FamilyCard({ family, onSaveFamily, onSaveChild, onAddChild, onRemoveUse
       <label>Last name<input value={child.last_name ?? ""} onChange={(event) => updateChild(child.id, { last_name: event.target.value, last_name_override: true })} /></label>
       <label className="checkbox-field"><input type="checkbox" checked={child.last_name_override} onChange={(event) => updateChild(child.id, { last_name_override: event.target.checked })} /> Custom name</label>
       <label className="checkbox-field"><input type="checkbox" checked={child.active} onChange={(event) => updateChild(child.id, { active: event.target.checked })} /> Active</label>
-      <div className="row-actions"><button onClick={() => onSaveChild(children.find((row) => row.id === child.id)!)}>Save</button></div>
+      <div className="row-actions"><button onClick={() => setViewingChildId(child.id)}>View</button><button onClick={() => onSaveChild(children.find((row) => row.id === child.id)!)}>Save</button></div>
     </div>)}
+    {viewingChildId && <ChildDetail childId={viewingChildId} onClose={() => setViewingChildId(null)} />}
 
     <div className="add-child-row">
       <label>Add a child<input value={newChildName} onChange={(event) => setNewChildName(event.target.value)} placeholder="First name" /></label>

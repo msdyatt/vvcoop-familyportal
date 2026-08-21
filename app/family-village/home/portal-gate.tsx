@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "../../../lib/supabase";
 import { getSignedFileUrl } from "../../../lib/storage";
 import PortalNav from "../portal-nav";
+import ChildDetail from "../child-detail";
 
 type PortalState = "loading" | "signed-out" | "pending" | "active" | "error";
 type Profile = { display_name: string | null; email: string; status: "pending" | "active" | "suspended" };
@@ -22,6 +23,7 @@ export default function PortalGate() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [portal, setPortal] = useState<PortalData | null>(null);
   const [postImages, setPostImages] = useState<Record<string, string>>({});
+  const [openChildId, setOpenChildId] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -64,12 +66,13 @@ export default function PortalGate() {
     <header className="live-portal-head"><div><p className="eyebrow">Family Village · Private</p><h1>Welcome{profile?.display_name ? `, ${profile.display_name}` : ""}.</h1><p>Your household’s week, gathered in one place.</p></div><div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><PortalNav current="home" roles={portal?.roles ?? []} /><button onClick={signOut}>Sign out</button></div></header>
     <section className="portal-family-strip"><div><span>Children</span><strong>{portal?.children.length ?? 0}</strong></div><div><span>Classes</span><strong>{portal?.classes.length ?? 0}</strong></div><div><span>Upcoming work</span><strong>{portal?.assignments.length ?? 0}</strong></div></section>
     <div className="portal-grid">
-      <section className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <article key={child.id}><span>{child.first_name.slice(0,1)}</span><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3></article>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}</section>
+      <section className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><span>{child.first_name.slice(0,1)}</span><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3></div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}</section>
       <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{portal?.events.length ? <ol className="portal-list">{portal.events.map(event => <li key={event.id}><time>{new Date(event.starts_at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</time><div><b>{event.title}</b>{event.location && <span>{event.location}</span>}</div></li>)}</ol> : empty("No upcoming events have been published yet.")}</section>
       <section className="portal-module"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news">{portal.posts.map(post => <li key={post.id}>{postImages[post.id] && <img src={postImages[post.id]} alt="" style={{ width: 64, height: 64, objectFit: "cover", flexShrink: 0 }} />}<div><b>{post.title}</b><span>{post.body.length > 130 ? `${post.body.slice(0,130)}…` : post.body}</span></div></li>)}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
       <section className="portal-module"><p className="eyebrow">Learning</p><h2>Classes & assignments</h2>{portal?.assignments.length ? <ol className="portal-list">{portal.assignments.map(item => <li key={item.id}><time>{item.due_at ? new Date(item.due_at).toLocaleDateString(undefined,{month:"short",day:"numeric"}) : "Open"}</time><div><b>{item.title}</b></div></li>)}</ol> : empty(portal?.classes.length ? "No assignments are currently due." : "Classes will appear after enrollment is entered.")}</section>
       <section className="portal-module"><p className="eyebrow">Family records</p><h2>Forms & documents</h2>{portal?.documents.length ? <ol className="portal-list portal-docs">{portal.documents.map(document => <li key={document.id}><div><b>{document.title}</b><span>{document.kind}{document.signature_status ? ` · ${document.signature_status}` : ""}</span></div></li>)}</ol> : empty("Signed forms and family documents will be available here once added.")}</section>
     </div>
     {portal?.roles.some(role => role === "teacher" || role === "admin") && <nav className="portal-role-links" aria-label="Staff workspaces">{portal.roles.includes("teacher") && <a href="/family-village/teacher">Teacher workspace →</a>}{portal.roles.includes("admin") && <a href="/family-village/admin">Administrator workspace →</a>}</nav>}
+    {openChildId && <ChildDetail childId={openChildId} onClose={() => setOpenChildId(null)} />}
   </main>;
 }

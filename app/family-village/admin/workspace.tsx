@@ -4,10 +4,12 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import PortalNav from "../portal-nav";
 import FamiliesTab from "./families-tab";
 import NewsTab from "./news-tab";
+import ClassesTab from "./classes-tab";
+import IntegrationsTab from "./integrations-tab";
 
 type AccessState = "loading" | "denied" | "ready";
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-type Tab = "invitations" | "families" | "news";
+type Tab = "invitations" | "families" | "classes" | "news" | "integrations";
 
 export default function AdminWorkspace() {
   const [access, setAccess] = useState<AccessState>(() => getSupabaseBrowserClient() ? "loading" : "denied");
@@ -45,7 +47,9 @@ export default function AdminWorkspace() {
     <nav className="admin-tabs">
       <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}>Invitations</button>
       <button className={tab === "families" ? "active" : ""} onClick={() => setTab("families")}>Families</button>
+      <button className={tab === "classes" ? "active" : ""} onClick={() => setTab("classes")}>Classes</button>
       <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>Village news</button>
+      <button className={tab === "integrations" ? "active" : ""} onClick={() => setTab("integrations")}>Integrations</button>
     </nav>
 
     {tab === "invitations" && <>
@@ -54,6 +58,8 @@ export default function AdminWorkspace() {
     </>}
 
     {tab === "families" && <FamiliesTab actorUserId={userId} />}
+    {tab === "classes" && <ClassesTab />}
     {tab === "news" && <NewsTab actorUserId={userId} />}
+    {tab === "integrations" && <IntegrationsTab actorUserId={userId} />}
   </main>;
 }
