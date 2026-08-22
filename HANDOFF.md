@@ -11,7 +11,7 @@ A private family-portal web app for Veritas Village, a Central Texas homeschool 
 - **App routes**: `/family-village` (sign-in), `/family-village/home` (Family), `/family-village/teacher` (Teacher's Lounge), `/family-village/admin` (Admin). Public marketing pages live at the site root (`app/page.tsx`, etc.) — separate from the private app.
 
 ## Important environment quirk
-This Mac's shell has `NODE_ENV=production` set globally, which makes plain `npm install`/`npm ci` skip devDependencies (ESLint, TypeScript, Vite, wrangler, etc. all vanish). **Always prefix build/lint/install commands with `NODE_ENV=development`**, e.g.:
+This Mac's shell has been seen with `NODE_ENV=production` set, which makes plain `npm install`/`npm ci` skip devDependencies (ESLint, TypeScript, Vite, wrangler, etc. all vanish). It is **not** set in `.zshrc`, `.zprofile`, `/etc/zprofile` or `/etc/zshrc`, and it was empty in a later session's shell — so it is probably exported ad hoc in some terminals and not others. **Keep prefixing build/lint/install commands with `NODE_ENV=development` regardless**: it is free when the variable is unset and essential when it isn't.
 ```
 NODE_ENV=development npm run build
 NODE_ENV=development npx eslint <files>
@@ -33,7 +33,13 @@ NODE_ENV=development npx wrangler deploy --config dist/server/wrangler.json --na
 5. **Never guess at existing schema/RLS** — query `information_schema.columns` and `pg_policies` before writing a migration that touches a table you haven't already inspected this session.
 6. **Git identity on this Mac**: commits use `Codex <codex@veritasvillage.com>` (matches the existing commit history from the AI agent that built the original site) — already configured locally, no action needed.
 7. **Commit messages**: multi-line, explaining *why* not just *what*, especially for RLS changes (state what was previously possible/impossible and what the policy now allows).
-8. **Design system**: plain CSS in `app/globals.css` (no Tailwind components in use despite the import), single ink/clay/paper/sage/mist color palette defined as CSS vars at the top, Georgia serif for headings. Match this exactly — no new frameworks, no inline component libraries.
+8. **Design system**: plain CSS in `app/globals.css`, now formatted one declaration per line (it was 44KB minified onto 80 lines). Tokens live in the `:root` block at the top and **no literal hex belongs anywhere else** — if you need a colour, add or reuse a token.
+   - Palette is the **2026 Edition**: Ink Navy `#0B2A3D`, Parchment Cream `#FAF7F1`, Terracotta `#BB6141`, plus Hill Sage `#6F7D72` retained by Sam's choice. Morning Mist is gone.
+   - **Small text must use `--terracotta-text` / `--sage-text`**, not the raw brand colours — the brand hues are only ~4.0:1 on cream and fail AA below 18.66px bold.
+   - Headings are Playfair Display, UI text is Inter. The guide forbids the display serif for body, captions, labels, or anything under ~20px.
+   - Each portal sets `--portal-accent` / `--portal-band-*` on its root class (`.live-portal`, `.workspace-preview`, `.admin-live`). Add new accented styling by consuming those vars, not by hardcoding terracotta.
+   - `@import "tailwindcss/preflight"` is load-bearing — the stylesheet depends on its reset. Do not remove it. No Tailwind utilities are used.
+9. **Brand assets** live in `public/brand/`. Use the horizontal lockup in headers, stacked in the hero, the cream variant on dark fields, and the compact mark below 64px. Full-resolution masters are outside the repo in `~/Downloads/veritas-village-logo-assets/`.
 
 ## Current state (as of this handoff)
 Everything below is live on `family.veritasvillage.org` right now — nothing is pending/uncommitted.
@@ -42,18 +48,21 @@ Everything below is live on `family.veritasvillage.org` right now — nothing is
 
 **Teacher's Lounge**: a single active-class selector drives the class roster, student notes (with author/class shown, delete-own-note, read receipts), resource/handout uploads, and the "Print queue" print-request feature together — switching class in any one section updates all of them.
 
-**Admin**: a 7-card dashboard (Accounts/Relationships/Classes/Documents/Publishing/Oversight/Configuration) is the default view. Sections: Invitations, Families (parents-first with email/phone, then children, role-assignment chips for teacher/admin), Classes (create/assign teachers/manage enrollment), Documents (upload/edit/delete, signature status), Village news (posts with photo upload), Activity (audit log viewer), Integrations (status tracker for Google Workspace/OpenSign/Facebook/calendar/dues — **tracking only, no live OAuth wired up for any of them yet**).
+**Admin**: a 7-card dashboard (Accounts/Relationships/Classes/Documents/Publishing/Oversight/Configuration) is the default view. Sections: Invitations, Families (parents-first with email/phone, then children, role-assignment chips for teacher/admin), Classes (create/assign teachers/manage enrollment), Documents (upload/edit/delete, signature status, **Send for signature** via OpenSign with per-signer status), Village news (posts with photo upload), Activity (audit log viewer), Integrations (status tracker for Google Workspace/Facebook/calendar/dues — still tracking-only for those; OpenSign is live and its row carries the API base URL).
 
-**Shared**: one `AppHeader` component (logo top-left, portal title, workspace switcher, account menu top-right) used identically across all three portals.
+**Shared**: one `AppHeader` component (the real horizontal lockup top-left, portal title, workspace switcher, account menu top-right) across all three portals. It renders as a full-bleed band whose colour identifies the workspace: cream with a terracotta rule for Family, a sage tint for Teacher, reversed navy with the cream lockup for Admin.
 
 **Auth**: email/password, Google/Apple OAuth (buttons present but **not actually configured** — no OAuth app credentials set up in Supabase yet), and passkeys (WebAuthn, enabled and working). TOTP 2FA available. The login flow checks authenticator-assurance-level and shows a code-challenge screen if 2FA is on.
 
 ## Known gaps / good next steps (raised but not yet built)
 - **Google/Apple OAuth** aren't actually wired up — buttons exist but will error if clicked. Either configure real OAuth apps in the Supabase dashboard, or consider dropping them in favor of passkeys + email/password, which already work.
+- **Dues/payments**: `docs/dues-processor-options.html` compares Stripe, Cheddar Up and Zeffy against the real dues structure. Recommendation is Stripe with ACH as the default method. No payments code exists yet; Sam still owes an actual family count and a board decision on absorbing vs passing on fees.
 - **Homeschool co-op features not yet built**, discussed as good candidates: attendance tracking, parent volunteer-hour tracking, field trip/event RSVP with headcount, per-class supply/curriculum lists, a lending library, carpool coordination, a "closed today" alert banner.
 - **Admin "Publishing" card** doesn't yet cover calendar events (only news posts) — no admin UI exists to create/edit `events` rows yet, despite the family portal displaying them.
-- **Integrations tab** is status-tracking only — actually connecting Google Workspace, OpenSign, or a dues/payment processor is separate, real integration work per service (OAuth flows, webhooks, etc.), not yet started.
-- **MFA/passkey login gating** is only wired up on the Family portal (`/home`) entry point — if someone reaches `/admin` or `/teacher` directly without passing through `/home` first, the 2FA challenge isn't separately enforced there.
+- **Integrations tab** is status-tracking only for every service *except OpenSign*, which is now wired: `opensign-send` and `opensign-webhook` edge functions, a `signature_requests` table, and a **Send for signature** action on each document in Admin → Documents. It needs three things set before it will work — the API base URL in Admin → Integrations, and the `OPENSIGN_API_TOKEN` and `OPENSIGN_WEBHOOK_SECRET` Supabase secrets.
+- ~~**MFA/passkey login gating** only on `/home`~~ — **closed.** `lib/use-portal-access.ts` performs the AAL check for every workspace, and all three portals share `MfaChallengeScreen`.
+- **`public.integration_settings` has never appeared in a migration.** It was created by hand early on, so a fresh `supabase db reset` would not reproduce it. Left alone deliberately rather than guessing at a `create table` that might diverge from the live definition — worth reconciling against production before anyone rebuilds the database from scratch.
+- **OpenSign's `/createdocument` request body is unverified.** Their published `openapi.json` is an unedited Swagger Petstore template and the hosted reference renders client-side, so the exact field names could not be confirmed from source. Everything shape-dependent is isolated in `supabase/functions/_shared/opensign.ts`; confirm against the live reference and correct that one file if a send fails.
 
 ## How to verify a change is really live
 ```
