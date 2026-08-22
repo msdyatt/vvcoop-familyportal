@@ -13,9 +13,8 @@ type Assignment = { class_id: string; assignment_role: string; classes: ClassRow
 type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string };
 type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string; author_name: string; read_count: number };
 type Handout = { id: string; title: string; storage_path: string; class_id: string | null; created_at: string };
-type PrintRequest = { id: string; title: string; quantity: number; status: string; storage_path: string; created_at: string };
-type Homework = { id: string; class_id: string; title: string; instructions: string | null; due_at: string | null; published_at: string | null };
-type ClassEvent = { id: string; class_id: string | null; title: string; description: string | null; starts_at: string; location: string | null };
+type PrintRequest = { id: string; title: string; quantity: number; status: string; storage_path: string; created_at: string; class_id: string | null };
+type ClassEvent = { id: string; class_id: string | null; title: string; description: string | null; starts_at: string; location: string | null; requires_prework: boolean };
 
 async function signOutToEntry() {
   await getSupabaseBrowserClient()?.auth.signOut();
@@ -41,7 +40,6 @@ export default function TeacherWorkspace() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [handouts, setHandouts] = useState<Handout[]>([]);
   const [printQueue, setPrintQueue] = useState<PrintRequest[]>([]);
-  const [homework, setHomework] = useState<Homework[]>([]);
   const [classEvents, setClassEvents] = useState<ClassEvent[]>([]);
   const [openChildId, setOpenChildId] = useState<string | null>(null);
 
@@ -58,13 +56,12 @@ export default function TeacherWorkspace() {
     const classIds = myClasses.map((row) => row.id);
     if (!classIds.length) return;
 
-    const [{ data: enrollments }, { data: noteRows }, { data: handoutRows }, { data: printRows }, { data: homeworkRows }, { data: eventRows }] = await Promise.all([
+    const [{ data: enrollments }, { data: noteRows }, { data: handoutRows }, { data: printRows }, { data: eventRows }] = await Promise.all([
       supabase.from("enrollments").select("child_id,class_id,children(id,first_name,last_name)").in("class_id", classIds).eq("status", "active"),
       supabase.from("teacher_notes").select("id,body,visibility,created_at,child_id,class_id,author_user_id").in("class_id", classIds).order("created_at", { ascending: false }).limit(60),
       supabase.from("documents").select("id,title,storage_path,class_id,created_at").in("class_id", classIds).order("created_at", { ascending: false }),
-      supabase.from("print_requests").select("id,title,quantity,status,storage_path,created_at").eq("requested_by_user_id", uid).order("created_at", { ascending: false }),
-      supabase.from("assignments").select("id,class_id,title,instructions,due_at,published_at").in("class_id", classIds).order("due_at", { ascending: true }),
-      supabase.from("events").select("id,class_id,title,description,starts_at,location").in("class_id", classIds).order("starts_at", { ascending: true }),
+      supabase.from("print_requests").select("id,title,quantity,status,storage_path,created_at,class_id").eq("requested_by_user_id", uid).is("cleared_at", null).order("created_at", { ascending: false }),
+      supabase.from("events").select("id,class_id,title,description,starts_at,location,requires_prework").in("class_id", classIds).order("starts_at", { ascending: true }),
     ]);
     setRoster(((enrollments ?? []) as unknown as { children: { id: string; first_name: string; last_name: string | null }; class_id: string }[])
       .map((row) => ({ ...row.children, class_id: row.class_id })));
@@ -83,7 +80,6 @@ export default function TeacherWorkspace() {
 
     setHandouts((handoutRows ?? []) as Handout[]);
     setPrintQueue((printRows ?? []) as PrintRequest[]);
-    setHomework((homeworkRows ?? []) as Homework[]);
     setClassEvents((eventRows ?? []) as ClassEvent[]);
   }
 
@@ -117,14 +113,16 @@ export default function TeacherWorkspace() {
 
     {classes.length > 0 && <section className="workspace-grid">
       <article className="workspace-nav">
-        <a className="active" href="#classes">Classes</a>
-        <a href="#planning">Homework &amp; dates</a>
+        <a className="active" href="#news">Teaching team news</a>
+        <a href="#classes">Classes</a>
+        <a href="#planning">Class dates</a>
         <a href="#resources">Handouts</a>
         <a href="#lounge">Print queue</a>
-        <a href="#news">Village news</a>
       </article>
 
       <div className="workspace-main">
+        <NewsSection classes={classes} />
+
         {/* One class selection drives the whole page. Every section below is
             scoped to it, so the per-section class dropdowns are gone. */}
         <section id="classes">
@@ -173,9 +171,8 @@ export default function TeacherWorkspace() {
           </div>}
         </section>
 
-        {activeClass && <PlanningSection
-          klass={activeClass} isLead={isLead} userId={userId}
-          homework={homework.filter((row) => row.class_id === activeClassId)}
+        {activeClass && <ClassDatesSection
+          klass={activeClass} isLead={isLead}
           events={classEvents.filter((row) => row.class_id === activeClassId)}
           onSaved={reload}
         />}
@@ -187,10 +184,9 @@ export default function TeacherWorkspace() {
         />}
 
         {activeClass && <PrintSection
-          klass={activeClass} isLead={isLead} userId={userId} queue={printQueue} onSaved={reload}
+          klass={activeClass} isLead={isLead} userId={userId}
+          queue={printQueue} classes={classes} onSaved={reload}
         />}
-
-        <NewsSection classes={classes} />
       </div>
     </section>}
   </main>;
@@ -253,113 +249,101 @@ function StudentNotes({ child, classId, notes, userId, onSaved, onDelete, onClos
   </div>;
 }
 
-/** Homework and one-off class dates, both scoped to the selected class. */
-function PlanningSection({ klass, isLead, userId, homework, events, onSaved }: {
-  klass: ClassRow; isLead: boolean; userId: string;
-  homework: Homework[]; events: ClassEvent[]; onSaved: () => void;
+/**
+ * Class dates: what is being worked on, when, where, and whether families need
+ * to do something first.
+ *
+ * Homework used to be a second form of its own. It is folded in here as a flag,
+ * because a teacher setting the week's topic and a teacher setting pre-work are
+ * the same act -- and a date carrying "prep needed" tells a parent more than a
+ * homework row with a due date does.
+ *
+ * Deliberately date-only. A co-op class has a day, not a start time, and asking
+ * for one produced times nobody meant.
+ */
+function ClassDatesSection({ klass, isLead, events, onSaved }: {
+  klass: ClassRow; isLead: boolean; events: ClassEvent[]; onSaved: () => void;
 }) {
   const [title, setTitle] = useState("");
+  const [on, setOn] = useState("");
+  const [location, setLocation] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [dueAt, setDueAt] = useState("");
+  const [requiresPrework, setRequiresPrework] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventAt, setEventAt] = useState("");
-  const [eventLocation, setEventLocation] = useState("");
-
-  async function addHomework(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
-    if (!supabase || !title.trim()) return;
-    setBusy(true); setStatus("");
-    // published_at is set on purpose -- an unpublished row stays invisible to
-    // families, so "Save as draft" is a real state rather than a label.
-    const { error } = await supabase.from("assignments").insert({
-      class_id: klass.id, title: title.trim(), instructions: instructions.trim() || null,
-      due_at: dueAt ? new Date(dueAt).toISOString() : null,
-      published_at: new Date().toISOString(), created_by: userId,
-    });
-    setBusy(false);
-    if (error) { setStatus(error.message); return; }
-    setTitle(""); setInstructions(""); setDueAt(""); setStatus("Homework published to families.");
-    onSaved();
-  }
-
-  async function addEvent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !eventTitle.trim() || !eventAt) return;
+    if (!supabase || !title.trim() || !on) return;
     setBusy(true); setStatus("");
     const { error } = await supabase.from("events").insert({
-      class_id: klass.id, audience: "class", title: eventTitle.trim(),
-      starts_at: new Date(eventAt).toISOString(), location: eventLocation.trim() || null,
+      class_id: klass.id,
+      audience: "class",
+      title: title.trim(),
+      description: instructions.trim() || null,
+      // Stored at midday UTC so the date cannot slide either side of midnight
+      // when it is read back in Central Time.
+      starts_at: new Date(`${on}T12:00:00Z`).toISOString(),
+      location: location.trim() || null,
+      requires_prework: requiresPrework,
     });
     setBusy(false);
     if (error) { setStatus(error.message); return; }
-    setEventTitle(""); setEventAt(""); setEventLocation(""); setStatus("Date added to the class calendar.");
+    setTitle(""); setOn(""); setLocation(""); setInstructions(""); setRequiresPrework(false);
+    setStatus("Added. Families in this class can see it now.");
     onSaved();
   }
 
-  async function removeHomework(id: string, name: string) {
+  async function remove(id: string, name: string) {
     if (!confirm(`Remove "${name}"? Families will no longer see it.`)) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { error } = await supabase.from("assignments").delete().eq("id", id);
+    const { error } = await supabase.from("events").delete().eq("id", id);
     if (error) { setStatus(error.message); return; }
     onSaved();
   }
 
   return <section id="planning">
-    <p className="card-kicker">Homework &amp; dates</p>
+    <p className="card-kicker">Class dates</p>
     <h2>What&rsquo;s coming up in {klass.title}.</h2>
-    <p className="portal-empty">Anything added here appears in the family portal for the children in this class.</p>
+    <p className="portal-empty">
+      Only the families with a child in {klass.title} see these. They do not go on the co-op calendar.
+    </p>
 
-    {isLead ? <>
-      <form onSubmit={addHomework} className="portal-form">
-        <label><span className="field-caption">Homework</span>
-          <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Read chapters 4–5" disabled={busy} />
-        </label>
-        <label><span className="field-caption">Due</span>
-          <input type="date" value={dueAt} onChange={(event) => setDueAt(event.target.value)} disabled={busy} />
-        </label>
-        <label><span className="field-caption">Instructions <i>optional</i></span>
-          <textarea value={instructions} onChange={(event) => setInstructions(event.target.value)} placeholder="What families should know" disabled={busy} />
-        </label>
-        <button disabled={busy}>{busy ? "Saving…" : "Add homework"}</button>
-      </form>
-
-      <form onSubmit={addEvent} className="portal-form">
-        <label><span className="field-caption">Class date</span>
-          <input required value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} placeholder="Bring a shoebox" disabled={busy} />
-        </label>
-        <label><span className="field-caption">When</span>
-          <input required type="datetime-local" value={eventAt} onChange={(event) => setEventAt(event.target.value)} disabled={busy} />
-        </label>
-        <label><span className="field-caption">Where <i>optional</i></span>
-          <input value={eventLocation} onChange={(event) => setEventLocation(event.target.value)} placeholder="Room 2" disabled={busy} />
-        </label>
-        <button disabled={busy}>{busy ? "Saving…" : "Add class date"}</button>
-        <p className="admin-form-status" role="status">{status}</p>
-      </form>
-    </> : <p className="portal-empty">The lead teacher for {klass.title} sets homework and class dates.</p>}
+    {isLead ? <form onSubmit={submit} className="portal-form">
+      <label><span className="field-caption">What are you working on?</span>
+        <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Rock layers and fossils" disabled={busy} />
+      </label>
+      <label><span className="field-caption">Date</span>
+        <input required type="date" value={on} onChange={(event) => setOn(event.target.value)} disabled={busy} />
+      </label>
+      <label><span className="field-caption">Where <i>optional</i></span>
+        <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Room 2" disabled={busy} />
+      </label>
+      <label><span className="field-caption">Instructions <i>optional</i></span>
+        <textarea value={instructions} onChange={(event) => setInstructions(event.target.value)} placeholder="What families should know, or what to bring" disabled={busy} />
+      </label>
+      <label className="checkbox-field">
+        <input type="checkbox" checked={requiresPrework} onChange={(event) => setRequiresPrework(event.target.checked)} />
+        Families need to do something before this class
+      </label>
+      <button disabled={busy}>{busy ? "Saving…" : "Add class date"}</button>
+      <p className="admin-form-status" role="status">{status}</p>
+    </form> : <p className="portal-empty">The lead teacher for {klass.title} sets class dates.</p>}
 
     <div className="portal-stack">
-      {homework.map((row) => <div key={row.id} className="teacher-class">
-        <div>
-          <b>{row.title}</b>
-          <span>{row.due_at ? `Due ${formatDay(row.due_at)}` : "No due date"}{row.instructions ? ` · ${row.instructions}` : ""}</span>
-        </div>
-        {isLead && <button className="danger" onClick={() => removeHomework(row.id, row.title)}>Remove</button>}
-      </div>)}
       {events.map((row) => <div key={row.id} className="teacher-class">
         <div>
           <b>{row.title}</b>
-          <span>{formatDay(row.starts_at)}{row.location ? ` · ${row.location}` : ""}</span>
+          <span>{[formatDay(row.starts_at), row.location, row.description].filter(Boolean).join(" · ")}</span>
         </div>
-        <span className="status-pill pending">Class date</span>
+        <div className="row-actions">
+          {row.requires_prework && <span className="status-pill outstanding">Prep needed</span>}
+          {isLead && <button className="danger" onClick={() => remove(row.id, row.title)}>Remove</button>}
+        </div>
       </div>)}
-      {!homework.length && !events.length && <p className="portal-empty">Nothing scheduled for {klass.title} yet.</p>}
+      {!events.length && <p className="portal-empty">Nothing scheduled for {klass.title} yet.</p>}
     </div>
   </section>;
 }
@@ -419,8 +403,9 @@ function ResourcesSection({ klass, isLead, userId, handouts, onSaved }: {
   </section>;
 }
 
-function PrintSection({ klass, isLead, userId, queue, onSaved }: {
-  klass: ClassRow; isLead: boolean; userId: string; queue: PrintRequest[]; onSaved: () => void;
+function PrintSection({ klass, isLead, userId, queue, classes, onSaved }: {
+  klass: ClassRow; isLead: boolean; userId: string;
+  queue: PrintRequest[]; classes: ClassRow[]; onSaved: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -448,9 +433,11 @@ function PrintSection({ klass, isLead, userId, queue, onSaved }: {
     onSaved();
   }
 
+  const classTitle = (id: string | null) => classes.find((row) => row.id === id)?.title;
+
   return <section id="lounge">
     <p className="card-kicker">Print queue</p>
-    <h2>Send something to be printed.</h2>
+    <h2>Printing for {klass.title}.</h2>
 
     {isLead ? <form onSubmit={submit} className="portal-form">
       <label><span className="field-caption">What is it?</span>
@@ -463,18 +450,27 @@ function PrintSection({ klass, isLead, userId, queue, onSaved }: {
         <input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} />
       </label>
       <label className="checkbox-field">
-        <input type="checkbox" checked={forThisClass} onChange={(event) => setForThisClass(event.target.checked)} /> This printing is for {klass.title}
+        <input type="checkbox" checked={forThisClass} onChange={(event) => setForThisClass(event.target.checked)} />
+        This printing is for {klass.title}
       </label>
-      <button disabled={busy}>{busy ? "Sending…" : "Send to print queue"}</button>
+      <button disabled={busy}>{busy ? "Sending…" : `Send to print queue`}</button>
       <p className="admin-form-status" role="status">{status}</p>
     </form> : <p className="portal-empty">The lead teacher for {klass.title} sends print requests.</p>}
 
+    {/* The list is everything this teacher has queued, across every class --
+        not just the selected one. Someone printing for three classes needs to
+        see the whole pile in one place, each row saying which class it is for. */}
     <div className="print-queue">
+      <p className="card-kicker">Everything you have queued</p>
       {queue.map((item) => <div className="print-item" key={item.id}>
-        <div><b>{item.title}</b><span>{item.quantity} copies · requested {formatDay(item.created_at)}</span></div>
+        <div>
+          <b>{item.title}</b>
+          <span>{[classTitle(item.class_id) ?? "Not class-specific", `${item.quantity} copies`, `requested ${formatDay(item.created_at)}`].join(" · ")}</span>
+        </div>
         <span className={`status-pill ${item.status}`}>{item.status}</span>
       </div>)}
       {!queue.length && <p className="portal-empty">Nothing in your print queue.</p>}
+      <p className="print-queue-note">The queue empties early on Sunday morning, after co-op day.</p>
     </div>
   </section>;
 }

@@ -2486,8 +2486,9 @@ footer {
 }
 
 .row-actions button.danger {
+  background:transparent;
   color:var(--terracotta-deep);
-  border-color:var(--terracotta);
+  border:1px solid var(--terracotta);
 }
 
 .row-actions button.danger:hover {
@@ -2665,7 +2666,7 @@ footer {
 }
 
 .status-pill.printed {
-  background:var(--sage);
+  background:var(--sage-text);
   color:white;
 }
 
@@ -3685,7 +3686,7 @@ footer {
 }
 
 .status-pill.signed {
-  background:var(--sage);
+  background:var(--sage-text);
   color:var(--cream);
 }
 
@@ -3744,7 +3745,7 @@ footer {
   width:38px;
   height:38px;
   flex-shrink:0;
-  background:var(--terracotta);
+  background:var(--terracotta-text);
   color:var(--cream);
   font:600 17px var(--sans);
   border-radius:50%;
@@ -3858,12 +3859,12 @@ footer {
 
 /* Status pills for the compliance lifecycle. */
 .status-pill.outstanding {
-  background:var(--terracotta);
+  background:var(--terracotta-text);
   color:var(--cream);
 }
 
 .status-pill.complete {
-  background:var(--sage);
+  background:var(--sage-text);
   color:var(--cream);
 }
 
@@ -3988,9 +3989,9 @@ footer {
   cursor:pointer;
 }
 
-.matrix-cell.outstanding { background:var(--terracotta); color:var(--cream); }
+.matrix-cell.outstanding { background:var(--terracotta-text); color:var(--cream); }
 .matrix-cell.pending     { background:var(--warm-tint); color:var(--terracotta-deep); }
-.matrix-cell.complete    { background:var(--sage); color:var(--cream); }
+.matrix-cell.complete    { background:var(--sage-text); color:var(--cream); }
 .matrix-cell.waived      { background:rgba(var(--navy-rgb),.08); color:var(--sage-text); }
 .matrix-cell.missing     { background:transparent; color:var(--sage-text); border:1px dashed rgba(var(--navy-rgb),.28); }
 
@@ -4198,3 +4199,47 @@ footer {
 .prose-body { white-space:pre-wrap; }
 
 .compliance-note { margin-bottom:10px; }
+
+.print-queue-note {
+  margin:4px 0 0;
+  color:var(--sage-text);
+  font-size:12px;
+  font-style:italic;
+}
+
+/* A class date needing action before the day. Loud on purpose -- a parent
+   scanning the list has to catch it before turning up without the shoebox. */
+.portal-list .prep-flag {
+  justify-self:start;
+  margin-top:3px;
+  padding:3px 8px;
+  background:var(--terracotta-text);
+  color:var(--cream);
+  font:600 10px var(--sans);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  border-radius:2px;
+}
+
+/* A checkbox is not a captioned field. Without this it inherits
+   `.portal-form label` -- a two-row grid in uppercase 12px -- and the box ends
+   up stranded above a shouting caption. */
+.portal-form .checkbox-field {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  align-self:end;
+  padding-bottom:11px;
+  color:var(--navy);
+  font:400 14px var(--sans);
+  letter-spacing:0;
+  text-transform:none;
+}
+
+.portal-form .checkbox-field input[type=checkbox] {
+  width:17px;
+  height:17px;
+  flex-shrink:0;
+  accent-color:var(--portal-accent);
+  cursor:pointer;
+}

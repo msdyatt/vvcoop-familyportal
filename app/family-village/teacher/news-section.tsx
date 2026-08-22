@@ -10,13 +10,12 @@ type Post = {
 };
 
 /**
- * Village news, read-only.
+ * News for the teaching team, read-only.
  *
- * Administrators could already publish to a `teachers` audience but the Lounge
- * had nowhere to show it, so those posts were written and never seen. No policy
- * change was needed: posts_read already narrows a teacher to the `teachers`
- * audience plus `class` posts for classes they teach, so this query returns
- * exactly what they are entitled to without filtering here.
+ * Deliberately narrowed to the `teachers` audience and `class` posts for the
+ * teacher's own classes. RLS would also return `public` and `families` posts,
+ * but a teacher opening the Lounge wants what concerns them teaching, not the
+ * whole co-op's noticeboard -- they see that in the family portal already.
  */
 export default function NewsSection({ classes }: { classes: { id: string; title: string }[] }) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -30,6 +29,7 @@ export default function NewsSection({ classes }: { classes: { id: string; title:
       .from("posts")
       .select("id,title,body,audience,class_id,published_at")
       .not("published_at", "is", null)
+      .in("audience", ["teachers", "class"])
       .order("published_at", { ascending: false })
       .limit(20);
     setPosts((data ?? []) as Post[]);
@@ -63,7 +63,7 @@ export default function NewsSection({ classes }: { classes: { id: string; title:
           </div>
         </li>)}
       </ol>
-      : <p className="portal-empty">No news has been published yet.</p>}
+      : <p className="portal-empty">Nothing for the teaching team right now. Co-op-wide news is in your family portal.</p>}
 
     {open && <DetailModal title={open.title} onClose={() => setOpenId(null)}>
       <p className="portal-empty compliance-note">
