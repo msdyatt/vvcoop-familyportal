@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 
 type ClassInfo = { id: string; title: string; meeting_time: string | null; teachers: string[] };
-type AssignmentInfo = { id: string; title: string; due_at: string | null; class_title: string };
+type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string };
 type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
 
 type ChildRecord = { id: string; first_name: string; last_name: string | null };
@@ -12,7 +12,7 @@ type ChildRecord = { id: string; first_name: string; last_name: string | null };
 export default function ChildDetail({ childId, onClose }: { childId: string; onClose: () => void }) {
   const [child, setChild] = useState<ChildRecord | null>(null);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentInfo[]>([]);
+  const [classDates, setClassDates] = useState<ClassDateInfo[]>([]);
   const [notes, setNotes] = useState<NoteInfo[]>([]);
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -66,8 +66,15 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
 
     const classIds = classInfos.map((info) => info.id);
     if (classIds.length) {
-      const { data: assignmentRows } = await supabase.from("assignments").select("id,title,due_at,class_id,classes(title)").in("class_id", classIds).order("due_at", { ascending: true }).limit(10);
-      setAssignments(((assignmentRows ?? []) as unknown as { id: string; title: string; due_at: string | null; classes: { title: string } }[]).map((row) => ({ id: row.id, title: row.title, due_at: row.due_at, class_title: row.classes?.title ?? "" })));
+      // Class dates replaced assignments -- one entry carries the topic, the
+      // date and whether anything is needed beforehand.
+      const { data: dateRows } = await supabase.from("events")
+        .select("id,title,starts_at,location,requires_prework,class_id,classes(title)")
+        .eq("audience", "class").in("class_id", classIds)
+        .gte("starts_at", new Date().toISOString())
+        .order("starts_at", { ascending: true }).limit(10);
+      setClassDates(((dateRows ?? []) as unknown as { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; classes: { title: string } }[])
+        .map((row) => ({ id: row.id, title: row.title, starts_at: row.starts_at, location: row.location, requires_prework: row.requires_prework, class_title: row.classes?.title ?? "" })));
     }
     setLoading(false);
   }
@@ -111,8 +118,14 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         </section>
 
         <section>
-          <p className="card-kicker">Assignments</p>
-          {assignments.length ? <ul className="child-detail-list">{assignments.map((row) => <li key={row.id}><b>{row.title}</b><span>{row.class_title}{row.due_at ? ` · Due ${new Date(row.due_at).toLocaleDateString()}` : ""}</span></li>)}</ul> : <p className="portal-empty">No assignments right now.</p>}
+          <p className="card-kicker">Coming up in class</p>
+          {classDates.length
+            ? <ul className="child-detail-list">{classDates.map((row) => <li key={row.id}>
+                <b>{row.title}</b>
+                <span>{[row.class_title, new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }), row.location].filter(Boolean).join(" · ")}</span>
+                {row.requires_prework && <span className="prep-flag">Something to do before class</span>}
+              </li>)}</ul>
+            : <p className="portal-empty">Nothing scheduled in this child&rsquo;s classes right now.</p>}
         </section>
 
         <section>

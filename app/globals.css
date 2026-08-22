@@ -4243,3 +4243,17 @@ footer {
   accent-color:var(--portal-accent);
   cursor:pointer;
 }
+
+/* The prep flag also appears in the child detail list, which styles its spans
+   the same way the portal list does -- so it needs the same weight there. */
+.child-detail-list .prep-flag {
+  display:inline-block;
+  margin-top:4px;
+  padding:3px 8px;
+  background:var(--terracotta-text);
+  color:var(--cream);
+  font:600 10px var(--sans);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  border-radius:2px;
+}
