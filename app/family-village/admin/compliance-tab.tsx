@@ -44,7 +44,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
     if (!activeYear) { setRequirements([]); setRows([]); setLoading(false); return; }
 
     const [{ data: reqRows }, { data: familyRows }, { data: docRows }] = await Promise.all([
-      supabase.from("requirements").select("id,school_year_id,kind,title,description,active,sort_order,document_id,amount_per_family,amount_per_child,payment_url,due_on")
+      supabase.from("requirements").select("id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,amount_per_family,amount_per_child,payment_url,due_on")
         .eq("school_year_id", activeYear).order("sort_order").order("title"),
       supabase.from("families").select("id,display_name,children(id,active),family_members(user_id,profiles(email,display_name,status))").order("display_name"),
       // Candidates to attach to a document requirement -- anything with a file.
@@ -260,13 +260,16 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
                 <b>{req.title}</b>
                 <span>{req.kind === "dues"
                   ? `${formatMoney(Number(req.amount_per_family ?? 0))} per family + ${formatMoney(Number(req.amount_per_child ?? 0))} per child`
-                  : req.document_id
-                    ? `Signature required · ${documents.find((d) => d.id === req.document_id)?.title ?? "document attached"}`
-                    : "Signature required · no document attached yet"} · open to {opened} of {families.length}</span>
+                  : req.public_sign_url
+                    ? "Signature required · shared OpenSign link"
+                    : req.document_id
+                      ? `Signature required · ${documents.find((d) => d.id === req.document_id)?.title ?? "document attached"}`
+                      : "Signature required · no signing link or document yet"} · open to {opened} of {families.length}</span>
               </div>
               <div className="row-actions">
                 {opened < families.length && <button onClick={() => openToAllFamilies(req)}>Open to all families</button>}
                 {req.kind === "dues" && opened > 0 && <button onClick={() => recalculateDues(req)}>Recalculate balances</button>}
+                {req.kind === "document" && <PublicSignLink requirement={req} onSaved={load} onStatus={setStatus} />}
                 {req.kind === "document" && <AttachDocument requirement={req} documents={documents} onSaved={load} onStatus={setStatus} />}
                 {req.kind === "document" && req.document_id && <button onClick={() => sendToAllFamilies(req)}>Create signing links for all</button>}
               </div>
@@ -343,6 +346,52 @@ function YearForm({ onSaved, onStatus }: { onSaved: () => void; onStatus: (messa
     </label>
     <button disabled={busy}>{busy ? "Adding…" : "Add year"}</button>
   </form>;
+}
+
+/**
+ * The co-op's shared OpenSign public template link for this requirement.
+ *
+ * Every family gets the same link, so no per-family send is needed and no
+ * signature allowance is drawn per household. The cost is that a public template
+ * asks signers to type their own name and email, so a completed signature is not
+ * inherently tied to a household -- an administrator confirms completion here.
+ */
+function PublicSignLink({ requirement, onSaved, onStatus }: {
+  requirement: Requirement;
+  onSaved: () => void;
+  onStatus: (message: string) => void;
+}) {
+  const [value, setValue] = useState(requirement.public_sign_url ?? "");
+  const [editing, setEditing] = useState(false);
+
+  async function save() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const trimmed = value.trim();
+    if (trimmed && !/^https:\/\//i.test(trimmed)) { onStatus("A signing link must start with https://"); return; }
+    const { error } = await supabase.from("requirements").update({ public_sign_url: trimmed || null }).eq("id", requirement.id);
+    if (error) { onStatus(error.message); return; }
+    setEditing(false);
+    onStatus(trimmed ? `Signing link saved for "${requirement.title}".` : `Signing link removed from "${requirement.title}".`);
+    onSaved();
+  }
+
+  if (!editing) {
+    return <button onClick={() => setEditing(true)}>
+      {requirement.public_sign_url ? "Edit signing link" : "Add signing link"}
+    </button>;
+  }
+
+  return <span className="inline-edit">
+    <input
+      aria-label={`Signing link for ${requirement.title}`}
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+      placeholder="https://app.opensignlabs.com/publicsign?templateid=…"
+    />
+    <button onClick={save}>Save</button>
+    <button className="ghost" onClick={() => { setValue(requirement.public_sign_url ?? ""); setEditing(false); }}>Cancel</button>
+  </span>;
 }
 
 /** Links a stored PDF to a document requirement, so it can be sent for signature. */

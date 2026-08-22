@@ -4076,3 +4076,27 @@ footer {
 .admin-live .app-header .eyebrow {
   color:var(--terracotta-on-navy);
 }
+
+/* Inline edit affordance in the compliance requirement rows. */
+.inline-edit {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.inline-edit input {
+  min-width:min(340px,60vw);
+  padding:9px 11px;
+  background:var(--surface);
+  color:var(--navy);
+  font:14px var(--sans);
+  border:1px solid rgba(var(--navy-rgb),.2);
+  border-radius:2px;
+}
+
+.compliance-requirement .row-actions button.ghost {
+  background:transparent;
+  color:var(--navy);
+  border:1px solid rgba(var(--navy-rgb),.3);
+}

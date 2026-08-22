@@ -83,12 +83,15 @@ function ComplianceRow({ item }: { item: ComplianceItem }) {
       {!settled && isDues && requirement.payment_url &&
         <a className="compliance-cta" href={requirement.payment_url} target="_blank" rel="noreferrer">Pay now ↗</a>}
 
-      {!settled && !isDues && row.signing_url &&
-        <a className="compliance-cta" href={row.signing_url} target="_blank" rel="noreferrer">Sign now ↗</a>}
+      {/* Two ways a document can be signed. A per-family link from an API send
+          takes precedence when one exists, because it is tied to this household;
+          otherwise the co-op's shared public template link is used. Both open in
+          a new tab -- OpenSign's signing page fetches inside an iframe but
+          renders nothing, so embedding it would show families an empty box. */}
+      {!settled && !isDues && (row.signing_url || requirement.public_sign_url) &&
+        <a className="compliance-cta" href={(row.signing_url ?? requirement.public_sign_url)!} target="_blank" rel="noreferrer">Sign now ↗</a>}
 
-      {/* Signing happens in the portal, not over email, so when no link exists
-          yet the honest thing to say is that it is coming here. */}
-      {!settled && !isDues && !row.signing_url &&
+      {!settled && !isDues && !row.signing_url && !requirement.public_sign_url &&
         <span className="compliance-hint">A signing link will appear here shortly.</span>}
 
       {settled && !isDues && row.signed_document_id &&

@@ -17,6 +17,8 @@ export type Requirement = {
   active: boolean;
   sort_order: number;
   document_id: string | null;
+  /** OpenSign public template link, shared by every family. */
+  public_sign_url: string | null;
   amount_per_family: number | null;
   amount_per_child: number | null;
   payment_url: string | null;
