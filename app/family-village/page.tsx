@@ -11,7 +11,7 @@ export default function FamilyVillageSignIn() {
   return <main className="portal-entry">
     <Link className="portal-back" href="/">← Return to Veritas Village</Link>
     <section className="portal-entry-card">
-      <div className="portal-entry-brand"><Image src="/veritas-approved-lockup.png" alt="Veritas Village" width={1536} height={1024} priority /></div>
+      <div className="portal-entry-brand"><Image src="/brand/lockup-horizontal-navy.png" alt="Veritas Village" width={900} height={310} priority /></div>
       <p className="eyebrow">Invitation-only family portal</p>
       <h1>Everything your family<br/><em>needs for the week.</em></h1>
       <p className="portal-entry-copy">Family Village brings classes, teacher notes, announcements, calendars, photographs, and signed documents together in one private place.</p>

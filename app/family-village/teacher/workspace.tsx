@@ -89,7 +89,7 @@ export default function TeacherWorkspace() {
   return <main className="workspace-preview">
     <AppHeader current="teacher" roles={roles} title="Teacher’s Lounge" subtitle="Your classes, roster, and resources in one place." />
     <div className="preview-banner"><b>Only your assigned classes are shown.</b> Families and students outside your roster stay private.</div>
-    {!classes.length && <p style={{ marginTop: 24 }}>No classes are assigned to you yet. A Village administrator can assign you to a class.</p>}
+    {!classes.length && <p className="portal-empty portal-empty-standalone">No classes are assigned to you yet. A Village administrator can assign you to a class.</p>}
     {classes.length > 0 && <section className="workspace-grid">
       <article className="workspace-nav"><a className="active" href="#classes">Classes</a><a href="#notes">Student notes</a><a href="#resources">Resources</a><a href="#lounge">Print queue</a></article>
       <div className="workspace-main">
@@ -137,14 +137,14 @@ function NotesSection({ classId, onClassChange, classes, roster, notes, userId, 
 
   return <section id="notes"><p className="card-kicker">Student notes</p><h2>Thoughtful, controlled communication.</h2>
     <div className="note-rules"><span>Family visible</span><span>Teaching team only</span><span>Administrators only</span></div>
-    <form onSubmit={submit} className="editor-placeholder">
-      <label>Class<select value={classId} onChange={(event) => { onClassChange(event.target.value); setChildId(""); }}>{classes.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select></label>
-      <label>Student<select required value={childId} onChange={(event) => setChildId(event.target.value)}><option value="">Choose a student</option>{childrenInClass.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name}</option>)}</select></label>
-      <label>Note<textarea required value={body} onChange={(event) => setBody(event.target.value)} placeholder="Progress, behavior, or a note home" disabled={busy} /></label>
-      <label>Visible to<select value={visibility} onChange={(event) => setVisibility(event.target.value)}><option value="family">Family</option><option value="teachers">Teaching team only</option><option value="admins">Administrators only</option></select></label>
+    <form onSubmit={submit} className="portal-form">
+      <label><span className="field-caption">Class</span><select value={classId} onChange={(event) => { onClassChange(event.target.value); setChildId(""); }}>{classes.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select></label>
+      <label><span className="field-caption">Student</span><select required value={childId} onChange={(event) => setChildId(event.target.value)}><option value="">Choose a student</option>{childrenInClass.map((child) => <option key={child.id} value={child.id}>{child.first_name} {child.last_name}</option>)}</select></label>
+      <label><span className="field-caption">Note</span><textarea required value={body} onChange={(event) => setBody(event.target.value)} placeholder="Progress, behavior, or a note home" disabled={busy} /></label>
+      <label><span className="field-caption">Visible to</span><select value={visibility} onChange={(event) => setVisibility(event.target.value)}><option value="family">Family</option><option value="teachers">Teaching team only</option><option value="admins">Administrators only</option></select></label>
       <button disabled={busy}>{busy ? "Saving…" : "Save note"}</button>
     </form>
-    <div style={{ marginTop: 20, display: "grid", gap: 10 }}>
+    <div className="portal-stack">
       {notes.filter((note) => note.class_id === classId).map((note) => <div key={note.id} className="note-card">
         <span className="note-meta"><b>{roster.find((child) => child.id === note.child_id)?.first_name}</b> · {note.author_name} · {note.visibility} · {new Date(note.created_at).toLocaleDateString()}{note.read_count > 0 ? ` · Read by ${note.read_count}` : ""}</span>
         <p>{note.body}</p>
@@ -182,16 +182,16 @@ function ResourcesSection({ classId, onClassChange, classes, handouts, userId, o
   }
 
   return <section id="resources"><p className="card-kicker">Resources</p><h2>Handouts families and students can find.</h2>
-    <form onSubmit={submit} className="editor-placeholder">
-      <label>Class<select value={classId} onChange={(event) => onClassChange(event.target.value)}>{classes.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select></label>
-      <label>Title<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Week 4 spelling list" disabled={busy} /></label>
-      <label className="file-drop">File<input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} /></label>
+    <form onSubmit={submit} className="portal-form">
+      <label><span className="field-caption">Class</span><select value={classId} onChange={(event) => onClassChange(event.target.value)}>{classes.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select></label>
+      <label><span className="field-caption">Title</span><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Week 4 spelling list" disabled={busy} /></label>
+      <label className="file-drop"><span className="field-caption">File</span><input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} /></label>
       <button disabled={busy}>{busy ? "Uploading…" : "Post handout"}</button>
       <p className="admin-form-status" role="status">{status}</p>
     </form>
-    <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
+    <div className="portal-stack portal-stack-tight">
       {handouts.filter((handout) => handout.class_id === classId).map((handout) => <div key={handout.id} className="teacher-class"><div><b>{handout.title}</b><span>{new Date(handout.created_at).toLocaleDateString()}</span></div><button onClick={() => download(handout.storage_path)}>Open</button></div>)}
-      {!handouts.filter((handout) => handout.class_id === classId).length && <p>No handouts posted yet.</p>}
+      {!handouts.filter((handout) => handout.class_id === classId).length && <p className="portal-empty">No handouts posted yet.</p>}
     </div>
   </section>;
 }
@@ -217,17 +217,17 @@ function LoungeSection({ classId, onClassChange, classes, queue, userId, onSaved
   }
 
   return <section id="lounge"><p className="card-kicker">Print queue</p><h2>Send something to be printed.</h2>
-    <form onSubmit={submit} className="editor-placeholder">
-      <label>Class <span>this is what the printing is for</span><select value={classId} onChange={(event) => onClassChange(event.target.value)}><option value="">Not class-specific</option>{classes.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select></label>
-      <label>What is it?<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Friday worksheet packet" disabled={busy} /></label>
-      <label>Copies needed<input required type="number" min={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} disabled={busy} /></label>
-      <label className="file-drop">File to print<input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} /></label>
+    <form onSubmit={submit} className="portal-form">
+      <label><span className="field-caption">Class <i>what the printing is for</i></span><select value={classId} onChange={(event) => onClassChange(event.target.value)}><option value="">Not class-specific</option>{classes.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select></label>
+      <label><span className="field-caption">What is it?</span><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Friday worksheet packet" disabled={busy} /></label>
+      <label><span className="field-caption">Copies needed</span><input required type="number" min={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} disabled={busy} /></label>
+      <label className="file-drop"><span className="field-caption">File to print</span><input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} /></label>
       <button disabled={busy}>{busy ? "Sending…" : "Send to print queue"}</button>
       <p className="admin-form-status" role="status">{status}</p>
     </form>
     <div className="print-queue">
       {queue.map((item) => <div className="print-item" key={item.id}><div><b>{item.title}</b><span>{item.quantity} copies · requested {new Date(item.created_at).toLocaleDateString()}</span></div><span className={`status-pill ${item.status}`}>{item.status}</span></div>)}
-      {!queue.length && <p>Nothing in your print queue.</p>}
+      {!queue.length && <p className="portal-empty">Nothing in your print queue.</p>}
     </div>
   </section>;
 }

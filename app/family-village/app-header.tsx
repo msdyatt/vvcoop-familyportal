@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import PortalNav from "./portal-nav";
@@ -45,9 +46,18 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
 
   return <>
     <header className="app-header">
-      <a href="/family-village/home" className="app-header-brand">
-        <span className="app-header-logo">VV</span>
-        <span className="app-header-wordmark">Veritas Village</span>
+      <a href="/family-village/home" className="app-header-brand" aria-label="Veritas Village home">
+        {/* The guide's own navigation-bar example uses the primary horizontal
+            lockup, and pairs the cream variant with dark fields -- which is
+            Admin's navy band. Rendered at 150px wide, above its 120px minimum. */}
+        <Image
+          className="app-header-lockup"
+          src={current === "admin" ? "/brand/lockup-horizontal-cream.png" : "/brand/lockup-horizontal-navy.png"}
+          alt="Veritas Village"
+          width={900}
+          height={310}
+          priority
+        />
       </a>
       <div className="app-header-title"><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
       <div className="app-header-actions">
