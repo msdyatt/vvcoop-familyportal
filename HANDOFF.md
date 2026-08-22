@@ -18,6 +18,23 @@ NODE_ENV=development npx eslint <files>
 NODE_ENV=development npx wrangler deploy --config dist/server/wrangler.json --name veritas-village dist/server/index.js
 ```
 
+## The site is password protected -- keep it that way
+The public site sits behind a shared password enforced in `worker/site-password.ts`,
+ahead of the app router so no route can bypass it. **Sam has asked that this stay on
+until he explicitly asks for it to be removed.**
+
+It reads the `SITE_PASSWORD` and `SITE_AUTH_SECRET` worker secrets and **fails closed** --
+missing either one returns 503 rather than serving publicly. `/family-village` is exempt
+because it has its own Supabase auth; gating it too would mean two credentials for one
+household.
+
+History worth knowing: those secrets existed on the worker for a long time while *nothing
+in the repo read them*. The gate lived only in an uncommitted deployed build, so the first
+`wrangler deploy` from this repo silently replaced it and the site went public. That is why
+it is in version control now. Do not "simplify" the guard call out of `worker/index.ts`.
+
+To test locally, put throwaway values in `.dev.vars` (gitignored) -- never the real password.
+
 ## Deploy command (exact)
 ```
 npm run build
