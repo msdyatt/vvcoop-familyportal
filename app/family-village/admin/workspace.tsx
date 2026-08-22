@@ -10,10 +10,11 @@ import ClassesTab from "./classes-tab";
 import IntegrationsTab from "./integrations-tab";
 import DocumentsTab from "./documents-tab";
 import ActivityTab from "./activity-tab";
+import ComplianceTab from "./compliance-tab";
 import AdminDashboard from "./dashboard";
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-type Tab = "dashboard" | "invitations" | "families" | "classes" | "documents" | "news" | "activity" | "integrations";
+type Tab = "dashboard" | "invitations" | "families" | "classes" | "documents" | "compliance" | "news" | "activity" | "integrations";
 
 async function signOutToEntry() {
   await getSupabaseBrowserClient()?.auth.signOut();
@@ -41,6 +42,7 @@ export default function AdminWorkspace() {
       <button className={tab === "families" ? "active" : ""} onClick={() => setTab("families")}>Families</button>
       <button className={tab === "classes" ? "active" : ""} onClick={() => setTab("classes")}>Classes</button>
       <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>Documents</button>
+      <button className={tab === "compliance" ? "active" : ""} onClick={() => setTab("compliance")}>Compliance</button>
       <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>Village news</button>
       <button className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}>Activity</button>
       <button className={tab === "integrations" ? "active" : ""} onClick={() => setTab("integrations")}>Integrations</button>
@@ -56,6 +58,7 @@ export default function AdminWorkspace() {
     {tab === "families" && <FamiliesTab actorUserId={userId} />}
     {tab === "classes" && <ClassesTab />}
     {tab === "documents" && <DocumentsTab actorUserId={userId} />}
+    {tab === "compliance" && <ComplianceTab actorUserId={userId} />}
     {tab === "news" && <NewsTab actorUserId={userId} />}
     {tab === "activity" && <ActivityTab />}
     {tab === "integrations" && <IntegrationsTab actorUserId={userId} />}

@@ -3715,3 +3715,359 @@ footer {
   margin:10px 0 0;
   color:var(--sage-text);
 }
+
+/* ===========================================================================
+   Family compliance -- required documents and dues
+   =========================================================================== */
+
+/* Sits under the header and only exists when something is outstanding. A banner
+   that is always on screen stops being read, so it is absent when up to date. */
+.compliance-banner {
+  display:flex;
+  align-items:center;
+  gap:18px;
+  flex-wrap:wrap;
+  margin-bottom:28px;
+  padding:16px 20px;
+  background:var(--warm-tint);
+  border-left:4px solid var(--terracotta);
+}
+
+.compliance-banner-count {
+  display:grid;
+  place-items:center;
+  width:38px;
+  height:38px;
+  flex-shrink:0;
+  background:var(--terracotta);
+  color:var(--cream);
+  font:600 17px var(--sans);
+  border-radius:50%;
+}
+
+.compliance-banner div {
+  display:grid;
+  gap:3px;
+  flex:1;
+  min-width:200px;
+}
+
+.compliance-banner b {
+  color:var(--terracotta-deep);
+  font:600 15px var(--sans);
+}
+
+.compliance-banner span {
+  color:var(--sage-text);
+  font-size:13px;
+}
+
+.compliance-banner a {
+  color:var(--terracotta-deep);
+  font-size:13px;
+  font-weight:600;
+  white-space:nowrap;
+}
+
+.compliance-list {
+  display:grid;
+  gap:10px;
+  margin:0;
+  padding:0;
+}
+
+.compliance-item {
+  display:flex;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+  padding:16px 18px;
+  background:var(--surface);
+  border:1px solid rgba(var(--navy-rgb),.12);
+}
+
+/* Outstanding items carry a terracotta edge and a warm ground; settled ones
+   recede so the eye lands on what is left to do. */
+.compliance-item.outstanding {
+  background:var(--warm-tint);
+  border-color:transparent;
+  border-left:3px solid var(--terracotta);
+}
+
+.compliance-item.settled {
+  border-left:3px solid var(--sage);
+}
+
+.compliance-item-main {
+  display:grid;
+  gap:3px;
+  flex:1;
+  min-width:210px;
+}
+
+.compliance-item-main b {
+  color:var(--navy);
+  font:600 16px var(--sans);
+}
+
+.compliance-item-main span {
+  color:var(--sage-text);
+  font-size:13px;
+}
+
+.compliance-amount {
+  font-variant-numeric:tabular-nums;
+  font-weight:600;
+}
+
+.compliance-due { color:var(--terracotta-deep); }
+
+.compliance-note { font-style:italic; }
+
+.compliance-item-action { display:flex; align-items:center; }
+
+.compliance-cta {
+  display:inline-block;
+  padding:9px 15px;
+  background:var(--navy);
+  color:var(--cream);
+  font:600 13px var(--sans);
+  text-decoration:none;
+  border:0;
+  border-radius:2px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+.compliance-cta.ghost {
+  background:transparent;
+  color:var(--navy);
+  border:1px solid rgba(var(--navy-rgb),.3);
+}
+
+.compliance-hint {
+  color:var(--sage-text);
+  font-size:12px;
+  font-style:italic;
+}
+
+/* Status pills for the compliance lifecycle. */
+.status-pill.outstanding {
+  background:var(--terracotta);
+  color:var(--cream);
+}
+
+.status-pill.complete {
+  background:var(--sage);
+  color:var(--cream);
+}
+
+.status-pill.waived {
+  background:rgba(var(--navy-rgb),.1);
+  color:var(--sage-text);
+}
+
+/* --- Admin compliance matrix ---------------------------------------------- */
+.compliance-toolbar {
+  display:flex;
+  align-items:flex-end;
+  gap:24px;
+  flex-wrap:wrap;
+  margin-bottom:6px;
+}
+
+.compliance-toolbar label {
+  display:grid;
+  grid-template-rows:auto 1fr;
+  gap:7px;
+  color:var(--sage-text);
+  font-size:12px;
+  font-weight:700;
+  text-transform:uppercase;
+}
+
+.compliance-toolbar select {
+  padding:10px 12px;
+  background:var(--surface-sunken);
+  color:var(--navy);
+  font:15px var(--sans);
+  border:1px solid rgba(var(--navy-rgb),.18);
+}
+
+.compliance-summary {
+  margin:0 0 8px;
+  color:var(--sage-text);
+  font-size:15px;
+}
+
+.compliance-summary b {
+  color:var(--navy);
+  font-variant-numeric:tabular-nums;
+}
+
+.compliance-form {
+  margin-top:14px;
+  padding:16px;
+  background:var(--surface);
+  border:1px solid rgba(var(--navy-rgb),.12);
+}
+
+.compliance-requirements {
+  display:grid;
+  gap:10px;
+  margin:22px 0;
+}
+
+.compliance-requirement {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+  padding:14px 16px;
+  background:var(--panel);
+}
+
+.compliance-requirement b {
+  display:block;
+  color:var(--navy);
+  font:600 15px var(--sans);
+}
+
+.compliance-requirement span {
+  color:var(--sage-text);
+  font-size:12px;
+}
+
+.compliance-matrix-wrap { background:var(--surface); }
+
+.compliance-matrix {
+  width:100%;
+  border-collapse:collapse;
+  font-size:14px;
+}
+
+.compliance-matrix th,
+.compliance-matrix td {
+  padding:10px 12px;
+  text-align:left;
+  border-bottom:1px solid rgba(var(--navy-rgb),.1);
+  vertical-align:middle;
+}
+
+.compliance-matrix thead th {
+  font:600 11px var(--sans);
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--sage-text);
+  border-bottom:1px solid rgba(var(--navy-rgb),.25);
+  white-space:nowrap;
+}
+
+.compliance-matrix tbody th {
+  font:600 14px var(--sans);
+  color:var(--navy);
+  white-space:nowrap;
+}
+
+/* Each cell is the control -- clicking it opens the editor for that pairing. */
+.matrix-cell {
+  width:100%;
+  padding:7px 10px;
+  font:600 11px var(--sans);
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  text-align:left;
+  border:0;
+  border-radius:2px;
+  cursor:pointer;
+}
+
+.matrix-cell.outstanding { background:var(--terracotta); color:var(--cream); }
+.matrix-cell.pending     { background:var(--warm-tint); color:var(--terracotta-deep); }
+.matrix-cell.complete    { background:var(--sage); color:var(--cream); }
+.matrix-cell.waived      { background:rgba(var(--navy-rgb),.08); color:var(--sage-text); }
+.matrix-cell.missing     { background:transparent; color:var(--sage-text); border:1px dashed rgba(var(--navy-rgb),.28); }
+
+.compliance-editor-backdrop {
+  position:fixed;
+  inset:0;
+  z-index:50;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:rgba(var(--navy-rgb),.45);
+}
+
+.compliance-editor {
+  width:min(520px,100%);
+  max-height:88vh;
+  overflow-y:auto;
+  padding:26px 28px;
+  background:var(--cream);
+}
+
+.compliance-editor h3 {
+  margin:0 0 4px;
+  color:var(--navy);
+  font:600 25px var(--serif);
+}
+
+.compliance-editor-owed {
+  margin:0;
+  color:var(--terracotta-deep);
+  font:600 15px var(--sans);
+  font-variant-numeric:tabular-nums;
+}
+
+.compliance-editor-actions {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:20px;
+}
+
+.compliance-editor-actions button {
+  padding:10px 15px;
+  background:var(--navy);
+  color:var(--cream);
+  font:600 13px var(--sans);
+  border:0;
+  border-radius:2px;
+  cursor:pointer;
+}
+
+.compliance-editor-actions button.ghost {
+  background:transparent;
+  color:var(--navy);
+  border:1px solid rgba(var(--navy-rgb),.3);
+}
+
+/* Compact per-family roll-up shown on each card in the Families tab. */
+.family-compliance-chips {
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px solid rgba(var(--navy-rgb),.1);
+}
+
+/* Eyebrows on a navy ground.
+   The accent text colours are tuned for the cream canvas -- terracotta-text is
+   only 2.85:1 against navy and the brand terracotta only 3.47:1, both failing
+   AA. These containers reverse the ground, so they take the lightened accent,
+   which measures 6.85:1. */
+.portal-module-wide .card-kicker,
+.portal-module-wide .eyebrow,
+.portal-sidebar .card-kicker,
+.portal-sidebar .eyebrow,
+.split-section .card-kicker,
+.split-section .eyebrow,
+.resources .card-kicker,
+.resources .eyebrow,
+.invitation-letter-preview .card-kicker,
+.accept-invite .eyebrow,
+.admin-live .app-header .eyebrow {
+  color:var(--terracotta-on-navy);
+}

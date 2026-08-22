@@ -3,16 +3,19 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import ChildDetail from "../child-detail";
+import { FamilyRequirement, Requirement, isSettled, statusLabel, statusTone } from "../../../lib/compliance";
 
 type Child = { id: string; first_name: string; last_name: string | null; last_initial: string | null; age_band: string | null; active: boolean; last_name_override: boolean };
 type Member = { user_id: string; relationship: string | null; profiles: { email: string; display_name: string | null; status: string; phone: string | null } | null };
 type Family = { id: string; display_name: string; last_name: string | null; children: Child[]; family_members: Member[] };
+type ComplianceRow = FamilyRequirement & { requirements: Requirement | null };
 
 const ASSIGNABLE_ROLES = ["teacher", "admin"];
 
 export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   const [families, setFamilies] = useState<Family[]>([]);
   const [roleMap, setRoleMap] = useState<Record<string, string[]>>({});
+  const [compliance, setCompliance] = useState<ComplianceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
 
@@ -32,6 +35,15 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
       (roleRows ?? []).forEach((row) => { map[row.user_id] = [...(map[row.user_id] ?? []), row.role]; });
       setRoleMap(map);
     }
+    // Standing against this year's requirements, shown as chips on each card so
+    // an administrator can see who is behind without opening the Compliance tab.
+    const { data: complianceRows } = await supabase
+      .from("family_requirements")
+      .select("id,requirement_id,family_id,status,signed_at,paid_at,amount_due,amount_paid,requirements!inner(id,kind,title,active,sort_order,school_years!inner(is_current))")
+      .eq("requirements.active", true)
+      .eq("requirements.school_years.is_current", true);
+    setCompliance((complianceRows ?? []) as unknown as ComplianceRow[]);
+
     setLoading(false);
   }
 
@@ -115,14 +127,15 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   return <section className="family-manage">
     <p className="admin-form-status" role="status">{status || "Editing a family's name updates every child who hasn't been given a custom last name."}</p>
     <div className="family-manage-list">
-      {families.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
+      {families.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
     </div>
   </section>;
 }
 
-function FamilyCard({ family, roleMap, onSaveFamily, onSaveChild, onAddChild, onRemoveUser, onGrantRole, onRevokeRole }: {
+function FamilyCard({ family, roleMap, compliance, onSaveFamily, onSaveChild, onAddChild, onRemoveUser, onGrantRole, onRevokeRole }: {
   family: Family;
   roleMap: Record<string, string[]>;
+  compliance: ComplianceRow[];
   onSaveFamily: (f: Family) => void;
   onSaveChild: (c: Child) => void;
   onAddChild: (familyId: string, firstName: string) => void;
@@ -183,6 +196,15 @@ function FamilyCard({ family, roleMap, onSaveFamily, onSaveChild, onAddChild, on
       <div className="row-actions"><button onClick={() => setViewingChildId(child.id)}>View</button><button onClick={() => onSaveChild(children.find((row) => row.id === child.id)!)}>Save</button></div>
     </div>)}
     {viewingChildId && <ChildDetail childId={viewingChildId} onClose={() => setViewingChildId(null)} />}
+
+    {compliance.length > 0 && <div className="family-compliance-chips">
+      {compliance
+        .filter((row) => row.requirements)
+        .sort((a, b) => Number(isSettled(a.status)) - Number(isSettled(b.status)))
+        .map((row) => <span key={row.id} className={`status-pill ${statusTone(row.status)}`}>
+          {row.requirements!.title}: {statusLabel(row.requirements!.kind, row)}
+        </span>)}
+    </div>}
 
     <div className="add-child-row">
       <label>Add a child<input value={newChildName} onChange={(event) => setNewChildName(event.target.value)} placeholder="First name" /></label>

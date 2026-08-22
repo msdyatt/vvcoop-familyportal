@@ -7,6 +7,8 @@ import ChildDetail from "../child-detail";
 import DetailModal from "../detail-modal";
 import AppHeader from "../app-header";
 import MfaChallengeScreen from "../mfa-challenge";
+import { ComplianceBanner, CompliancePanel, ComplianceItem } from "../compliance-panel";
+import { FamilyRequirement, Requirement } from "../../../lib/compliance";
 
 type PortalState = "loading" | "signed-out" | "mfa-challenge" | "pending" | "active" | "error";
 type Profile = { display_name: string | null; email: string; status: "pending" | "active" | "suspended" };
@@ -18,8 +20,24 @@ type PortalData = {
   posts: { id: string; title: string; body: string; published_at: string | null; image_storage_path: string | null; audience: string }[];
   events: { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null }[];
   documents: { id: string; title: string; kind: string; signature_status: string | null; storage_path: string | null }[];
+  compliance: ComplianceItem[];
   roles: string[];
 };
+
+/**
+ * PostgREST returns the joined requirement nested inside each row; the UI wants
+ * the pair side by side. Rows whose requirement failed to embed are dropped
+ * rather than rendered half-populated.
+ */
+function toComplianceItems(rows: unknown): ComplianceItem[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((entry) => {
+    const row = entry as FamilyRequirement & { requirements?: Requirement };
+    if (!row?.requirements) return [];
+    const { requirements, ...rest } = row;
+    return [{ row: rest as FamilyRequirement, requirement: requirements }];
+  });
+}
 
 export default function PortalGate() {
   const [state, setState] = useState<PortalState>(() => isSupabaseConfigured() ? "loading" : "error");
@@ -65,10 +83,20 @@ export default function PortalGate() {
       supabase.from("documents").select("id,title,kind,signature_status,storage_path").or(`family_id.in.(${safeFamilyIds.join(",")}),class_id.in.(${safeClassIds.join(",")})`).order("created_at", { ascending: false }).limit(8),
       supabase.from("user_roles").select("role").eq("user_id", data.user.id),
     ]);
+
+    // Required documents and dues for the current school year. !inner keeps this
+    // to requirements that are active in the year flagged current, so a family
+    // never sees last year's handbook sitting unsigned.
+    const compliance = await supabase
+      .from("family_requirements")
+      .select("id,requirement_id,family_id,status,signed_document_id,signed_at,signing_url,provider_document_id,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,amount_per_family,amount_per_child,payment_url,due_on,school_years!inner(is_current))")
+      .in("family_id", safeFamilyIds)
+      .eq("requirements.active", true)
+      .eq("requirements.school_years.is_current", true);
     const children = childrenResult;
     const failed = [children, classes, assignments, posts, events, documents, roles].find((item) => item.error);
     if (failed?.error) { setState("error"); return; }
-    setPortal({ familyId: safeFamilyIds[0] ?? "", children: children.data ?? [], classes: classes.data ?? [], assignments: assignments.data ?? [], posts: posts.data ?? [], events: events.data ?? [], documents: documents.data ?? [], roles: (roles.data ?? []).map((item) => item.role) } as PortalData);
+    setPortal({ familyId: safeFamilyIds[0] ?? "", children: children.data ?? [], classes: classes.data ?? [], assignments: assignments.data ?? [], posts: posts.data ?? [], events: events.data ?? [], documents: documents.data ?? [], compliance: toComplianceItems(compliance.data), roles: (roles.data ?? []).map((item) => item.role) } as PortalData);
     setState("active");
     const withImages = ((posts.data ?? []) as PortalData["posts"]).filter((post) => post.image_storage_path);
     const urls: Record<string, string> = {};
@@ -100,8 +128,16 @@ export default function PortalGate() {
   const openEvent = portal?.events.find((event) => event.id === openEventId);
   const openDocument_ = portal?.documents.find((document) => document.id === openDocumentId);
 
+  // Requirement masters and signed copies are already shown in Paperwork & dues,
+  // so keep them out of the shared-files list rather than listing them twice.
+  const complianceDocumentIds = new Set(
+    (portal?.compliance ?? []).flatMap((item) => [item.requirement.document_id, item.row.signed_document_id].filter(Boolean) as string[]),
+  );
+  const otherDocuments = (portal?.documents ?? []).filter((document) => !complianceDocumentIds.has(document.id));
+
   return <main className="live-portal">
     <AppHeader current="home" roles={portal?.roles ?? []} title="Family Village" subtitle="Your household’s week, gathered in one place." />
+    <ComplianceBanner items={portal?.compliance ?? []} />
     <section className="portal-family-strip"><div><span>Children</span><strong>{portal?.children.length ?? 0}</strong></div><div><span>Classes</span><strong>{portal?.classes.length ?? 0}</strong></div><div><span>Upcoming work</span><strong>{portal?.assignments.length ?? 0}</strong></div></section>
     <div className="portal-grid">
       <section className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><span>{child.first_name.slice(0,1)}</span><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3></div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
@@ -110,7 +146,13 @@ export default function PortalGate() {
       <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{portal?.events.length ? <ol className="portal-list clickable-list">{portal.events.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</time><div><b>{event.title}</b>{event.location && <span>{event.location}</span>}</div></div></li>)}</ol> : empty("No upcoming events have been published yet.")}</section>
       <section className="portal-module"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}>{postImages[post.id] && <img src={postImages[post.id]} alt="" style={{ width: 64, height: 64, objectFit: "cover", flexShrink: 0 }} />}<div><b>{post.title}</b><span>{post.body.length > 130 ? `${post.body.slice(0,130)}…` : post.body}</span></div></div></li>)}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
       <section className="portal-module"><p className="eyebrow">Learning</p><h2>Classes & assignments</h2>{portal?.assignments.length ? <ol className="portal-list">{portal.assignments.map(item => <li key={item.id}><time>{item.due_at ? new Date(item.due_at).toLocaleDateString(undefined,{month:"short",day:"numeric"}) : "Open"}</time><div><b>{item.title}</b></div></li>)}</ol> : empty(portal?.classes.length ? "No assignments are currently due." : "Classes will appear after enrollment is entered.")}</section>
-      <section className="portal-module"><p className="eyebrow">Family records</p><h2>Forms & documents</h2>{portal?.documents.length ? <ol className="portal-list portal-docs clickable-list">{portal.documents.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}{document.signature_status ? ` · ${document.signature_status}` : ""}</span></div></div></li>)}</ol> : empty("Signed forms and family documents will be available here once added.")}</section>
+      <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">Family records</p><h2>Paperwork &amp; dues</h2>
+        <CompliancePanel items={portal?.compliance ?? []} />
+      </section>
+      {/* Documents that aren't a requirement -- class handouts and anything an
+          administrator has shared with this household. Signed copies are
+          excluded because they already appear above, against their requirement. */}
+      <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other documents</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>
       <section className="portal-module"><p className="eyebrow">Your account</p><h2>Household settings</h2>{profile && <ProfileNameForm profile={profile} onSaved={load} />}</section>
     </div>
     {portal?.roles.some(role => role === "teacher" || role === "admin") && <nav className="portal-role-links" aria-label="Staff workspaces">{portal.roles.includes("teacher") && <a href="/family-village/teacher">Teacher workspace →</a>}{portal.roles.includes("admin") && <a href="/family-village/admin">Administrator workspace →</a>}</nav>}
