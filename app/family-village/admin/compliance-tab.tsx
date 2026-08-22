@@ -146,21 +146,24 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
    * the returned signing link on their compliance row, so the family signs from
    * inside the portal. Email is suppressed -- the link lives on the page.
    */
-  async function sendForSignature(requirement: Requirement, family: FamilyRow, row: FamilyRequirement | null, signerEmail: string) {
+  async function sendForSignature(
+    requirement: Requirement, family: FamilyRow, row: FamilyRequirement | null,
+    signerEmail: string, opts: { quiet?: boolean } = {},
+  ): Promise<boolean> {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    if (!requirement.document_id) { setStatus(`"${requirement.title}" has no document attached. Upload it in Documents and link it to the requirement first.`); return; }
+    if (!supabase) return false;
+    if (!requirement.document_id) { setStatus(`"${requirement.title}" has no document attached. Upload it in Documents and link it to the requirement first.`); return false; }
 
     let targetId = row?.id;
     if (!targetId) {
       const { data: created, error: createError } = await supabase.from("family_requirements")
         .insert({ requirement_id: requirement.id, family_id: family.id, updated_by: actorUserId })
         .select("id").single();
-      if (createError) { setStatus(createError.message); return; }
+      if (createError) { setStatus(createError.message); return false; }
       targetId = created.id;
     }
 
-    setStatus(`Sending "${requirement.title}" to ${signerEmail}…`);
+    if (!opts.quiet) setStatus(`Sending "${requirement.title}" to ${signerEmail}…`);
     const { data, error } = await supabase.functions.invoke("opensign-send", {
       body: {
         documentId: requirement.document_id,
@@ -169,12 +172,50 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
         sendEmail: false,
       },
     });
-    if (error || data?.error) { setStatus(data?.error || "The signing link could not be created."); await load(); return; }
+    if (error || data?.error) {
+      if (!opts.quiet) { setStatus(data?.error || "The signing link could not be created."); await load(); }
+      return false;
+    }
     await log("signature_link_created", targetId!, { family: family.display_name, requirement: requirement.title, signer: signerEmail });
-    setStatus(data?.signingUrl
-      ? `Signing link ready for ${family.display_name}. It is now on their dashboard.`
-      : `Sent, but OpenSign returned no signing link — the family may need the emailed copy.`);
-    setEditing(null);
+    if (!opts.quiet) {
+      setStatus(data?.signingUrl
+        ? `Signing link ready for ${family.display_name}. It is now on their dashboard.`
+        : `Sent, but OpenSign returned no signing link — the family may need the emailed copy.`);
+      setEditing(null);
+      await load();
+    }
+    return true;
+  }
+
+  /**
+   * Creates a signing link for every household that still needs one.
+   *
+   * Doing this a family at a time is 80 clicks for two documents across forty
+   * households, which is the kind of chore that quietly stops happening. Runs
+   * sequentially rather than in parallel so a rate limit on the OpenSign side
+   * degrades into slower, not failed.
+   */
+  async function sendToAllFamilies(requirement: Requirement) {
+    if (!requirement.document_id) { setStatus(`"${requirement.title}" has no document attached yet.`); return; }
+    const pending = families.filter((family) => {
+      const row = cell(requirement.id, family.id);
+      return !row || (!isSettled(row.status) && !row.signing_url);
+    });
+    if (!pending.length) { setStatus(`Every family already has a link for "${requirement.title}".`); return; }
+    if (!confirm(`Create a signing link for ${pending.length} famil${pending.length === 1 ? "y" : "ies"}? Each one uses a signature from your OpenSign plan.`)) return;
+
+    let sent = 0;
+    const failures: string[] = [];
+    for (const family of pending) {
+      const adult = (family.family_members ?? []).find((m) => m.profiles && m.profiles.status === "active");
+      if (!adult?.profiles) { failures.push(`${family.display_name} (no active adult)`); continue; }
+      setStatus(`Creating links… ${sent + failures.length + 1} of ${pending.length}`);
+      const ok = await sendForSignature(requirement, family, cell(requirement.id, family.id), adult.profiles.email, { quiet: true });
+      if (ok) sent += 1; else failures.push(family.display_name);
+    }
+    setStatus(failures.length
+      ? `Created ${sent} link${sent === 1 ? "" : "s"}. Could not send to: ${failures.join(", ")}.`
+      : `Created ${sent} signing link${sent === 1 ? "" : "s"}. They are on the families' dashboards now.`);
     await load();
   }
 
@@ -227,6 +268,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
                 {opened < families.length && <button onClick={() => openToAllFamilies(req)}>Open to all families</button>}
                 {req.kind === "dues" && opened > 0 && <button onClick={() => recalculateDues(req)}>Recalculate balances</button>}
                 {req.kind === "document" && <AttachDocument requirement={req} documents={documents} onSaved={load} onStatus={setStatus} />}
+                {req.kind === "document" && req.document_id && <button onClick={() => sendToAllFamilies(req)}>Create signing links for all</button>}
               </div>
             </article>;
           })}
