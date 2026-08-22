@@ -1,9 +1,12 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { guardRequest } from "./site-password";
 
 interface Env {
   ASSETS: Fetcher;
+  SITE_PASSWORD?: string;
+  SITE_AUTH_SECRET?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -27,6 +30,12 @@ interface ExecutionContext {
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    // Shared-password gate, ahead of everything else so no route can slip past
+    // it. See worker/site-password.ts -- it stays on until this call is removed
+    // on purpose.
+    const gated = await guardRequest(request, env);
+    if (gated) return gated;
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];

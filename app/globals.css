@@ -557,7 +557,7 @@ footer {
     font-weight:700;
   }
   .hero-logo {
-    height:220px;
+    width:min(320px,60vw);
   }
   .welcome,.families,.resources {
     grid-template-columns:1fr;
@@ -602,8 +602,7 @@ footer {
     padding-top:95px;
   }
   .hero-logo {
-    height:170px;
-    width:95vw;
+    width:min(236px,54vw);
   }
   .hero h1 {
     font-size:43px;
