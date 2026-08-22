@@ -4118,3 +4118,83 @@ footer {
   color:var(--sage-text);
   font-size:13px;
 }
+
+/* --- Teacher's Lounge: roster picker and student notes -------------------- */
+.roster-pickable {
+  display:grid;
+  gap:6px;
+}
+
+.roster-pickable li { background:none; padding:0; }
+
+/* The roster is the control now -- picking a student is what reveals their
+   notes, so each row has to read as pressable. */
+.workspace-main button.roster-pick {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  width:100%;
+  padding:11px 14px;
+  background:var(--panel);
+  color:var(--navy);
+  font:600 14px var(--sans);
+  text-align:left;
+  border:0;
+  border-left:3px solid transparent;
+  border-radius:2px;
+  cursor:pointer;
+}
+
+.workspace-main button.roster-pick span {
+  color:var(--sage-text);
+  font-size:12px;
+  font-weight:400;
+}
+
+.workspace-main button.roster-pick:hover { background:var(--surface-sunken); }
+
+.workspace-main button.roster-pick.active {
+  background:var(--surface-sunken);
+  border-left-color:var(--portal-accent);
+}
+
+.workspace-main button.roster-pick:focus-visible {
+  outline:2px solid var(--portal-accent);
+  outline-offset:1px;
+}
+
+.student-notes {
+  margin-top:16px;
+  padding:20px;
+  background:var(--surface);
+  border:1px solid rgba(var(--navy-rgb),.12);
+  border-left:3px solid var(--portal-accent);
+}
+
+.student-notes-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+}
+
+.student-notes-head h3 {
+  margin:0;
+  color:var(--navy);
+  font:600 22px var(--serif);
+}
+
+.student-notes-head button.ghost {
+  padding:8px 13px;
+  background:transparent;
+  color:var(--navy);
+  font:600 12px var(--sans);
+  border:1px solid rgba(var(--navy-rgb),.3);
+  border-radius:2px;
+  cursor:pointer;
+}
+
+.prose-body { white-space:pre-wrap; }
+
+.compliance-note { margin-bottom:10px; }
