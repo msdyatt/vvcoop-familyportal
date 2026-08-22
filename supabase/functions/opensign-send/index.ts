@@ -1,0 +1,128 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.112.3";
+import { OpenSignError, sendForSignature } from "../_shared/opensign.ts";
+
+const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+const PRIVATE_BUCKET = "family-village-private";
+
+function toBase64(bytes: Uint8Array) {
+  // btoa needs a binary string; chunked to avoid blowing the argument limit on
+  // multi-megabyte PDFs.
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+export default {
+  async fetch(req: Request) {
+    if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const publishableKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const apiToken = Deno.env.get("OPENSIGN_API_TOKEN");
+    const authorization = req.headers.get("Authorization");
+    if (!supabaseUrl || !publishableKey || !serviceRoleKey || !authorization) return json({ error: "Unauthorized" }, 401);
+
+    // Same gate as invite-family-admin: verify the caller with their own token,
+    // then act with the service role.
+    const userClient = createClient(supabaseUrl, publishableKey, { global: { headers: { Authorization: authorization } } });
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) return json({ error: "Your session has expired. Please sign in again." }, 401);
+
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const [{ data: profile }, { data: role }] = await Promise.all([
+      adminClient.from("profiles").select("status").eq("id", user.id).single(),
+      adminClient.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
+    ]);
+    if (profile?.status !== "active" || !role) return json({ error: "Administrator access is required." }, 403);
+
+    if (!apiToken) {
+      return json({ error: "OpenSign is not configured. Set the OPENSIGN_API_TOKEN secret with `supabase secrets set OPENSIGN_API_TOKEN=...`." }, 400);
+    }
+
+    const body = await req.json().catch(() => null) as
+      { documentId?: string; signers?: { email?: string; name?: string }[]; sendInOrder?: boolean } | null;
+
+    const documentId = body?.documentId?.trim();
+    const signers = (body?.signers ?? [])
+      .map((s) => ({ email: s.email?.trim().toLowerCase() ?? "", name: s.name?.trim() }))
+      .filter((s) => s.email);
+
+    if (!documentId) return json({ error: "A documentId is required." }, 400);
+    if (!signers.length) return json({ error: "At least one signer email is required." }, 400);
+
+    // Base URL is per-installation, so it lives in integration_settings where an
+    // administrator can set it from the Integrations tab.
+    const { data: integration } = await adminClient
+      .from("integration_settings").select("api_base_url,status").eq("id", "opensign").maybeSingle();
+    const baseUrl = integration?.api_base_url?.trim();
+    if (!baseUrl) {
+      return json({ error: "Set the OpenSign API base URL in Admin → Integrations first (cloud is https://app.opensignlabs.com/api/v1)." }, 400);
+    }
+
+    const { data: document } = await adminClient
+      .from("documents").select("id,title,storage_path,signature_status").eq("id", documentId).maybeSingle();
+    if (!document) return json({ error: "That document could not be found." }, 404);
+    if (!document.storage_path) return json({ error: "That document has no stored file to send." }, 400);
+
+    const download = await adminClient.storage.from(PRIVATE_BUCKET).download(document.storage_path);
+    if (download.error || !download.data) return json({ error: `The document file could not be read: ${download.error?.message ?? "unknown error"}` }, 500);
+    const fileBase64 = toBase64(new Uint8Array(await download.data.arrayBuffer()));
+
+    // Record the intent before calling out, so a failure is still visible in the
+    // Admin workspace rather than vanishing.
+    const { data: inserted, error: insertError } = await adminClient
+      .from("signature_requests")
+      .insert(signers.map((s) => ({
+        document_id: document.id,
+        provider: "opensign",
+        signer_email: s.email,
+        signer_name: s.name ?? null,
+        status: "pending",
+        requested_by_user_id: user.id,
+      })))
+      .select("id,signer_email");
+    if (insertError) return json({ error: insertError.message }, 500);
+
+    const requestIds = (inserted ?? []).map((row) => row.id);
+
+    try {
+      const result = await sendForSignature({ baseUrl, token: apiToken, title: document.title, fileBase64, signers, sendInOrder: body?.sendInOrder });
+
+      await Promise.all([
+        adminClient.from("documents").update({
+          signature_provider: "opensign",
+          provider_document_id: result.providerDocumentId,
+          signature_status: "sent",
+          updated_at: new Date().toISOString(),
+        }).eq("id", document.id),
+        ...(inserted ?? []).map((row) => adminClient.from("signature_requests").update({
+          provider_document_id: result.providerDocumentId,
+          status: "sent",
+          signing_url: result.signingUrls[row.signer_email] ?? null,
+        }).eq("id", row.id)),
+      ]);
+
+      return json({ ok: true, providerDocumentId: result.providerDocumentId, signers: signers.length });
+    } catch (error) {
+      const message = error instanceof OpenSignError
+        ? `OpenSign rejected the request: ${error.message}`
+        : `OpenSign could not be reached: ${error instanceof Error ? error.message : String(error)}`;
+
+      if (requestIds.length) {
+        await adminClient.from("signature_requests")
+          .update({ status: "failed", error_detail: message.slice(0, 500) })
+          .in("id", requestIds);
+      }
+      await adminClient.from("documents").update({ signature_status: "failed" }).eq("id", document.id);
+      return json({ error: message }, 502);
+    }
+  },
+};

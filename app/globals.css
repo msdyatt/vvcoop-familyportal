@@ -3602,3 +3602,116 @@ footer {
   justify-content:center;
   margin-top:10px;
 }
+
+/* --- Signature requests (Admin -> Documents) ------------------------------ */
+.signature-send-form {
+  display:flex;
+  align-items:flex-end;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:14px;
+  padding:14px;
+  background:var(--surface-sunken);
+  border-left:3px solid var(--portal-accent);
+}
+
+.signature-send-form label {
+  display:grid;
+  grid-template-rows:auto 1fr;
+  gap:6px;
+  flex:1;
+  min-width:260px;
+  color:var(--sage-text);
+  font-size:12px;
+  font-weight:700;
+  text-transform:uppercase;
+}
+
+.signature-send-form .field-caption i {
+  margin-left:6px;
+  font-size:11px;
+  font-style:normal;
+  font-weight:400;
+  text-transform:none;
+  opacity:.8;
+}
+
+.signature-send-form input {
+  width:100%;
+  padding:10px 12px;
+  background:var(--surface);
+  color:var(--navy);
+  font:15px var(--sans);
+  border:1px solid rgba(var(--navy-rgb),.18);
+}
+
+.signature-send-form .admin-form-status {
+  flex-basis:100%;
+  margin:0;
+}
+
+.signature-request-list {
+  display:grid;
+  gap:8px;
+  margin:14px 0 0;
+  padding:0;
+}
+
+.signature-request-list li {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:9px 12px;
+  background:var(--surface-sunken);
+  font-size:13px;
+}
+
+.signature-request-list small {
+  flex-basis:100%;
+  color:var(--terracotta-deep);
+  font-size:11px;
+}
+
+/* Status pills for the signature lifecycle, matching the print-queue pills. */
+.status-pill.sent,.status-pill.viewed {
+  background:var(--panel);
+  color:var(--navy);
+}
+
+.status-pill.signed {
+  background:var(--sage);
+  color:var(--cream);
+}
+
+.status-pill.declined,.status-pill.failed,.status-pill.expired {
+  background:var(--warm-tint);
+  color:var(--terracotta-deep);
+}
+
+.integration-help {
+  margin:16px 0 24px;
+  padding:18px 20px;
+  background:var(--panel);
+  border-left:3px solid var(--portal-accent);
+  font-size:14px;
+}
+
+.integration-help ol {
+  display:grid;
+  gap:8px;
+  margin:10px 0;
+  padding-left:18px;
+  list-style:decimal;
+}
+
+.integration-help code {
+  padding:1px 5px;
+  background:var(--surface);
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+
+.integration-help p:last-child {
+  margin:10px 0 0;
+  color:var(--sage-text);
+}
