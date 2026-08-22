@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
+import { useOutsideClick } from "../../lib/use-outside-click";
 import PortalNav from "./portal-nav";
 import DetailModal from "./detail-modal";
 import AccountSettings from "./account-settings";
@@ -31,13 +32,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { loadProfile(); }, []);
 
-  useEffect(() => {
-    function onClick(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+  useOutsideClick(menuRef, () => setMenuOpen(false));
 
   async function signOut() {
     await getSupabaseBrowserClient()?.auth.signOut();

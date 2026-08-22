@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useOutsideClick } from "../../lib/use-outside-click";
 
 type PortalKey = "home" | "admin" | "teacher";
 
@@ -22,13 +23,7 @@ export default function PortalNav({ current, roles }: { current: PortalKey; role
 
   const available: PortalKey[] = ["home", ...(roles.includes("teacher") ? (["teacher"] as const) : []), ...(roles.includes("admin") ? (["admin"] as const) : [])];
 
-  useEffect(() => {
-    function onClick(event: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+  useOutsideClick(rootRef, () => setOpen(false));
 
   if (available.length <= 1) return null;
 

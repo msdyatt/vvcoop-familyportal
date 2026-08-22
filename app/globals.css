@@ -3597,3 +3597,8 @@ footer {
 .portal-empty-standalone {
   margin-top:24px;
 }
+
+.mfa-form {
+  justify-content:center;
+  margin-top:10px;
+}

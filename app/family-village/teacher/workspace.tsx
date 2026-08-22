@@ -3,19 +3,23 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
+import { usePortalAccess } from "../../../lib/use-portal-access";
+import MfaChallengeScreen from "../mfa-challenge";
 import AppHeader from "../app-header";
 
-type AccessState = "loading" | "denied" | "ready";
 type ClassRow = { id: string; title: string; description: string | null; meeting_time: string | null };
 type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string };
 type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string; author_name: string; read_count: number };
 type Handout = { id: string; title: string; storage_path: string; class_id: string | null; created_at: string };
 type PrintRequest = { id: string; title: string; quantity: number; status: string; storage_path: string; created_at: string };
 
+async function signOutToEntry() {
+  await getSupabaseBrowserClient()?.auth.signOut();
+  window.location.assign("/family-village");
+}
+
 export default function TeacherWorkspace() {
-  const [access, setAccess] = useState<AccessState>(() => getSupabaseBrowserClient() ? "loading" : "denied");
-  const [userId, setUserId] = useState("");
-  const [roles, setRoles] = useState<string[]>([]);
+  const { state: access, userId, roles, recheck } = usePortalAccess("teacher");
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [activeClassId, setActiveClassId] = useState("");
   const [roster, setRoster] = useState<RosterChild[]>([]);
@@ -56,22 +60,8 @@ export default function TeacherWorkspace() {
     setPrintQueue((printRows ?? []) as PrintRequest[]);
   }
 
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient(); if (!supabase) return;
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) { setAccess("denied"); return; }
-      const [{ data: profile }, { data: teacherRole }, { data: allRoles }] = await Promise.all([
-        supabase.from("profiles").select("status").eq("id", data.user.id).single(),
-        supabase.from("user_roles").select("role").eq("user_id", data.user.id).eq("role", "teacher").maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", data.user.id),
-      ]);
-      if (profile?.status !== "active" || !teacherRole) { setAccess("denied"); return; }
-      setUserId(data.user.id);
-      setRoles((allRoles ?? []).map((row) => row.role));
-      setAccess("ready");
-      await loadAll(data.user.id);
-    });
-  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch once access resolves
+  useEffect(() => { if (access === "ready" && userId) loadAll(userId); }, [access, userId]);
 
   async function deleteNote(noteId: string) {
     if (!confirm("Delete this note? This cannot be undone.")) return;
@@ -82,6 +72,7 @@ export default function TeacherWorkspace() {
   }
 
   if (access === "loading") return <main className="portal-state"><p className="eyebrow">Teacher workspace</p><h1>Gathering your classes…</h1></main>;
+  if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private teacher workspace</p><h1>Teacher access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
 
   const activeClass = classes.find((row) => row.id === activeClassId);

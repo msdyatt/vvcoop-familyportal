@@ -1,6 +1,8 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import { usePortalAccess } from "../../../lib/use-portal-access";
+import MfaChallengeScreen from "../mfa-challenge";
 import AppHeader from "../app-header";
 import FamiliesTab from "./families-tab";
 import NewsTab from "./news-tab";
@@ -10,37 +12,26 @@ import DocumentsTab from "./documents-tab";
 import ActivityTab from "./activity-tab";
 import AdminDashboard from "./dashboard";
 
-type AccessState = "loading" | "denied" | "ready";
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
 type Tab = "dashboard" | "invitations" | "families" | "classes" | "documents" | "news" | "activity" | "integrations";
 
+async function signOutToEntry() {
+  await getSupabaseBrowserClient()?.auth.signOut();
+  window.location.assign("/family-village");
+}
+
 export default function AdminWorkspace() {
-  const [access, setAccess] = useState<AccessState>(() => getSupabaseBrowserClient() ? "loading" : "denied");
-  const [userId, setUserId] = useState<string>("");
-  const [roles, setRoles] = useState<string[]>([]);
+  const { state: access, userId, roles, recheck } = usePortalAccess("admin");
   const [tab, setTab] = useState<Tab>("dashboard");
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [familyName, setFamilyName] = useState(""); const [adminName, setAdminName] = useState(""); const [email, setEmail] = useState(""); const [note, setNote] = useState("");
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   async function loadInvitations() { const supabase = getSupabaseBrowserClient(); if (!supabase) return; const { data } = await supabase.from("invitations").select("id,email,expires_at,accepted_at,families(display_name)").order("created_at", { ascending: false }).limit(8); setInvitations((data ?? []) as unknown as Invitation[]); }
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient(); if (!supabase) return;
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) { setAccess("denied"); return; }
-      const [{ data: profile }, { data: role }, { data: allRoles }] = await Promise.all([
-        supabase.from("profiles").select("status").eq("id", data.user.id).single(),
-        supabase.from("user_roles").select("role").eq("user_id", data.user.id).eq("role", "admin").maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", data.user.id),
-      ]);
-      if (profile?.status !== "active" || !role) { setAccess("denied"); return; }
-      setUserId(data.user.id);
-      setRoles((allRoles ?? []).map((item) => item.role));
-      setAccess("ready");
-      await loadInvitations();
-    });
-  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch once access resolves
+  useEffect(() => { if (access === "ready") loadInvitations(); }, [access]);
   async function invite(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const supabase = getSupabaseBrowserClient(); if (!supabase) return; setBusy(true); setMessage(""); const { data, error } = await supabase.functions.invoke("invite-family-admin", { body: { familyName, adminName, email, note } }); setBusy(false); if (error || data?.error) { setMessage(data?.error || "The invitation could not be sent. Check the email service configuration and try again."); return; } setMessage(`Invitation sent to ${email}. The link expires in one hour.`); setFamilyName(""); setAdminName(""); setEmail(""); setNote(""); await loadInvitations(); }
   if (access === "loading") return <main className="portal-state"><p className="eyebrow">Village administration</p><h1>Checking your stewardship access…</h1></main>;
+  if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private administrator workspace</p><h1>Administrator access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
