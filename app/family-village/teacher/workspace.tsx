@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
-import PortalNav from "../portal-nav";
+import AppHeader from "../app-header";
 
 type AccessState = "loading" | "denied" | "ready";
 type ClassRow = { id: string; title: string; description: string | null; meeting_time: string | null };
@@ -87,11 +87,11 @@ export default function TeacherWorkspace() {
   const activeClass = classes.find((row) => row.id === activeClassId);
 
   return <main className="workspace-preview">
-    <header><div><p className="eyebrow">Teacher workspace</p><h1>Teach with the whole<br /><em>week in view.</em></h1></div><PortalNav current="teacher" roles={roles} /></header>
+    <AppHeader current="teacher" roles={roles} title="Teacher’s Lounge" subtitle="Your classes, roster, and resources in one place." />
     <div className="preview-banner"><b>Only your assigned classes are shown.</b> Families and students outside your roster stay private.</div>
     {!classes.length && <p style={{ marginTop: 24 }}>No classes are assigned to you yet. A Village administrator can assign you to a class.</p>}
     {classes.length > 0 && <section className="workspace-grid">
-      <article className="workspace-nav"><a className="active" href="#classes">Classes</a><a href="#notes">Student notes</a><a href="#resources">Resources</a><a href="#lounge">Teachers’ Lounge</a></article>
+      <article className="workspace-nav"><a className="active" href="#classes">Classes</a><a href="#notes">Student notes</a><a href="#resources">Resources</a><a href="#lounge">Print queue</a></article>
       <div className="workspace-main">
         <section id="classes"><p className="card-kicker">My classes</p><h2>Your classroom, organized.</h2>
           <div className="teacher-class-list">
@@ -216,7 +216,7 @@ function LoungeSection({ classId, onClassChange, classes, queue, userId, onSaved
     onSaved();
   }
 
-  return <section id="lounge"><p className="card-kicker">Teachers’ Lounge</p><h2>Send something to be printed.</h2>
+  return <section id="lounge"><p className="card-kicker">Print queue</p><h2>Send something to be printed.</h2>
     <form onSubmit={submit} className="editor-placeholder">
       <label>Class <span>this is what the printing is for</span><select value={classId} onChange={(event) => onClassChange(event.target.value)}><option value="">Not class-specific</option>{classes.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select></label>
       <label>What is it?<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Friday worksheet packet" disabled={busy} /></label>

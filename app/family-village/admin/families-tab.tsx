@@ -5,7 +5,7 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import ChildDetail from "../child-detail";
 
 type Child = { id: string; first_name: string; last_name: string | null; last_initial: string | null; age_band: string | null; active: boolean; last_name_override: boolean };
-type Member = { user_id: string; relationship: string | null; profiles: { email: string; display_name: string | null; status: string } | null };
+type Member = { user_id: string; relationship: string | null; profiles: { email: string; display_name: string | null; status: string; phone: string | null } | null };
 type Family = { id: string; display_name: string; last_name: string | null; children: Child[]; family_members: Member[] };
 
 const ASSIGNABLE_ROLES = ["teacher", "admin"];
@@ -21,7 +21,7 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("families")
-      .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,active,last_name_override),family_members(user_id,relationship,profiles(email,display_name,status))")
+      .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,active,last_name_override),family_members(user_id,relationship,profiles(email,display_name,status,phone))")
       .order("display_name");
     if (!error) setFamilies((data ?? []) as unknown as Family[]);
 
@@ -152,6 +152,29 @@ function FamilyCard({ family, roleMap, onSaveFamily, onSaveChild, onAddChild, on
       <button onClick={() => onSaveFamily({ ...family, display_name: displayName, last_name: lastName })}>Save household</button>
     </div>
 
+    {family.family_members?.map((member) => {
+      const roles = roleMap[member.user_id] ?? [];
+      return <div className="member-row" key={member.user_id}>
+        <div className="member-identity">
+          <b>{member.profiles?.display_name || "Unnamed"} {family.last_name}</b>
+          <span>{member.profiles?.email}</span>
+          <span>{member.profiles?.phone || "No phone on file"}</span>
+          <span className="member-meta">{member.relationship} · {member.profiles?.status}</span>
+        </div>
+        <div className="role-chips">
+          {ASSIGNABLE_ROLES.map((role) => <button key={role} className={`role-chip${roles.includes(role) ? " active" : ""}`}
+            onClick={() => (roles.includes(role) ? onRevokeRole(member.user_id, role) : onGrantRole(member.user_id, role))}>{role}</button>)}
+        </div>
+        <div className="row-actions">
+          {member.profiles?.status !== "removed"
+            ? <button className="danger" onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
+            : <span className="status-pill cancelled">Removed</span>}
+        </div>
+      </div>;
+    })}
+
+    <div className="family-section-divider"><span>Children</span></div>
+
     {children.map((child) => <div className="child-row" key={child.id}>
       <label>First name<input value={child.first_name} onChange={(event) => updateChild(child.id, { first_name: event.target.value })} /></label>
       <label>Last name<input value={child.last_name ?? ""} onChange={(event) => updateChild(child.id, { last_name: event.target.value, last_name_override: true })} /></label>
@@ -165,21 +188,5 @@ function FamilyCard({ family, roleMap, onSaveFamily, onSaveChild, onAddChild, on
       <label>Add a child<input value={newChildName} onChange={(event) => setNewChildName(event.target.value)} placeholder="First name" /></label>
       <div className="row-actions"><button onClick={() => { onAddChild(family.id, newChildName); setNewChildName(""); }}>Add child</button></div>
     </div>
-
-    {family.family_members?.map((member) => {
-      const roles = roleMap[member.user_id] ?? [];
-      return <div className="member-row" key={member.user_id}>
-        <div><b>{member.profiles?.display_name || member.profiles?.email}</b><span style={{ display: "block", fontSize: 11, color: "var(--sage)" }}>{member.relationship} · {member.profiles?.status}</span></div>
-        <div className="role-chips">
-          {ASSIGNABLE_ROLES.map((role) => <button key={role} className={`role-chip${roles.includes(role) ? " active" : ""}`}
-            onClick={() => (roles.includes(role) ? onRevokeRole(member.user_id, role) : onGrantRole(member.user_id, role))}>{role}</button>)}
-        </div>
-        <div className="row-actions">
-          {member.profiles?.status !== "removed"
-            ? <button className="danger" onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
-            : <span className="status-pill cancelled">Removed</span>}
-        </div>
-      </div>;
-    })}
   </article>;
 }

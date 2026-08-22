@@ -1,7 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
-import PortalNav from "../portal-nav";
+import AppHeader from "../app-header";
 import FamiliesTab from "./families-tab";
 import NewsTab from "./news-tab";
 import ClassesTab from "./classes-tab";
@@ -43,10 +43,7 @@ export default function AdminWorkspace() {
   if (access === "loading") return <main className="portal-state"><p className="eyebrow">Village administration</p><h1>Checking your stewardship access…</h1></main>;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private administrator workspace</p><h1>Administrator access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
   return <main className="admin-live">
-    <header className="admin-live-head">
-      <div><p className="eyebrow">Village administration</p><h1>Run the village,<br /><em>one household at a time.</em></h1><p>Invite families, keep household and roster records accurate, and publish news to the co-op.</p></div>
-      <PortalNav current="admin" roles={roles} />
-    </header>
+    <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <nav className="admin-tabs">
       <button className={tab === "dashboard" ? "active" : ""} onClick={() => setTab("dashboard")}>Dashboard</button>
       <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}>Invitations</button>

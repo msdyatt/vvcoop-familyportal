@@ -3,10 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "../../../lib/supabase";
 import { getSignedFileUrl } from "../../../lib/storage";
-import PortalNav from "../portal-nav";
 import ChildDetail from "../child-detail";
 import DetailModal from "../detail-modal";
-import AccountSettings from "../account-settings";
+import AppHeader from "../app-header";
 
 type PortalState = "loading" | "signed-out" | "mfa-challenge" | "pending" | "active" | "error";
 type Profile = { display_name: string | null; email: string; status: "pending" | "active" | "suspended" };
@@ -101,7 +100,7 @@ export default function PortalGate() {
   const openDocument_ = portal?.documents.find((document) => document.id === openDocumentId);
 
   return <main className="live-portal">
-    <header className="live-portal-head"><div><p className="eyebrow">Family Village · Private</p><h1>Welcome{profile?.display_name ? `, ${profile.display_name}` : ""}.</h1><p>Your household’s week, gathered in one place.</p></div><div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><PortalNav current="home" roles={portal?.roles ?? []} /><button onClick={signOut}>Sign out</button></div></header>
+    <AppHeader current="home" roles={portal?.roles ?? []} title="Family Village" subtitle="Your household’s week, gathered in one place." />
     <section className="portal-family-strip"><div><span>Children</span><strong>{portal?.children.length ?? 0}</strong></div><div><span>Classes</span><strong>{portal?.classes.length ?? 0}</strong></div><div><span>Upcoming work</span><strong>{portal?.assignments.length ?? 0}</strong></div></section>
     <div className="portal-grid">
       <section className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><span>{child.first_name.slice(0,1)}</span><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3></div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
@@ -112,7 +111,6 @@ export default function PortalGate() {
       <section className="portal-module"><p className="eyebrow">Learning</p><h2>Classes & assignments</h2>{portal?.assignments.length ? <ol className="portal-list">{portal.assignments.map(item => <li key={item.id}><time>{item.due_at ? new Date(item.due_at).toLocaleDateString(undefined,{month:"short",day:"numeric"}) : "Open"}</time><div><b>{item.title}</b></div></li>)}</ol> : empty(portal?.classes.length ? "No assignments are currently due." : "Classes will appear after enrollment is entered.")}</section>
       <section className="portal-module"><p className="eyebrow">Family records</p><h2>Forms & documents</h2>{portal?.documents.length ? <ol className="portal-list portal-docs clickable-list">{portal.documents.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}{document.signature_status ? ` · ${document.signature_status}` : ""}</span></div></div></li>)}</ol> : empty("Signed forms and family documents will be available here once added.")}</section>
       <section className="portal-module"><p className="eyebrow">Your account</p><h2>Household settings</h2>{profile && <ProfileNameForm profile={profile} onSaved={load} />}</section>
-      <section className="portal-module"><p className="eyebrow">Security</p><h2>Account & security</h2>{profile && <AccountSettings email={profile.email} onSignOut={signOut} />}</section>
     </div>
     {portal?.roles.some(role => role === "teacher" || role === "admin") && <nav className="portal-role-links" aria-label="Staff workspaces">{portal.roles.includes("teacher") && <a href="/family-village/teacher">Teacher workspace →</a>}{portal.roles.includes("admin") && <a href="/family-village/admin">Administrator workspace →</a>}</nav>}
     {openChildId && <ChildDetail childId={openChildId} onClose={() => setOpenChildId(null)} />}

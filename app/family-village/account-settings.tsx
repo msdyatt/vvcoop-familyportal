@@ -5,10 +5,59 @@ import { getSupabaseBrowserClient } from "../../lib/supabase";
 
 export default function AccountSettings({ email, onSignOut }: { email: string; onSignOut: () => void }) {
   return <div className="account-settings">
+    <ContactSection />
     <PasswordSection email={email} />
     <PasskeySection />
     <TwoFactorSection />
     <DangerZone onSignOut={onSignOut} />
+  </div>;
+}
+
+function ContactSection() {
+  const [phone, setPhone] = useState("");
+  const [emergencyName, setEmergencyName] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+
+  async function load() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    const { data: profile } = await supabase.from("profiles").select("phone,emergency_contact_name,emergency_contact_phone").eq("id", data.user.id).single();
+    setPhone(profile?.phone ?? ""); setEmergencyName(profile?.emergency_contact_name ?? ""); setEmergencyPhone(profile?.emergency_contact_phone ?? "");
+    setLoading(false);
+  }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
+  useEffect(() => { load(); }, []);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true); setStatus("");
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) { setBusy(false); return; }
+    const { error } = await supabase.from("profiles").update({ phone: phone.trim() || null, emergency_contact_name: emergencyName.trim() || null, emergency_contact_phone: emergencyPhone.trim() || null }).eq("id", data.user.id);
+    setBusy(false);
+    if (error) { setStatus(error.message); return; }
+    setStatus("Saved.");
+  }
+
+  if (loading) return null;
+
+  return <div className="settings-block">
+    <p className="card-kicker">Contact information</p>
+    <form onSubmit={submit} className="household-form">
+      <label>Phone number<input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="(555) 555-5555" disabled={busy} /></label>
+      <label>Emergency contact name<input value={emergencyName} onChange={(event) => setEmergencyName(event.target.value)} disabled={busy} /></label>
+      <label>Emergency contact phone<input type="tel" value={emergencyPhone} onChange={(event) => setEmergencyPhone(event.target.value)} disabled={busy} /></label>
+      <button disabled={busy}>{busy ? "Saving…" : "Save contact info"}</button>
+      <p className="admin-form-status" role="status">{status}</p>
+    </form>
   </div>;
 }
 
