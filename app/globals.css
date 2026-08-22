@@ -4100,3 +4100,21 @@ footer {
   color:var(--navy);
   border:1px solid rgba(var(--navy-rgb),.3);
 }
+
+/* Switching which school year the whole portal points at. */
+.compliance-toolbar .make-current {
+  padding:11px 15px;
+  background:var(--portal-accent);
+  color:var(--cream);
+  font:600 13px var(--sans);
+  border:0;
+  border-radius:2px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+.current-year-note {
+  padding-bottom:11px;
+  color:var(--sage-text);
+  font-size:13px;
+}
