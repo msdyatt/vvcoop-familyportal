@@ -4257,3 +4257,70 @@ footer {
   text-transform:uppercase;
   border-radius:2px;
 }
+
+/* --- Files attached to a news post ---------------------------------------- */
+.post-attachments {
+  display:grid;
+  gap:14px;
+  margin-top:18px;
+}
+
+.post-photo-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:8px;
+}
+
+.post-photo {
+  display:block;
+  aspect-ratio:4 / 3;
+  overflow:hidden;
+  background:var(--surface-sunken);
+  border-radius:2px;
+}
+
+.post-photo img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  transition:transform .18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .post-photo img { transition:none; }
+}
+
+.post-photo:hover img { transform:scale(1.03); }
+
+.post-photo:focus-visible {
+  outline:2px solid var(--portal-accent);
+  outline-offset:2px;
+}
+
+.post-file-list {
+  display:grid;
+  gap:6px;
+  margin:0;
+  padding:0;
+}
+
+.post-file-list li {
+  padding:10px 12px;
+  background:var(--surface-sunken);
+  font-size:14px;
+}
+
+/* Small square preview beside a post in a list. */
+.post-thumb {
+  width:64px;
+  height:64px;
+  flex-shrink:0;
+  object-fit:cover;
+  border-radius:2px;
+}
+
+.composer-files {
+  margin:0;
+  color:var(--sage-text);
+  font-size:13px;
+}

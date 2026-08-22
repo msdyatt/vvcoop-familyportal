@@ -2,28 +2,24 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
-import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
+import { uploadPrivateFile } from "../../../lib/storage";
+import { PostThumbnail, usePostAttachments } from "../post-attachments";
 
-type Post = { id: string; title: string; body: string; audience: string; published_at: string | null; image_storage_path: string | null };
+type Post = { id: string; title: string; body: string; audience: string; published_at: string | null };
 
 export default function NewsTab({ actorUserId }: { actorUserId: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [previews, setPreviews] = useState<Record<string, string>>({});
   const [title, setTitle] = useState(""); const [body, setBody] = useState(""); const [audience, setAudience] = useState("families");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false); const [status, setStatus] = useState("");
+  const attachments = usePostAttachments(posts.map((post) => post.id));
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { data, error } = await supabase.from("posts").select("id,title,body,audience,published_at,image_storage_path").order("created_at", { ascending: false }).limit(20);
+    const { data, error } = await supabase.from("posts").select("id,title,body,audience,published_at").order("created_at", { ascending: false }).limit(20);
     if (error) return;
-    const rows = (data ?? []) as Post[];
-    setPosts(rows);
-    const withImages = rows.filter((row) => row.image_storage_path);
-    const urls: Record<string, string> = {};
-    await Promise.all(withImages.map(async (row) => { const url = await getSignedFileUrl(supabase, row.image_storage_path!); if (url) urls[row.id] = url; }));
-    setPreviews(urls);
+    setPosts((data ?? []) as Post[]);
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
@@ -34,19 +30,36 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !title.trim() || !body.trim()) return;
     setBusy(true); setStatus("");
-    let imagePath: string | null = null;
-    if (file) {
+
+    // Upload first. A post that exists with half its photos missing is worse
+    // than one that was never published, so nothing is inserted until every
+    // file is safely in the bucket.
+    const uploaded: { path: string; file: File }[] = [];
+    for (const file of files) {
       const result = await uploadPrivateFile(supabase, "news", file);
-      if ("error" in result) { setStatus(result.error); setBusy(false); return; }
-      imagePath = result.path;
+      if ("error" in result) { setStatus(`${file.name}: ${result.error}`); setBusy(false); return; }
+      uploaded.push({ path: result.path, file });
     }
-    const { error } = await supabase.from("posts").insert({
-      author_user_id: actorUserId, title: title.trim(), body: body.trim(), audience, image_storage_path: imagePath, published_at: new Date().toISOString(),
-    });
+
+    const { data: post, error } = await supabase.from("posts").insert({
+      author_user_id: actorUserId, title: title.trim(), body: body.trim(), audience,
+      published_at: new Date().toISOString(),
+    }).select("id").single();
+    if (error) { setStatus(error.message); setBusy(false); return; }
+
+    if (uploaded.length) {
+      const { error: attachError } = await supabase.from("post_attachments").insert(
+        uploaded.map((item, index) => ({
+          post_id: post.id, storage_path: item.path,
+          file_name: item.file.name, content_type: item.file.type || null, sort_order: index,
+        })),
+      );
+      if (attachError) { setStatus(`Published, but the files could not be attached: ${attachError.message}`); setBusy(false); await load(); return; }
+    }
+
     setBusy(false);
-    if (error) { setStatus(error.message); return; }
-    setTitle(""); setBody(""); setFile(null); setAudience("families");
-    setStatus("Published.");
+    setTitle(""); setBody(""); setFiles([]); setAudience("families");
+    setStatus(uploaded.length ? `Published with ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}.` : "Published.");
     await load();
   }
 
@@ -60,15 +73,24 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
           <option value="public">Public website</option>
           <option value="teachers">Teachers only</option>
         </select>
-        <label className="file-drop">Photo (optional)<input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} /></label>
+        <label className="file-drop"><span className="field-caption">Photos or files <i>optional</i></span>
+          <input type="file" multiple onChange={(event) => setFiles([...(event.target.files ?? [])])} disabled={busy} />
+        </label>
       </div>
+      {files.length > 0 && <p className="composer-files">{files.length} file{files.length === 1 ? "" : "s"} ready: {files.map((file) => file.name).join(", ")}</p>}
       <button disabled={busy}>{busy ? "Publishing…" : "Publish news"}</button>
       <p className="admin-form-status" role="status">{status}</p>
     </form>
     <div className="news-list">
       {posts.map((post) => <article className="news-item" key={post.id}>
-        {previews[post.id] && <img src={previews[post.id]} alt="" />}
-        <div><b>{post.title}</b><span>{post.audience} · {post.published_at ? new Date(post.published_at).toLocaleDateString() : "Draft"}</span></div>
+        <PostThumbnail attachments={attachments[post.id] ?? []} />
+        <div>
+          <b>{post.title}</b>
+          <span>
+            {post.audience} · {post.published_at ? new Date(post.published_at).toLocaleDateString() : "Draft"}
+            {(attachments[post.id]?.length ?? 0) > 0 ? ` · ${attachments[post.id].length} file${attachments[post.id].length === 1 ? "" : "s"}` : ""}
+          </span>
+        </div>
       </article>)}
       {!posts.length && <p>No news published yet.</p>}
     </div>

@@ -8,6 +8,7 @@ import DetailModal from "../detail-modal";
 import AppHeader from "../app-header";
 import MfaChallengeScreen from "../mfa-challenge";
 import { ComplianceBanner, CompliancePanel, ComplianceItem } from "../compliance-panel";
+import PostAttachments, { PostThumbnail, usePostAttachments } from "../post-attachments";
 import { FamilyRequirement, Requirement } from "../../../lib/compliance";
 
 type PortalState = "loading" | "signed-out" | "mfa-challenge" | "pending" | "active" | "error";
@@ -16,7 +17,7 @@ type PortalData = {
   familyId: string;
   children: { id: string; first_name: string; last_initial: string | null }[];
   classes: { id: string; title: string; description: string | null; meeting_time: string | null }[];
-  posts: { id: string; title: string; body: string; published_at: string | null; image_storage_path: string | null; audience: string }[];
+  posts: { id: string; title: string; body: string; published_at: string | null; audience: string }[];
   events: { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; class_id: string | null; audience: string; requires_prework: boolean }[];
   documents: { id: string; title: string; kind: string; signature_status: string | null; storage_path: string | null }[];
   compliance: ComplianceItem[];
@@ -42,8 +43,8 @@ export default function PortalGate() {
   const [state, setState] = useState<PortalState>(() => isSupabaseConfigured() ? "loading" : "error");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [portal, setPortal] = useState<PortalData | null>(null);
-  const [postImages, setPostImages] = useState<Record<string, string>>({});
   const [openChildId, setOpenChildId] = useState<string | null>(null);
+  const postAttachments = usePostAttachments((portal?.posts ?? []).map((post) => post.id));
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const [openDocumentId, setOpenDocumentId] = useState<string | null>(null);
@@ -76,7 +77,7 @@ export default function PortalGate() {
 
     const [classes, posts, events, documents, roles] = await Promise.all([
       supabase.from("classes").select("id,title,description,meeting_time").in("id", safeClassIds).order("title"),
-      supabase.from("posts").select("id,title,body,published_at,image_storage_path,audience").order("published_at", { ascending: false }).limit(6),
+      supabase.from("posts").select("id,title,body,published_at,audience").order("published_at", { ascending: false }).limit(6),
       supabase.from("events").select("id,title,description,starts_at,ends_at,location,class_id,audience,requires_prework").gte("starts_at", new Date().toISOString()).order("starts_at").limit(20),
       supabase.from("documents").select("id,title,kind,signature_status,storage_path").or(`family_id.in.(${safeFamilyIds.join(",")}),class_id.in.(${safeClassIds.join(",")})`).order("created_at", { ascending: false }).limit(8),
       supabase.from("user_roles").select("role").eq("user_id", data.user.id),
@@ -96,10 +97,6 @@ export default function PortalGate() {
     if (failed?.error) { setState("error"); return; }
     setPortal({ familyId: safeFamilyIds[0] ?? "", children: children.data ?? [], classes: classes.data ?? [], posts: posts.data ?? [], events: events.data ?? [], documents: documents.data ?? [], compliance: toComplianceItems(compliance.data), roles: (roles.data ?? []).map((item) => item.role) } as PortalData);
     setState("active");
-    const withImages = ((posts.data ?? []) as PortalData["posts"]).filter((post) => post.image_storage_path);
-    const urls: Record<string, string> = {};
-    await Promise.all(withImages.map(async (post) => { const url = await getSignedFileUrl(supabase, post.image_storage_path!); if (url) urls[post.id] = url; }));
-    setPostImages(urls);
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
@@ -149,7 +146,7 @@ export default function PortalGate() {
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
       </section>
       <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}</section>
-      <section className="portal-module"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}>{postImages[post.id] && <img src={postImages[post.id]} alt="" style={{ width: 64, height: 64, objectFit: "cover", flexShrink: 0 }} />}<div><b>{post.title}</b><span>{post.body.length > 130 ? `${post.body.slice(0,130)}…` : post.body}</span></div></div></li>)}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
+      <section className="portal-module"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{post.body.length > 130 ? `${post.body.slice(0,130)}…` : post.body}</span></div></div></li>)}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
       {/* Class dates, per class, with anything needing prep called out. This
           replaces the old assignments list -- homework is now a flag on a date
           rather than a separate row, so a parent reads one list instead of two. */}
@@ -178,9 +175,9 @@ export default function PortalGate() {
     </div>
     {openChildId && <ChildDetail childId={openChildId} onClose={() => setOpenChildId(null)} />}
     {openPost && <DetailModal title={openPost.title} onClose={() => setOpenPostId(null)}>
-      {postImages[openPost.id] && <img src={postImages[openPost.id]} alt="" style={{ width: "100%", maxHeight: 320, objectFit: "cover", marginBottom: 16 }} />}
-      <p className="portal-empty" style={{ marginBottom: 8 }}>{openPost.published_at ? new Date(openPost.published_at).toLocaleDateString() : ""} · {openPost.audience}</p>
-      <p style={{ whiteSpace: "pre-wrap" }}>{openPost.body}</p>
+      <p className="portal-empty compliance-note">{openPost.published_at ? new Date(openPost.published_at).toLocaleDateString() : ""} · {openPost.audience}</p>
+      <p className="prose-body">{openPost.body}</p>
+      <PostAttachments attachments={postAttachments[openPost.id] ?? []} />
     </DetailModal>}
     {openEvent && <DetailModal title={openEvent.title} onClose={() => setOpenEventId(null)}>
       <p className="portal-empty" style={{ marginBottom: 8 }}>{new Date(openEvent.starts_at).toLocaleString(undefined,{ month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}{openEvent.ends_at ? ` – ${new Date(openEvent.ends_at).toLocaleTimeString(undefined,{ hour:"numeric", minute:"2-digit" })}` : ""}{openEvent.location ? ` · ${openEvent.location}` : ""}</p>

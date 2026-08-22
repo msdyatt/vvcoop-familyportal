@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import DetailModal from "../detail-modal";
+import PostAttachments, { PostThumbnail, usePostAttachments } from "../post-attachments";
 
 type Post = {
   id: string; title: string; body: string; audience: string;
@@ -21,6 +22,7 @@ export default function NewsSection({ classes }: { classes: { id: string; title:
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const attachments = usePostAttachments(posts.map((post) => post.id));
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
@@ -53,6 +55,7 @@ export default function NewsSection({ classes }: { classes: { id: string; title:
             onClick={() => setOpenId(post.id)}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenId(post.id); } }}
             style={{ display: "contents" }}>
+            <PostThumbnail attachments={attachments[post.id] ?? []} />
             <div>
               <b>{post.title}</b>
               <span>
@@ -71,6 +74,7 @@ export default function NewsSection({ classes }: { classes: { id: string; title:
         {open.audience === "class" ? ` · ${classTitle(open.class_id) ?? "a class"}` : open.audience === "teachers" ? " · teaching team" : ""}
       </p>
       <p className="prose-body">{open.body}</p>
+      <PostAttachments attachments={attachments[open.id] ?? []} />
     </DetailModal>}
   </section>;
 }
