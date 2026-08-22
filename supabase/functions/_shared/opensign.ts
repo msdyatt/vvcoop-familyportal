@@ -4,33 +4,49 @@
  * Everything that depends on OpenSign's exact request and response shape lives
  * in this one file, so correcting the contract is a single-file change.
  *
- * What is confirmed:
- *   - Auth is an `x-api-token` request header (OpenSign API v1.1).
- *   - The cloud base URL is https://app.opensignlabs.com/api/v1; self-hosted
- *     instances expose the same paths under their own origin. The base URL is
- *     read from public.integration_settings.api_base_url rather than hardcoded,
- *     so cloud and self-hosted both work.
- *   - The relevant paths are POST /createdocument, GET /document/{id} and the
- *     webhook configuration endpoints.
+ * Verified against a real sandbox send on 22 August 2026 -- a minimal PDF POSTed
+ * to https://sandbox.opensignlabs.com/api/v1.2/createdocument returned 200 with
+ * a real objectId and signurl. This is no longer guesswork.
  *
- * What is NOT confirmed, and why:
- *   OpenSign's published openapi.json (apps/OpenSignServer/public/openapi.json)
- *   is an unedited Swagger Petstore template -- /createdocument is documented
- *   there as "Returns pet inventories by status" with operationId getInventory
- *   -- and the hosted API reference renders client-side, so the exact field
- *   names of the /createdocument body could not be verified from source.
+ *   - Auth: `x-api-token: <token>` request header.
+ *   - API version is **v1.2**. Base URLs:
+ *       production   https://app.opensignlabs.com/api/v1.2
+ *       sandbox      https://sandbox.opensignlabs.com/api/v1.2
+ *       EU region    https://eu-app.opensignlabs.com/api/v1.2
+ *     Read from public.integration_settings.api_base_url, never hardcoded, so
+ *     cloud, EU and self-hosted all work without a code change.
+ *   - POST /createdocument returns
+ *       { objectId, signurl: [...], message: "Document sent successfully!" }
  *
- *   The body below follows the documented widget/signer vocabulary. Confirm it
- *   against the live reference on a paid account, or against the JSON that
- *   https://app.opensignlabs.com/debugpdf emits, before relying on it. A
- *   mismatch surfaces as a clear OpenSignError with OpenSign's own message
- *   rather than a silent failure -- see sendForSignature.
+ * Note on widgets: every signer needs at least one widget, or the document
+ * arrives with nowhere to sign. See defaultSignatureWidget below.
  */
+export type OpenSignWidget = {
+  type: string;
+  page: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
 
 export type OpenSignSigner = {
   email: string;
   name?: string;
+  role?: string;
+  widgets?: OpenSignWidget[];
 };
+
+/**
+ * Where the signature box lands when the caller doesn't specify one.
+ *
+ * Page 1, lower left -- the conventional spot on the co-op's one- and two-page
+ * waivers and permission forms. A longer document will want the box on its last
+ * page instead; pass explicit widgets to override rather than editing this.
+ */
+export function defaultSignatureWidget(): OpenSignWidget {
+  return { type: "signature", page: 1, x: 30, y: 40, w: 80, h: 30 };
+}
 
 export type SendResult = {
   providerDocumentId: string;
@@ -84,17 +100,27 @@ export async function sendForSignature(opts: {
   fileBase64: string;
   signers: OpenSignSigner[];
   sendInOrder?: boolean;
+  note?: string;
+  description?: string;
+  timeToCompleteDays?: number;
+  /** Set false to create the document without emailing signers (useful in sandbox). */
+  sendEmail?: boolean;
 }): Promise<SendResult> {
   const body = {
-    title: opts.title,
     file: opts.fileBase64,
-    signers: opts.signers.map((signer, index) => ({
+    title: opts.title,
+    note: opts.note ?? `Please sign "${opts.title}" for Veritas Village.`,
+    description: opts.description ?? "",
+    timeToCompleteDays: opts.timeToCompleteDays ?? 15,
+    signers: opts.signers.map((signer) => ({
+      role: signer.role ?? "Signer",
       email: signer.email,
       name: signer.name ?? signer.email,
-      order: index + 1,
+      // A signer with no widget gets a document with nowhere to sign.
+      widgets: signer.widgets?.length ? signer.widgets : [defaultSignatureWidget()],
     })),
+    send_email: opts.sendEmail ?? true,
     sendInOrder: opts.sendInOrder ?? false,
-    sendmail: true,
   };
 
   const result = await call(opts.baseUrl, opts.token, "/createdocument", {
@@ -108,15 +134,15 @@ export async function sendForSignature(opts: {
     // Surfacing this loudly beats storing an empty id that the webhook can
     // never match against.
     throw new OpenSignError(
-      "OpenSign accepted the document but returned no recognisable document id. " +
-      "Check the response shape against your account's API reference and update " +
-      "extractDocumentId in supabase/functions/_shared/opensign.ts.",
+      "OpenSign accepted the document but returned no objectId. Check the " +
+      "response shape and update extractDocumentId in " +
+      "supabase/functions/_shared/opensign.ts.",
       200,
       result,
     );
   }
 
-  return { providerDocumentId, signingUrls: extractSigningUrls(result), raw: result };
+  return { providerDocumentId, signingUrls: extractSigningUrls(result, opts.signers), raw: result };
 }
 
 /** OpenSign is a Parse-backed app, so an id may arrive under several keys. */
@@ -137,23 +163,37 @@ export function extractDocumentId(payload: unknown): string | null {
   return null;
 }
 
-function extractSigningUrls(payload: unknown): Record<string, string> {
+/**
+ * Reads the `signurl` array back into a per-signer map.
+ *
+ * The confirmed response carries `signurl` as an array. Its element shape is not
+ * pinned down, so both forms are handled: objects carrying an email alongside a
+ * url, and bare url strings, which are matched to signers positionally in the
+ * order they were submitted.
+ */
+function extractSigningUrls(payload: unknown, signers: OpenSignSigner[]): Record<string, string> {
   const urls: Record<string, string> = {};
   if (!payload || typeof payload !== "object") return urls;
   const record = payload as Record<string, unknown>;
-  const list = record.signers ?? record.signingLinks ?? record.signurl;
-  if (Array.isArray(list)) {
-    for (const entry of list) {
-      if (entry && typeof entry === "object") {
-        const item = entry as Record<string, unknown>;
-        const email = typeof item.email === "string" ? item.email : null;
-        const url = ["signurl", "signingUrl", "url"]
-          .map((k) => item[k])
-          .find((v): v is string => typeof v === "string" && !!v);
-        if (email && url) urls[email] = url;
-      }
+  const list = record.signurl ?? record.signers ?? record.signingLinks;
+  if (!Array.isArray(list)) return urls;
+
+  list.forEach((entry, index) => {
+    if (typeof entry === "string" && entry) {
+      const signer = signers[index];
+      if (signer) urls[signer.email] = entry;
+      return;
     }
-  }
+    if (entry && typeof entry === "object") {
+      const item = entry as Record<string, unknown>;
+      const url = ["signurl", "signingUrl", "url"]
+        .map((key) => item[key])
+        .find((value): value is string => typeof value === "string" && !!value);
+      if (!url) return;
+      const email = typeof item.email === "string" ? item.email : signers[index]?.email;
+      if (email) urls[email] = url;
+    }
+  });
   return urls;
 }
 

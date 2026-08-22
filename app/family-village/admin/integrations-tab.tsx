@@ -39,11 +39,11 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
     <aside className="integration-help">
       <p className="card-kicker">OpenSign setup</p>
       <ol>
-        <li><b>API base URL</b> — <code>https://app.opensignlabs.com/api/v1</code> for the hosted service, or your own origin plus <code>/api/v1</code> if you self-host.</li>
-        <li><b>API token</b> — generate one in OpenSign under Settings → API Token, then set it as a server secret. It is never stored in this database and never reaches the browser.</li>
-        <li><b>Webhook</b> — point OpenSign at <code>/functions/v1/opensign-webhook?token=&lt;your secret&gt;</code> on this Supabase project so signature completions flow back automatically.</li>
+        <li><b>API base URL</b> — <code>https://app.opensignlabs.com/api/v1.2</code> for the hosted service, <code>https://eu-app.opensignlabs.com/api/v1.2</code> in the EU, or your own origin plus <code>/api/v1.2</code> if you self-host. Set it in the OpenSign row below.</li>
+        <li><b>API token</b> — OpenSign → Settings → API Token. Set it as the <code>OPENSIGN_API_TOKEN</code> server secret. It is never stored in this database and never reaches the browser.</li>
+        <li><b>Webhook, last</b> — OpenSign only issues a signing key once a live webhook URL is registered, so this step comes after the functions are deployed. In OpenSign → Settings → Webhook, add the deployed <code>opensign-webhook</code> URL, enable authentication, generate the key, then set it as <code>OPENSIGN_WEBHOOK_SECRET</code>.</li>
       </ol>
-      <p>Once those are in place, every document in the Documents tab gains a <b>Send for signature</b> action.</p>
+      <p>Sending works as soon as the base URL and API token are set. Until the webhook secret is in place, signature completions will not flow back on their own and statuses stay at <b>sent</b>.</p>
     </aside>
     <div className="integrations-list">
       {integrations.map((row) => <IntegrationCard key={row.id} row={row} onSave={save} />)}

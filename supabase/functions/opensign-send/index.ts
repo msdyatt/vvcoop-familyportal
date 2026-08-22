@@ -47,12 +47,25 @@ export default {
       return json({ error: "OpenSign is not configured. Set the OPENSIGN_API_TOKEN secret with `supabase secrets set OPENSIGN_API_TOKEN=...`." }, 400);
     }
 
-    const body = await req.json().catch(() => null) as
-      { documentId?: string; signers?: { email?: string; name?: string }[]; sendInOrder?: boolean } | null;
+    const body = await req.json().catch(() => null) as {
+      documentId?: string;
+      signers?: { email?: string; name?: string; role?: string; widgets?: unknown[] }[];
+      sendInOrder?: boolean;
+      note?: string;
+      timeToCompleteDays?: number;
+      sendEmail?: boolean;
+    } | null;
 
     const documentId = body?.documentId?.trim();
     const signers = (body?.signers ?? [])
-      .map((s) => ({ email: s.email?.trim().toLowerCase() ?? "", name: s.name?.trim() }))
+      .map((s) => ({
+        email: s.email?.trim().toLowerCase() ?? "",
+        name: s.name?.trim(),
+        role: s.role?.trim(),
+        // Widgets are passed straight through when supplied, so a longer
+        // document can place its signature box without a code change.
+        widgets: Array.isArray(s.widgets) ? s.widgets as never : undefined,
+      }))
       .filter((s) => s.email);
 
     if (!documentId) return json({ error: "A documentId is required." }, 400);
@@ -64,7 +77,7 @@ export default {
       .from("integration_settings").select("api_base_url,status").eq("id", "opensign").maybeSingle();
     const baseUrl = integration?.api_base_url?.trim();
     if (!baseUrl) {
-      return json({ error: "Set the OpenSign API base URL in Admin → Integrations first (cloud is https://app.opensignlabs.com/api/v1)." }, 400);
+      return json({ error: "Set the OpenSign API base URL in Admin → Integrations first (cloud is https://app.opensignlabs.com/api/v1.2)." }, 400);
     }
 
     const { data: document } = await adminClient
@@ -94,7 +107,17 @@ export default {
     const requestIds = (inserted ?? []).map((row) => row.id);
 
     try {
-      const result = await sendForSignature({ baseUrl, token: apiToken, title: document.title, fileBase64, signers, sendInOrder: body?.sendInOrder });
+      const result = await sendForSignature({
+        baseUrl,
+        token: apiToken,
+        title: document.title,
+        fileBase64,
+        signers,
+        sendInOrder: body?.sendInOrder,
+        note: body?.note,
+        timeToCompleteDays: body?.timeToCompleteDays,
+        sendEmail: body?.sendEmail,
+      });
 
       await Promise.all([
         adminClient.from("documents").update({
