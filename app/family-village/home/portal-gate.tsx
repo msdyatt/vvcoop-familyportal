@@ -6,8 +6,9 @@ import { getSignedFileUrl } from "../../../lib/storage";
 import PortalNav from "../portal-nav";
 import ChildDetail from "../child-detail";
 import DetailModal from "../detail-modal";
+import AccountSettings from "../account-settings";
 
-type PortalState = "loading" | "signed-out" | "pending" | "active" | "error";
+type PortalState = "loading" | "signed-out" | "mfa-challenge" | "pending" | "active" | "error";
 type Profile = { display_name: string | null; email: string; status: "pending" | "active" | "suspended" };
 type PortalData = {
   familyId: string;
@@ -36,6 +37,8 @@ export default function PortalGate() {
     if (!supabase) return;
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) { setState("signed-out"); return; }
+    const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal.data && aal.data.nextLevel === "aal2" && aal.data.nextLevel !== aal.data.currentLevel) { setState("mfa-challenge"); return; }
     const result = await supabase.from("profiles").select("display_name,email,status").eq("id", data.user.id).single();
     if (result.error || !result.data) { setState("error"); return; }
     setProfile(result.data as Profile);
@@ -88,6 +91,7 @@ export default function PortalGate() {
 
   if (state === "loading") return <main className="portal-state"><p className="eyebrow">Family Village</p><h1>Gathering your village…</h1></main>;
   if (state === "signed-out") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><p>Your Family Village session has ended.</p><a href="/family-village">Return to sign in →</a></main>;
+  if (state === "mfa-challenge") return <MfaChallengeScreen onVerified={load} onCancel={signOut} />;
   if (state === "error") return <main className="portal-state"><p className="eyebrow">Family Village</p><h1>We could not open your village.</h1><p>No private information was shown. Please try signing in again or contact a Village administrator.</p><a href="/family-village">Return to sign in →</a></main>;
   if (state === "pending") return <main className="portal-state"><p className="eyebrow">Approval required</p><h1>Welcome to the doorway.</h1><p>Your identity has been verified, but a Village administrator must connect <b>{profile?.email}</b> to the correct household and roles before any family information appears.</p><button onClick={signOut}>Sign out</button></main>;
 
@@ -108,6 +112,7 @@ export default function PortalGate() {
       <section className="portal-module"><p className="eyebrow">Learning</p><h2>Classes & assignments</h2>{portal?.assignments.length ? <ol className="portal-list">{portal.assignments.map(item => <li key={item.id}><time>{item.due_at ? new Date(item.due_at).toLocaleDateString(undefined,{month:"short",day:"numeric"}) : "Open"}</time><div><b>{item.title}</b></div></li>)}</ol> : empty(portal?.classes.length ? "No assignments are currently due." : "Classes will appear after enrollment is entered.")}</section>
       <section className="portal-module"><p className="eyebrow">Family records</p><h2>Forms & documents</h2>{portal?.documents.length ? <ol className="portal-list portal-docs clickable-list">{portal.documents.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}{document.signature_status ? ` · ${document.signature_status}` : ""}</span></div></div></li>)}</ol> : empty("Signed forms and family documents will be available here once added.")}</section>
       <section className="portal-module"><p className="eyebrow">Your account</p><h2>Household settings</h2>{profile && <ProfileNameForm profile={profile} onSaved={load} />}</section>
+      <section className="portal-module"><p className="eyebrow">Security</p><h2>Account & security</h2>{profile && <AccountSettings email={profile.email} onSignOut={signOut} />}</section>
     </div>
     {portal?.roles.some(role => role === "teacher" || role === "admin") && <nav className="portal-role-links" aria-label="Staff workspaces">{portal.roles.includes("teacher") && <a href="/family-village/teacher">Teacher workspace →</a>}{portal.roles.includes("admin") && <a href="/family-village/admin">Administrator workspace →</a>}</nav>}
     {openChildId && <ChildDetail childId={openChildId} onClose={() => setOpenChildId(null)} />}
@@ -182,3 +187,37 @@ function AddChildForm({ familyId, onAdded }: { familyId: string; onAdded: () => 
     <p className="admin-form-status" role="status">{status}</p>
   </form>;
 }
+
+function MfaChallengeScreen({ onVerified, onCancel }: { onVerified: () => void; onCancel: () => void }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true); setMessage("");
+    const factors = await supabase.auth.mfa.listFactors();
+    const totpFactor = factors.data?.totp?.[0];
+    if (!totpFactor) { setMessage("No two-factor method found on this account."); setBusy(false); return; }
+    const challenge = await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+    if (challenge.error) { setMessage(challenge.error.message); setBusy(false); return; }
+    const verifyResult = await supabase.auth.mfa.verify({ factorId: totpFactor.id, challengeId: challenge.data.id, code });
+    setBusy(false);
+    if (verifyResult.error) { setMessage(verifyResult.error.message); return; }
+    onVerified();
+  }
+
+  return <main className="portal-state">
+    <p className="eyebrow">Two-factor authentication</p>
+    <h1>Enter your verification code.</h1>
+    <form onSubmit={submit} className="household-form" style={{ justifyContent: "center", marginTop: 10 }}>
+      <label>6-digit code<input value={code} onChange={(event) => setCode(event.target.value.trim())} maxLength={6} disabled={busy} /></label>
+      <button disabled={busy}>{busy ? "Checking…" : "Verify"}</button>
+    </form>
+    <p className="setup-note" role="status">{message}</p>
+    <button className="mode-switch" onClick={onCancel}>Sign out instead</button>
+  </main>;
+}
+
