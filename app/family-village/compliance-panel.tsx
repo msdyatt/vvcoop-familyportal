@@ -86,8 +86,10 @@ function ComplianceRow({ item }: { item: ComplianceItem }) {
       {!settled && !isDues && row.signing_url &&
         <a className="compliance-cta" href={row.signing_url} target="_blank" rel="noreferrer">Sign now ↗</a>}
 
+      {/* Signing happens in the portal, not over email, so when no link exists
+          yet the honest thing to say is that it is coming here. */}
       {!settled && !isDues && !row.signing_url &&
-        <span className="compliance-hint">A signing link will arrive by email.</span>}
+        <span className="compliance-hint">A signing link will appear here shortly.</span>}
 
       {settled && !isDues && row.signed_document_id &&
         <button className="compliance-cta ghost" onClick={openSignedCopy}>Download copy</button>}

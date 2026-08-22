@@ -7,7 +7,12 @@ import {
   duesFor, formatMoney, isSettled, statusLabel, statusTone,
 } from "../../../lib/compliance";
 
-type FamilyRow = { id: string; display_name: string; children: { id: string; active: boolean }[] };
+type FamilyAdult = { user_id: string; profiles: { email: string; display_name: string | null; status: string } | null };
+type FamilyRow = {
+  id: string; display_name: string;
+  children: { id: string; active: boolean }[];
+  family_members: FamilyAdult[];
+};
 
 /**
  * Who has signed what, and who has paid -- one row per family, one column per
@@ -20,6 +25,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [families, setFamilies] = useState<FamilyRow[]>([]);
   const [rows, setRows] = useState<FamilyRequirement[]>([]);
+  const [documents, setDocuments] = useState<{ id: string; title: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
   const [editing, setEditing] = useState<{ requirement: Requirement; family: FamilyRow; row: FamilyRequirement | null } | null>(null);
@@ -37,11 +43,14 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
 
     if (!activeYear) { setRequirements([]); setRows([]); setLoading(false); return; }
 
-    const [{ data: reqRows }, { data: familyRows }] = await Promise.all([
+    const [{ data: reqRows }, { data: familyRows }, { data: docRows }] = await Promise.all([
       supabase.from("requirements").select("id,school_year_id,kind,title,description,active,sort_order,document_id,amount_per_family,amount_per_child,payment_url,due_on")
         .eq("school_year_id", activeYear).order("sort_order").order("title"),
-      supabase.from("families").select("id,display_name,children(id,active)").order("display_name"),
+      supabase.from("families").select("id,display_name,children(id,active),family_members(user_id,profiles(email,display_name,status))").order("display_name"),
+      // Candidates to attach to a document requirement -- anything with a file.
+      supabase.from("documents").select("id,title,storage_path").not("storage_path", "is", null).order("created_at", { ascending: false }),
     ]);
+    setDocuments((docRows ?? []).map((d) => ({ id: d.id, title: d.title })));
 
     const reqs = (reqRows ?? []) as Requirement[];
     setRequirements(reqs);
@@ -132,6 +141,43 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
     await load();
   }
 
+  /**
+   * Sends the requirement's master PDF to one adult in the household and stores
+   * the returned signing link on their compliance row, so the family signs from
+   * inside the portal. Email is suppressed -- the link lives on the page.
+   */
+  async function sendForSignature(requirement: Requirement, family: FamilyRow, row: FamilyRequirement | null, signerEmail: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    if (!requirement.document_id) { setStatus(`"${requirement.title}" has no document attached. Upload it in Documents and link it to the requirement first.`); return; }
+
+    let targetId = row?.id;
+    if (!targetId) {
+      const { data: created, error: createError } = await supabase.from("family_requirements")
+        .insert({ requirement_id: requirement.id, family_id: family.id, updated_by: actorUserId })
+        .select("id").single();
+      if (createError) { setStatus(createError.message); return; }
+      targetId = created.id;
+    }
+
+    setStatus(`Sending "${requirement.title}" to ${signerEmail}…`);
+    const { data, error } = await supabase.functions.invoke("opensign-send", {
+      body: {
+        documentId: requirement.document_id,
+        familyRequirementId: targetId,
+        signers: [{ email: signerEmail }],
+        sendEmail: false,
+      },
+    });
+    if (error || data?.error) { setStatus(data?.error || "The signing link could not be created."); await load(); return; }
+    await log("signature_link_created", targetId!, { family: family.display_name, requirement: requirement.title, signer: signerEmail });
+    setStatus(data?.signingUrl
+      ? `Signing link ready for ${family.display_name}. It is now on their dashboard.`
+      : `Sent, but OpenSign returned no signing link — the family may need the emailed copy.`);
+    setEditing(null);
+    await load();
+  }
+
   if (loading) return <p>Loading compliance…</p>;
 
   const cell = (requirementId: string, familyId: string) =>
@@ -160,7 +206,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
 
     <YearForm onSaved={load} onStatus={setStatus} />
 
-    {yearId && <RequirementForm yearId={yearId} onSaved={load} onStatus={setStatus} />}
+    {yearId && <RequirementForm yearId={yearId} documents={documents} onSaved={load} onStatus={setStatus} />}
 
     {!requirements.length
       ? <p className="portal-empty">No requirements for this year yet.</p>
@@ -173,11 +219,14 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
                 <b>{req.title}</b>
                 <span>{req.kind === "dues"
                   ? `${formatMoney(Number(req.amount_per_family ?? 0))} per family + ${formatMoney(Number(req.amount_per_child ?? 0))} per child`
-                  : "Signature required"} · open to {opened} of {families.length}</span>
+                  : req.document_id
+                    ? `Signature required · ${documents.find((d) => d.id === req.document_id)?.title ?? "document attached"}`
+                    : "Signature required · no document attached yet"} · open to {opened} of {families.length}</span>
               </div>
               <div className="row-actions">
                 {opened < families.length && <button onClick={() => openToAllFamilies(req)}>Open to all families</button>}
                 {req.kind === "dues" && opened > 0 && <button onClick={() => recalculateDues(req)}>Recalculate balances</button>}
+                {req.kind === "document" && <AttachDocument requirement={req} documents={documents} onSaved={load} onStatus={setStatus} />}
               </div>
             </article>;
           })}
@@ -218,6 +267,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
       row={editing.row}
       onCancel={() => setEditing(null)}
       onSave={(patch) => saveCell(editing.row, editing.requirement, editing.family, patch)}
+      onSend={(email) => sendForSignature(editing.requirement, editing.family, editing.row, email)}
     />}
   </section>;
 }
@@ -253,7 +303,32 @@ function YearForm({ onSaved, onStatus }: { onSaved: () => void; onStatus: (messa
   </form>;
 }
 
-function RequirementForm({ yearId, onSaved, onStatus }: { yearId: string; onSaved: () => void; onStatus: (message: string) => void }) {
+/** Links a stored PDF to a document requirement, so it can be sent for signature. */
+function AttachDocument({ requirement, documents, onSaved, onStatus }: {
+  requirement: Requirement;
+  documents: { id: string; title: string }[];
+  onSaved: () => void;
+  onStatus: (message: string) => void;
+}) {
+  const [value, setValue] = useState(requirement.document_id ?? "");
+
+  async function attach(documentId: string) {
+    setValue(documentId);
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("requirements").update({ document_id: documentId || null }).eq("id", requirement.id);
+    if (error) { onStatus(error.message); return; }
+    onStatus(documentId ? `Attached a document to "${requirement.title}".` : `Removed the document from "${requirement.title}".`);
+    onSaved();
+  }
+
+  return <select aria-label={`Document for ${requirement.title}`} value={value} onChange={(event) => attach(event.target.value)}>
+    <option value="">No document attached</option>
+    {documents.map((doc) => <option key={doc.id} value={doc.id}>{doc.title}</option>)}
+  </select>;
+}
+
+function RequirementForm({ yearId, documents, onSaved, onStatus }: { yearId: string; documents: { id: string; title: string }[]; onSaved: () => void; onStatus: (message: string) => void }) {
   const [kind, setKind] = useState<"document" | "dues">("document");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -261,6 +336,7 @@ function RequirementForm({ yearId, onSaved, onStatus }: { yearId: string; onSave
   const [perChild, setPerChild] = useState("150");
   const [paymentUrl, setPaymentUrl] = useState("");
   const [dueOn, setDueOn] = useState("");
+  const [documentId, setDocumentId] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent) {
@@ -276,11 +352,11 @@ function RequirementForm({ yearId, onSaved, onStatus }: { yearId: string; onSave
       due_on: dueOn || null,
       ...(kind === "dues"
         ? { amount_per_family: Number(perFamily) || 0, amount_per_child: Number(perChild) || 0, payment_url: paymentUrl.trim() || null }
-        : {}),
+        : { document_id: documentId || null }),
     });
     setBusy(false);
     if (error) { onStatus(error.message); return; }
-    setTitle(""); setDescription(""); setPaymentUrl("");
+    setTitle(""); setDescription(""); setPaymentUrl(""); setDocumentId("");
     onSaved();
   }
 
@@ -300,6 +376,12 @@ function RequirementForm({ yearId, onSaved, onStatus }: { yearId: string; onSave
     <label><span className="field-caption">Due date <i>optional</i></span>
       <input type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} disabled={busy} />
     </label>
+    {kind === "document" && <label><span className="field-caption">Document <i>the PDF families sign</i></span>
+      <select value={documentId} onChange={(event) => setDocumentId(event.target.value)} disabled={busy}>
+        <option value="">Choose a document…</option>
+        {documents.map((doc) => <option key={doc.id} value={doc.id}>{doc.title}</option>)}
+      </select>
+    </label>}
     {kind === "dues" && <>
       <label><span className="field-caption">Per family</span>
         <input type="number" min={0} step="0.01" value={perFamily} onChange={(event) => setPerFamily(event.target.value)} disabled={busy} />
@@ -316,14 +398,20 @@ function RequirementForm({ yearId, onSaved, onStatus }: { yearId: string; onSave
 }
 
 /** Record a payment, mark a signature received, or waive an item. */
-function CellEditor({ requirement, family, row, onSave, onCancel }: {
+function CellEditor({ requirement, family, row, onSave, onCancel, onSend }: {
   requirement: Requirement;
   family: FamilyRow;
   row: FamilyRequirement | null;
   onSave: (patch: Partial<FamilyRequirement>) => void;
   onCancel: () => void;
+  onSend: (signerEmail: string) => void;
 }) {
   const isDues = requirement.kind === "dues";
+  // Any adult may sign for the household and the first signature settles it, so
+  // the link goes to one person rather than everyone -- the OpenSign plan meters
+  // signatures, and sending to every adult would double the yearly draw.
+  const adults = (family.family_members ?? []).filter((m) => m.profiles && m.profiles.status === "active");
+  const [signer, setSigner] = useState(adults[0]?.profiles?.email ?? "");
   const [amountPaid, setAmountPaid] = useState(String(row?.amount_paid ?? 0));
   const [method, setMethod] = useState(row?.payment_method ?? "Crowded");
   const [reference, setReference] = useState(row?.payment_reference ?? "");
@@ -334,6 +422,18 @@ function CellEditor({ requirement, family, row, onSave, onCancel }: {
       <p className="card-kicker">{family.display_name}</p>
       <h3>{requirement.title}</h3>
       {isDues && row?.amount_due != null && <p className="compliance-editor-owed">Owes {formatMoney(Number(row.amount_due))}</p>}
+
+      {!isDues && <div className="portal-form compliance-form">
+        <label><span className="field-caption">Send the signing link to</span>
+          <select value={signer} onChange={(event) => setSigner(event.target.value)}>
+            {adults.map((adult) => <option key={adult.user_id} value={adult.profiles!.email}>
+              {adult.profiles!.display_name || adult.profiles!.email}
+            </option>)}
+            {!adults.length && <option value="">No active adults on this household</option>}
+          </select>
+        </label>
+        {row?.signing_url && <p className="compliance-editor-owed">A signing link is already on this family&rsquo;s dashboard.</p>}
+      </div>}
 
       {isDues && <div className="portal-form compliance-form">
         <label><span className="field-caption">Amount received</span>
@@ -354,7 +454,10 @@ function CellEditor({ requirement, family, row, onSave, onCancel }: {
       </div>
 
       <div className="compliance-editor-actions">
-        <button onClick={() => onSave(isDues
+        {!isDues && <button disabled={!signer} onClick={() => onSend(signer)}>
+          {row?.signing_url ? "Resend signing link" : "Create signing link"}
+        </button>}
+        <button className={isDues ? "" : "ghost"} onClick={() => onSave(isDues
           ? { status: "complete", amount_paid: Number(amountPaid) || 0, paid_at: new Date().toISOString(), payment_method: method || null, payment_reference: reference || null, note: note || null }
           : { status: "complete", signed_at: new Date().toISOString(), note: note || null })}>
           {isDues ? "Record payment" : "Mark signed"}

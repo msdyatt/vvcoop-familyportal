@@ -49,6 +49,9 @@ export default {
 
     const body = await req.json().catch(() => null) as {
       documentId?: string;
+      /** When present the signing link is written back to this compliance row,
+          so the family sees "Sign now" in the portal instead of waiting on mail. */
+      familyRequirementId?: string;
       signers?: { email?: string; name?: string; role?: string; widgets?: unknown[] }[];
       sendInOrder?: boolean;
       note?: string;
@@ -57,6 +60,7 @@ export default {
     } | null;
 
     const documentId = body?.documentId?.trim();
+    const familyRequirementId = body?.familyRequirementId?.trim();
     const signers = (body?.signers ?? [])
       .map((s) => ({
         email: s.email?.trim().toLowerCase() ?? "",
@@ -119,13 +123,26 @@ export default {
         sendEmail: body?.sendEmail,
       });
 
+      const firstSigningUrl = signers.map((s) => result.signingUrls[s.email]).find(Boolean) ?? null;
+
       await Promise.all([
-        adminClient.from("documents").update({
-          signature_provider: "opensign",
-          provider_document_id: result.providerDocumentId,
-          signature_status: "sent",
-          updated_at: new Date().toISOString(),
-        }).eq("id", document.id),
+        // A requirement's master PDF is shared by every family, so its own row
+        // must not be stamped with one household's provider id -- that state
+        // belongs on the compliance row. Only a standalone document send, which
+        // has no compliance row to write to, updates the document itself.
+        familyRequirementId
+          ? adminClient.from("family_requirements").update({
+              status: "sent",
+              provider_document_id: result.providerDocumentId,
+              signing_url: firstSigningUrl,
+              updated_by: user.id,
+            }).eq("id", familyRequirementId)
+          : adminClient.from("documents").update({
+              signature_provider: "opensign",
+              provider_document_id: result.providerDocumentId,
+              signature_status: "sent",
+              updated_at: new Date().toISOString(),
+            }).eq("id", document.id),
         ...(inserted ?? []).map((row) => adminClient.from("signature_requests").update({
           provider_document_id: result.providerDocumentId,
           status: "sent",
@@ -133,7 +150,7 @@ export default {
         }).eq("id", row.id)),
       ]);
 
-      return json({ ok: true, providerDocumentId: result.providerDocumentId, signers: signers.length });
+      return json({ ok: true, providerDocumentId: result.providerDocumentId, signers: signers.length, signingUrl: firstSigningUrl });
     } catch (error) {
       const message = error instanceof OpenSignError
         ? `OpenSign rejected the request: ${error.message}`
@@ -144,7 +161,11 @@ export default {
           .update({ status: "failed", error_detail: message.slice(0, 500) })
           .in("id", requestIds);
       }
-      await adminClient.from("documents").update({ signature_status: "failed" }).eq("id", document.id);
+      if (familyRequirementId) {
+        await adminClient.from("family_requirements").update({ note: message.slice(0, 500), updated_by: user.id }).eq("id", familyRequirementId);
+      } else {
+        await adminClient.from("documents").update({ signature_status: "failed" }).eq("id", document.id);
+      }
       return json({ error: message }, 502);
     }
   },

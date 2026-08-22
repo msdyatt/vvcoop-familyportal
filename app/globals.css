@@ -3673,9 +3673,15 @@ footer {
 }
 
 /* Status pills for the signature lifecycle, matching the print-queue pills. */
-.status-pill.sent,.status-pill.viewed {
-  background:var(--panel);
-  color:var(--navy);
+/* The pending tone sits on outstanding rows, which share the warm tint -- so a
+   filled warm pill vanishes into its own row. An outline keeps it legible on
+   both the warm row and the plain card. */
+.status-pill.sent,.status-pill.viewed,
+.compliance-item .status-pill.pending,
+.family-compliance-chips .status-pill.pending {
+  background:transparent;
+  color:var(--terracotta-deep);
+  box-shadow:inset 0 0 0 1px var(--terracotta);
 }
 
 .status-pill.signed {

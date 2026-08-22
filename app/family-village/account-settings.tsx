@@ -13,7 +13,14 @@ export default function AccountSettings({ email, onSignOut }: { email: string; o
   </div>;
 }
 
+/**
+ * Name and contact details. Display name used to live in a "Household settings"
+ * module on the family dashboard, which put an account setting on a page about
+ * the week ahead; it belongs here with the rest of the account, and it saves in
+ * the same round trip as the contact fields rather than needing its own form.
+ */
 function ContactSection() {
+  const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
@@ -26,7 +33,8 @@ function ContactSection() {
     if (!supabase) return;
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
-    const { data: profile } = await supabase.from("profiles").select("phone,emergency_contact_name,emergency_contact_phone").eq("id", data.user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("display_name,phone,emergency_contact_name,emergency_contact_phone").eq("id", data.user.id).single();
+    setDisplayName(profile?.display_name ?? "");
     setPhone(profile?.phone ?? ""); setEmergencyName(profile?.emergency_contact_name ?? ""); setEmergencyPhone(profile?.emergency_contact_phone ?? "");
     setLoading(false);
   }
@@ -41,7 +49,12 @@ function ContactSection() {
     setBusy(true); setStatus("");
     const { data } = await supabase.auth.getUser();
     if (!data.user) { setBusy(false); return; }
-    const { error } = await supabase.from("profiles").update({ phone: phone.trim() || null, emergency_contact_name: emergencyName.trim() || null, emergency_contact_phone: emergencyPhone.trim() || null }).eq("id", data.user.id);
+    const { error } = await supabase.from("profiles").update({
+      display_name: displayName.trim() || null,
+      phone: phone.trim() || null,
+      emergency_contact_name: emergencyName.trim() || null,
+      emergency_contact_phone: emergencyPhone.trim() || null,
+    }).eq("id", data.user.id);
     setBusy(false);
     if (error) { setStatus(error.message); return; }
     setStatus("Saved.");
@@ -50,12 +63,13 @@ function ContactSection() {
   if (loading) return null;
 
   return <div className="settings-block">
-    <p className="card-kicker">Contact information</p>
+    <p className="card-kicker">Your details</p>
     <form onSubmit={submit} className="household-form">
+      <label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="How your name appears in the Village" disabled={busy} /></label>
       <label>Phone number<input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="(555) 555-5555" disabled={busy} /></label>
       <label>Emergency contact name<input value={emergencyName} onChange={(event) => setEmergencyName(event.target.value)} disabled={busy} /></label>
       <label>Emergency contact phone<input type="tel" value={emergencyPhone} onChange={(event) => setEmergencyPhone(event.target.value)} disabled={busy} /></label>
-      <button disabled={busy}>{busy ? "Saving…" : "Save contact info"}</button>
+      <button disabled={busy}>{busy ? "Saving…" : "Save details"}</button>
       <p className="admin-form-status" role="status">{status}</p>
     </form>
   </div>;

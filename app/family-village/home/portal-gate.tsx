@@ -138,7 +138,6 @@ export default function PortalGate() {
   return <main className="live-portal">
     <AppHeader current="home" roles={portal?.roles ?? []} title="Family Village" subtitle="Your household’s week, gathered in one place." />
     <ComplianceBanner items={portal?.compliance ?? []} />
-    <section className="portal-family-strip"><div><span>Children</span><strong>{portal?.children.length ?? 0}</strong></div><div><span>Classes</span><strong>{portal?.classes.length ?? 0}</strong></div><div><span>Upcoming work</span><strong>{portal?.assignments.length ?? 0}</strong></div></section>
     <div className="portal-grid">
       <section className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><span>{child.first_name.slice(0,1)}</span><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3></div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
@@ -153,9 +152,7 @@ export default function PortalGate() {
           administrator has shared with this household. Signed copies are
           excluded because they already appear above, against their requirement. */}
       <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other documents</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>
-      <section className="portal-module"><p className="eyebrow">Your account</p><h2>Household settings</h2>{profile && <ProfileNameForm profile={profile} onSaved={load} />}</section>
     </div>
-    {portal?.roles.some(role => role === "teacher" || role === "admin") && <nav className="portal-role-links" aria-label="Staff workspaces">{portal.roles.includes("teacher") && <a href="/family-village/teacher">Teacher workspace →</a>}{portal.roles.includes("admin") && <a href="/family-village/admin">Administrator workspace →</a>}</nav>}
     {openChildId && <ChildDetail childId={openChildId} onClose={() => setOpenChildId(null)} />}
     {openPost && <DetailModal title={openPost.title} onClose={() => setOpenPostId(null)}>
       {postImages[openPost.id] && <img src={postImages[openPost.id]} alt="" style={{ width: "100%", maxHeight: 320, objectFit: "cover", marginBottom: 16 }} />}
@@ -171,34 +168,6 @@ export default function PortalGate() {
       {documentUrl ? <a href={documentUrl} target="_blank" rel="noreferrer" className="email-button" style={{ textDecoration: "none" }}>Open document ↗</a> : <p className="portal-empty">No file is attached to this record yet.</p>}
     </DetailModal>}
   </main>;
-}
-
-function ProfileNameForm({ profile, onSaved }: { profile: Profile; onSaved: () => void }) {
-  const [name, setName] = useState(profile.display_name ?? "");
-  const [busy, setBusy] = useState(false); const [status, setStatus] = useState("");
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- resync when profile reloads
-  useEffect(() => { setName(profile.display_name ?? ""); }, [profile.display_name]);
-
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !name.trim()) return;
-    setBusy(true); setStatus("");
-    const { data, error } = await supabase.auth.getUser();
-    if (!data.user) { setBusy(false); return; }
-    const { error: updateError } = await supabase.from("profiles").update({ display_name: name.trim() }).eq("id", data.user.id);
-    setBusy(false);
-    if (updateError || error) { setStatus(updateError?.message ?? "Could not save."); return; }
-    setStatus("Saved.");
-    onSaved();
-  }
-
-  return <form onSubmit={save} className="household-form">
-    <label>Your name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" disabled={busy} /></label>
-    <button disabled={busy}>{busy ? "Saving…" : "Save name"}</button>
-    <p className="admin-form-status" role="status">{status}</p>
-  </form>;
 }
 
 function AddChildForm({ familyId, onAdded }: { familyId: string; onAdded: () => void }) {
