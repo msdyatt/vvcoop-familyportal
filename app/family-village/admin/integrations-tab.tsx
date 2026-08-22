@@ -35,7 +35,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
   if (loading) return <p>Loading integrations…</p>;
 
   return <section className="integrations-manage">
-    <p className="admin-form-status" role="status">{status || "Most rows here track connection status only. OpenSign is live: set its API base URL below, and a Village administrator must set the OPENSIGN_API_TOKEN and OPENSIGN_WEBHOOK_SECRET secrets on the server."}</p>
+    <p className="admin-form-status" role="status">{status || "One of these is a real connection. The rest are notes."}</p>
     <aside className="integration-help">
       <p className="card-kicker">OpenSign setup</p>
       <ol>
@@ -46,12 +46,22 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
       <p>Sending works as soon as the base URL and API token are set. Until the webhook secret is in place, signature completions will not flow back on their own and statuses stay at <b>sent</b>.</p>
     </aside>
     <div className="integrations-list">
-      {integrations.map((row) => <IntegrationCard key={row.id} row={row} onSave={save} />)}
+      {/* Split on purpose. A page that lists six services as though six are
+          connected is worse than one that admits only OpenSign is. */}
+      <p className="card-kicker">Connected</p>
+      {integrations.filter((row) => row.id === "opensign").map((row) => <IntegrationCard key={row.id} row={row} onSave={save} live />)}
+
+      <p className="card-kicker integrations-divider">Notes only</p>
+      <p className="field-note">
+        Nothing below is wired to anything. These rows are somewhere to record what the co-op uses and where it
+        lives — changing a status here changes nothing in the portal.
+      </p>
+      {integrations.filter((row) => row.id !== "opensign").map((row) => <IntegrationCard key={row.id} row={row} onSave={save} />)}
     </div>
   </section>;
 }
 
-function IntegrationCard({ row, onSave }: { row: Integration; onSave: (row: Integration) => void }) {
+function IntegrationCard({ row, onSave, live = false }: { row: Integration; onSave: (row: Integration) => void; live?: boolean }) {
   const [local, setLocal] = useState(row);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- resync local edit buffer when parent data reloads
@@ -59,7 +69,7 @@ function IntegrationCard({ row, onSave }: { row: Integration; onSave: (row: Inte
 
   return <article className="integration-card">
     <div className="integration-card-head">
-      <h3>{local.display_name}</h3>
+      <h3>{local.display_name}{live && <span className="live-badge">live</span>}</h3>
       <select value={local.status} onChange={(event) => setLocal({ ...local, status: event.target.value })}>
         <option value="not_configured">Not configured</option>
         <option value="pending">Pending</option>
@@ -72,6 +82,9 @@ function IntegrationCard({ row, onSave }: { row: Integration; onSave: (row: Inte
       <label>External URL<input value={local.external_url ?? ""} onChange={(event) => setLocal({ ...local, external_url: event.target.value })} placeholder="https://…" /></label>
       <label>API base URL<input value={local.api_base_url ?? ""} onChange={(event) => setLocal({ ...local, api_base_url: event.target.value })} placeholder="https://api…" /></label>
     </div>
+    {live && <p className="field-note">
+      This base URL is read by the signing function every time a document is sent — changing it changes real behaviour.
+    </p>}
     <button onClick={() => onSave(local)}>Save</button>
   </article>;
 }

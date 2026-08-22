@@ -6,6 +6,7 @@ import {
   FamilyRequirement, Requirement, SchoolYear,
   duesFor, formatMoney, isSettled, statusLabel, statusTone,
 } from "../../../lib/compliance";
+import DuesImport from "./dues-import";
 
 /**
  * Academic years the co-op could plausibly be setting up.
@@ -233,25 +234,6 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
     await load();
   }
 
-  /**
-   * Points the whole portal at a different year. Families only ever see the
-   * year flagged current, so this is what makes a new year's paperwork appear
-   * and last year's drop away.
-   */
-  async function makeCurrent(year: SchoolYear) {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    // Only one row may carry the flag, enforced by a partial unique index, so
-    // the outgoing year has to stand down before the incoming one is set.
-    const cleared = await supabase.from("school_years").update({ is_current: false }).eq("is_current", true);
-    if (cleared.error) { setStatus(cleared.error.message); return; }
-    const { error } = await supabase.from("school_years").update({ is_current: true }).eq("id", year.id);
-    if (error) { setStatus(error.message); return; }
-    await log("school_year_made_current", year.id, { label: year.label });
-    setStatus(`${year.label} is now the current year. Families see this year's paperwork and dues.`);
-    await load(year.id);
-  }
-
   if (loading) return <p>Loading compliance…</p>;
 
   const selectedYear = years.find((year) => year.id === yearId) ?? null;
@@ -273,21 +255,26 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
           {!years.length && <option value="">No years yet</option>}
         </select>
       </label>
-      {selectedYear && !selectedYear.is_current &&
-        <button className="make-current" onClick={() => makeCurrent(selectedYear)}>
-          Make {selectedYear.label} the current year
-        </button>}
-      {selectedYear?.is_current && <span className="current-year-note">This is the current year.</span>}
+      <span className="current-year-note">
+        {selectedYear?.is_current ? "This is the current year." : "Not the current year."} School years are managed in Classes.
+      </span>
       {requirements.length > 0 && <p className="compliance-summary">
         <b>{completeFamilies}</b> of <b>{families.length}</b> families are fully up to date
       </p>}
     </div>
 
-    <p className="admin-form-status" role="status">{status || "Create a school year, add what families must sign or pay, then open each requirement to every household."}</p>
-
-    <YearForm existing={years} onSaved={load} onStatus={setStatus} />
+    <p className="admin-form-status" role="status">{status || "Add what families must sign or pay this year, then open each requirement to every household. School years live in Classes."}</p>
 
     {yearId && <RequirementForm yearId={yearId} documents={documents} onSaved={load} onStatus={setStatus} />}
+
+    {yearId && <DuesImport
+      families={families.map((family) => ({ id: family.id, name: family.display_name }))}
+      rows={rows}
+      requirements={requirements}
+      actorUserId={actorUserId}
+      onSaved={load}
+      onStatus={setStatus}
+    />}
 
     {!requirements.length
       ? <p className="portal-empty">No requirements for this year yet.</p>
@@ -355,54 +342,6 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
       onSend={(email) => sendForSignature(editing.requirement, editing.family, editing.row, email)}
     />}
   </section>;
-}
-
-function YearForm({ existing, onSaved, onStatus }: { existing: SchoolYear[]; onSaved: (yearId?: string) => void; onStatus: (message: string) => void }) {
-  const taken = new Set(existing.map((year) => year.label));
-  const available = academicYearOptions().filter((label) => !taken.has(label));
-  const [label, setLabel] = useState(available[0] ?? "");
-  const [makeCurrent, setMakeCurrent] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !label) return;
-    setBusy(true);
-    // Only one year may be current, enforced by a partial unique index -- so
-    // stand the old one down first rather than letting the insert collide.
-    if (makeCurrent) await supabase.from("school_years").update({ is_current: false }).eq("is_current", true);
-    // Derive the span from the label so a year is not left without dates.
-    const startYear = Number(label.slice(0, 4));
-    const { data, error } = await supabase.from("school_years").insert({
-      label,
-      starts_on: `${startYear}-08-01`,
-      ends_on: `${startYear + 1}-06-30`,
-      is_current: makeCurrent,
-    }).select("id").single();
-    setBusy(false);
-    if (error) { onStatus(error.message); return; }
-    onStatus(makeCurrent
-      ? `Added ${label} and made it the current year.`
-      : `Added ${label}. It is not current yet -- switch to it above when you are ready.`);
-    onSaved(data?.id);
-  }
-
-  if (!available.length) {
-    return <p className="admin-form-status">Every upcoming school year has been added.</p>;
-  }
-
-  return <form onSubmit={submit} className="portal-form compliance-form">
-    <label><span className="field-caption">Add a school year</span>
-      <select value={label} onChange={(event) => setLabel(event.target.value)} disabled={busy}>
-        {available.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-    </label>
-    <label className="checkbox-field">
-      <input type="checkbox" checked={makeCurrent} onChange={(event) => setMakeCurrent(event.target.checked)} /> Make this the current year straight away
-    </label>
-    <button disabled={busy}>{busy ? "Adding…" : "Add year"}</button>
-  </form>;
 }
 
 function PublicSignLink({ requirement, onSaved, onStatus }: {

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import ChildDetail from "../child-detail";
+import { CollapsibleRecord, EditableSection, Field } from "./admin-ui";
+import FamilyDocuments from "./family-documents";
 import { FamilyRequirement, Requirement, isSettled, statusLabel, statusTone } from "../../../lib/compliance";
 
 type Child = { id: string; first_name: string; last_name: string | null; last_initial: string | null; age_band: string | null; active: boolean; last_name_override: boolean };
@@ -164,7 +166,7 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   if (loading) return <p>Loading households…</p>;
 
   return <section className="family-manage">
-    <p className="admin-form-status" role="status">{status || "Editing a family's name updates every child who hasn't been given a custom last name."}</p>
+    <p className="admin-form-status" role="status">{status || `${families.length} household${families.length === 1 ? "" : "s"}. Open one to see its details; nothing is editable until you choose to edit it.`}</p>
     <div className="family-manage-list">
       {families.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
     </div>
@@ -182,13 +184,11 @@ function FamilyCard({ family, roleMap, compliance, onSaveFamily, onSaveChild, on
   onGrantRole: (userId: string, role: string) => void;
   onRevokeRole: (userId: string, role: string) => void;
 }) {
-  // One name. families.last_name is the real one -- a trigger pushes it onto
-  // every child who has not overridden their surname -- and display_name is
-  // only a label, so it is kept in step rather than asked for twice.
   const [lastName, setLastName] = useState(family.last_name ?? family.display_name ?? "");
-  const [newChildName, setNewChildName] = useState("");
   const [children, setChildren] = useState(family.children ?? []);
   const [viewingChildId, setViewingChildId] = useState<string | null>(null);
+  const [addingChild, setAddingChild] = useState(false);
+  const [newChildName, setNewChildName] = useState("");
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- resync local edit buffer when parent data reloads
   useEffect(() => { setLastName(family.last_name ?? family.display_name ?? ""); setChildren(family.children ?? []); }, [family]);
@@ -197,58 +197,100 @@ function FamilyCard({ family, roleMap, compliance, onSaveFamily, onSaveChild, on
     setChildren((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   }
 
-  return <article className="family-card">
-    <div className="family-card-head">
-      <div className="field-row">
-        <label>Family name<input value={lastName} onChange={(event) => setLastName(event.target.value)} placeholder="Lewis" /></label>
-      </div>
-      <button onClick={() => onSaveFamily({ ...family, display_name: lastName, last_name: lastName })}>Save household</button>
+  const adults = (family.family_members ?? []).filter((member) => member.profiles?.status !== "removed");
+  const activeChildren = children.filter((child) => child.active);
+  const outstanding = compliance.filter((row) => row.requirements && !isSettled(row.status)).length;
+  const name = family.last_name || family.display_name;
+
+  return <CollapsibleRecord
+    summary={<b>{name}</b>}
+    meta={`${adults.length} adult${adults.length === 1 ? "" : "s"} · ${activeChildren.length} child${activeChildren.length === 1 ? "" : "ren"}`}
+    chips={compliance.length > 0
+      ? <span className={`status-pill ${outstanding ? "outstanding" : "complete"}`}>
+          {outstanding ? `${outstanding} outstanding` : "Up to date"}
+        </span>
+      : null}
+  >
+    <EditableSection
+      label="Household"
+      onSave={() => onSaveFamily({ ...family, display_name: lastName, last_name: lastName })}
+      onCancel={() => setLastName(family.last_name ?? family.display_name ?? "")}
+    >
+      {(editing) => <div className="field-grid">
+        <Field label="Family name" value={name} editing={editing}>
+          <input value={lastName} onChange={(event) => setLastName(event.target.value)} placeholder="Lewis" />
+        </Field>
+        {editing && <p className="field-note">Children without a custom surname follow this name.</p>}
+      </div>}
+    </EditableSection>
+
+    <div className="record-section">
+      <p className="card-kicker">Adults</p>
+      {adults.map((member) => {
+        const roles = roleMap[member.user_id] ?? [];
+        return <div className="member-row" key={member.user_id}>
+          <div className="member-identity">
+            <b>{member.profiles?.display_name || "Unnamed"} {family.last_name}</b>
+            <span>{member.profiles?.email}</span>
+            <span>{member.profiles?.phone || "No phone on file"}</span>
+            <span className="member-meta">{member.relationship} · {member.profiles?.status}</span>
+          </div>
+          <div className="role-chips">
+            {ASSIGNABLE_ROLES.map((role) => <button key={role} className={`role-chip${roles.includes(role) ? " active" : ""}`}
+              onClick={() => (roles.includes(role) ? onRevokeRole(member.user_id, role) : onGrantRole(member.user_id, role))}>{role}</button>)}
+          </div>
+          <div className="row-actions">
+            <button className="danger" onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
+          </div>
+        </div>;
+      })}
+      {!adults.length && <p className="portal-empty">No adults have access to this household.</p>}
     </div>
 
-    {family.family_members?.map((member) => {
-      const roles = roleMap[member.user_id] ?? [];
-      return <div className="member-row" key={member.user_id}>
-        <div className="member-identity">
-          <b>{member.profiles?.display_name || "Unnamed"} {family.last_name}</b>
-          <span>{member.profiles?.email}</span>
-          <span>{member.profiles?.phone || "No phone on file"}</span>
-          <span className="member-meta">{member.relationship} · {member.profiles?.status}</span>
-        </div>
-        <div className="role-chips">
-          {ASSIGNABLE_ROLES.map((role) => <button key={role} className={`role-chip${roles.includes(role) ? " active" : ""}`}
-            onClick={() => (roles.includes(role) ? onRevokeRole(member.user_id, role) : onGrantRole(member.user_id, role))}>{role}</button>)}
-        </div>
-        <div className="row-actions">
-          {member.profiles?.status !== "removed"
-            ? <button className="danger" onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
-            : <span className="status-pill cancelled">Removed</span>}
-        </div>
-      </div>;
-    })}
+    <EditableSection label="Children" onSave={async () => { for (const child of children) onSaveChild(child); }} onCancel={() => setChildren(family.children ?? [])}>
+      {(editing) => <>
+        {children.map((child) => editing
+          ? <div className="child-row" key={child.id}>
+              <label>First name<input value={child.first_name} onChange={(event) => updateChild(child.id, { first_name: event.target.value })} /></label>
+              <label>Last name<input value={child.last_name ?? ""} onChange={(event) => updateChild(child.id, { last_name: event.target.value, last_name_override: true })} /></label>
+              <label className="checkbox-field"><input type="checkbox" checked={child.last_name_override} onChange={(event) => updateChild(child.id, { last_name_override: event.target.checked })} /> Custom name</label>
+              <label className="checkbox-field"><input type="checkbox" checked={child.active} onChange={(event) => updateChild(child.id, { active: event.target.checked })} /> Active</label>
+            </div>
+          : <div className="child-line" key={child.id}>
+              <b>{child.first_name} {child.last_name}</b>
+              <span>{child.age_band ? `Grade ${child.age_band}` : "Grade not set"}{child.active ? "" : " · inactive"}</span>
+              <button onClick={() => setViewingChildId(child.id)}>View</button>
+            </div>)}
+        {!children.length && <p className="portal-empty">No children on this household yet.</p>}
 
-    <div className="family-section-divider"><span>Children</span></div>
+        {/* A button, not a stray input sitting open on the page. */}
+        {!addingChild
+          ? <button className="add-child-button" onClick={() => setAddingChild(true)}>Add a child</button>
+          : <div className="add-child-row">
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the field only exists after the user pressed Add, so focusing it follows their intent rather than hijacking it */}
+              <label>First name<input autoFocus value={newChildName} onChange={(event) => setNewChildName(event.target.value)} placeholder="First name" /></label>
+              <div className="row-actions">
+                <button onClick={() => { onAddChild(family.id, newChildName); setNewChildName(""); setAddingChild(false); }}>Add</button>
+                <button className="ghost" onClick={() => { setNewChildName(""); setAddingChild(false); }}>Cancel</button>
+              </div>
+            </div>}
+      </>}
+    </EditableSection>
 
-    {children.map((child) => <div className="child-row" key={child.id}>
-      <label>First name<input value={child.first_name} onChange={(event) => updateChild(child.id, { first_name: event.target.value })} /></label>
-      <label>Last name<input value={child.last_name ?? ""} onChange={(event) => updateChild(child.id, { last_name: event.target.value, last_name_override: true })} /></label>
-      <label className="checkbox-field"><input type="checkbox" checked={child.last_name_override} onChange={(event) => updateChild(child.id, { last_name_override: event.target.checked })} /> Custom name</label>
-      <label className="checkbox-field"><input type="checkbox" checked={child.active} onChange={(event) => updateChild(child.id, { active: event.target.checked })} /> Active</label>
-      <div className="row-actions"><button onClick={() => setViewingChildId(child.id)}>View</button><button onClick={() => onSaveChild(children.find((row) => row.id === child.id)!)}>Save</button></div>
-    </div>)}
-    {viewingChildId && <ChildDetail childId={viewingChildId} onClose={() => setViewingChildId(null)} />}
-
-    {compliance.length > 0 && <div className="family-compliance-chips">
-      {compliance
-        .filter((row) => row.requirements)
-        .sort((a, b) => Number(isSettled(a.status)) - Number(isSettled(b.status)))
-        .map((row) => <span key={row.id} className={`status-pill ${statusTone(row.status)}`}>
-          {row.requirements!.title}: {statusLabel(row.requirements!.kind, row)}
-        </span>)}
+    {compliance.length > 0 && <div className="record-section">
+      <p className="card-kicker">This year</p>
+      <div className="family-compliance-chips">
+        {compliance
+          .filter((row) => row.requirements)
+          .sort((a, b) => Number(isSettled(a.status)) - Number(isSettled(b.status)))
+          .map((row) => <span key={row.id} className={`status-pill ${statusTone(row.status)}`}>
+            {row.requirements!.title}: {statusLabel(row.requirements!.kind, row)}
+          </span>)}
+      </div>
     </div>}
 
-    <div className="add-child-row">
-      <label>Add a child<input value={newChildName} onChange={(event) => setNewChildName(event.target.value)} placeholder="First name" /></label>
-      <div className="row-actions"><button onClick={() => { onAddChild(family.id, newChildName); setNewChildName(""); }}>Add child</button></div>
-    </div>
-  </article>;
+    <FamilyDocuments familyId={family.id} familyName={name} />
+
+    {viewingChildId && <ChildDetail childId={viewingChildId} onClose={() => setViewingChildId(null)} />}
+  </CollapsibleRecord>;
 }
