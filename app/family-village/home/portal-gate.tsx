@@ -77,7 +77,10 @@ export default function PortalGate() {
 
     const [classes, posts, events, documents, roles] = await Promise.all([
       supabase.from("classes").select("id,title,description,meeting_time").in("id", safeClassIds).order("title"),
-      supabase.from("posts").select("id,title,body,published_at,audience").order("published_at", { ascending: false }).limit(6),
+      // Ask for family news explicitly. Leaning on RLS alone leaked staff news
+      // here: it permits a teacher to read `teachers` posts, so anyone who is
+      // both a parent and a teacher saw them on their family dashboard.
+      supabase.from("posts").select("id,title,body,published_at,audience").in("audience", ["public", "families"]).not("published_at", "is", null).order("published_at", { ascending: false }).limit(6),
       supabase.from("events").select("id,title,description,starts_at,ends_at,location,class_id,audience,requires_prework").gte("starts_at", new Date().toISOString()).order("starts_at").limit(20),
       supabase.from("documents").select("id,title,kind,signature_status,storage_path").or(`family_id.in.(${safeFamilyIds.join(",")}),class_id.in.(${safeClassIds.join(",")})`).order("created_at", { ascending: false }).limit(8),
       supabase.from("user_roles").select("role").eq("user_id", data.user.id),

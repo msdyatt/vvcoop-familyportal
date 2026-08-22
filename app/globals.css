@@ -4324,3 +4324,121 @@ footer {
   color:var(--sage-text);
   font-size:13px;
 }
+
+/* --- Public news on the front page ---------------------------------------- */
+.public-news {
+  padding:clamp(60px,9vw,110px) 5vw;
+  background:var(--surface);
+}
+
+.public-news-heading { max-width:1100px; margin:0 auto 34px; }
+
+.public-news-list {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:34px;
+  max-width:1100px;
+  margin:0 auto;
+}
+
+.public-news-list article {
+  display:grid;
+  gap:8px;
+  align-content:start;
+  padding-top:20px;
+  border-top:2px solid var(--terracotta);
+}
+
+.public-news-list time {
+  color:var(--sage-text);
+  font:600 12px var(--sans);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.public-news-list h3 {
+  margin:0;
+  color:var(--navy);
+  font:600 clamp(22px,2.4vw,28px)/1.2 var(--serif);
+}
+
+.public-news-list p {
+  margin:0;
+  color:var(--navy);
+  font-size:16px;
+  line-height:1.6;
+  white-space:pre-wrap;
+}
+
+.composer-hint {
+  margin:0;
+  color:var(--sage-text);
+  font-size:13px;
+  line-height:1.5;
+}
+
+/* --- Activity log --------------------------------------------------------- */
+.activity-filters {
+  display:flex;
+  align-items:flex-end;
+  gap:16px;
+  flex-wrap:wrap;
+  margin-bottom:20px;
+  padding-bottom:18px;
+  border-bottom:1px solid rgba(var(--navy-rgb),.12);
+}
+
+.activity-filters label {
+  display:grid;
+  grid-template-rows:auto 1fr;
+  gap:6px;
+  color:var(--sage-text);
+  font-size:12px;
+  font-weight:700;
+  text-transform:uppercase;
+}
+
+.activity-filters select {
+  padding:9px 11px;
+  background:var(--surface-sunken);
+  color:var(--navy);
+  font:14px var(--sans);
+  border:1px solid rgba(var(--navy-rgb),.18);
+  border-radius:2px;
+}
+
+.activity-count {
+  margin:0 0 10px auto;
+  color:var(--sage-text);
+  font-size:13px;
+  font-variant-numeric:tabular-nums;
+}
+
+.activity-line {
+  color:var(--navy);
+  font-size:15px;
+  line-height:1.5;
+}
+
+.activity-detail-toggle {
+  justify-self:start;
+  margin-top:6px;
+  padding:4px 9px;
+  background:transparent;
+  color:var(--sage-text);
+  font:600 11px var(--sans);
+  border:1px solid rgba(var(--navy-rgb),.2);
+  border-radius:2px;
+  cursor:pointer;
+}
+
+.activity-row code {
+  display:block;
+  margin-top:8px;
+  padding:10px 12px;
+  overflow-x:auto;
+  background:var(--surface-sunken);
+  color:var(--sage-text);
+  font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  white-space:pre;
+}

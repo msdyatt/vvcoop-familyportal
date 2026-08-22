@@ -61,7 +61,7 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     const { error } = await supabase.from("families").update({ display_name: family.display_name, last_name: family.last_name }).eq("id", family.id);
     if (error) { setStatus(error.message); return; }
     await log("family_updated", "family", family.id, { display_name: family.display_name, last_name: family.last_name });
-    setStatus(`Saved ${family.display_name}. Children without a custom last name were updated to match.`);
+    setStatus(`Saved ${family.last_name || family.display_name}. Children without a custom last name were updated to match.`);
     await load();
   }
 
@@ -88,10 +88,38 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     await load();
   }
 
+  /**
+   * Removing a member is confirmed once. Removing the *last* member of a
+   * household is a different act -- it takes the children, their enrollments
+   * and the household record with it -- so that path asks the administrator to
+   * type the word, and says exactly what goes.
+   */
   async function removeUser(familyId: string, userId: string, displayName: string) {
-    if (!confirm(`Remove ${displayName || "this person"}'s access? Their past posts and notes are kept, but they will no longer be able to sign in to Family Village.`)) return;
+    const family = families.find((row) => row.id === familyId);
+    const remaining = (family?.family_members ?? []).filter(
+      (member) => member.user_id !== userId && member.profiles?.status !== "removed",
+    );
+    const who = displayName || "this person";
+
+    if (remaining.length > 0) {
+      if (!confirm(`Remove ${who}'s access to Family Village?\n\nTheir past notes and posts are kept. ${remaining.length} other adult${remaining.length === 1 ? "" : "s"} still have access to this household.`)) return;
+    } else {
+      const childCount = family?.children?.length ?? 0;
+      const typed = prompt(
+        `${who} is the last adult with access to the ${family?.last_name || family?.display_name || "this"} household.\n\n` +
+        `Removing them DELETES THE WHOLE HOUSEHOLD:\n` +
+        `  • ${childCount} child record${childCount === 1 ? "" : "s"}\n` +
+        `  • every class enrollment for those children\n` +
+        `  • the household's documents and compliance record\n\n` +
+        `This cannot be undone. Type remove to confirm.`,
+      );
+      if (typed === null) return;
+      if (typed.trim().toLowerCase() !== "remove") { setStatus("Not removed — the confirmation did not match."); return; }
+    }
+
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+
     const results = await Promise.all([
       supabase.from("profiles").update({ status: "removed" }).eq("id", userId),
       supabase.from("user_roles").delete().eq("user_id", userId),
@@ -99,8 +127,19 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     ]);
     const failed = results.find((result) => result.error);
     if (failed?.error) { setStatus(failed.error.message); return; }
-    await log("user_removed", "profile", userId, { family_id: familyId });
-    setStatus(`${displayName || "That person"} no longer has access.`);
+
+    if (remaining.length === 0) {
+      // children, enrollments, documents and compliance rows all cascade.
+      const { error } = await supabase.from("families").delete().eq("id", familyId);
+      if (error) { setStatus(`${who} lost access, but the household could not be deleted: ${error.message}`); await load(); return; }
+      await log("household_deleted", "family", familyId, { last_adult: who, children: family?.children?.length ?? 0 });
+      setStatus(`Removed ${who} and deleted the household.`);
+      await load();
+      return;
+    }
+
+    await log("user_removed", "profile", userId, { family_id: familyId, display_name: who });
+    setStatus(`${who} no longer has access.`);
     await load();
   }
 
@@ -143,14 +182,16 @@ function FamilyCard({ family, roleMap, compliance, onSaveFamily, onSaveChild, on
   onGrantRole: (userId: string, role: string) => void;
   onRevokeRole: (userId: string, role: string) => void;
 }) {
-  const [displayName, setDisplayName] = useState(family.display_name);
-  const [lastName, setLastName] = useState(family.last_name ?? "");
+  // One name. families.last_name is the real one -- a trigger pushes it onto
+  // every child who has not overridden their surname -- and display_name is
+  // only a label, so it is kept in step rather than asked for twice.
+  const [lastName, setLastName] = useState(family.last_name ?? family.display_name ?? "");
   const [newChildName, setNewChildName] = useState("");
   const [children, setChildren] = useState(family.children ?? []);
   const [viewingChildId, setViewingChildId] = useState<string | null>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- resync local edit buffer when parent data reloads
-  useEffect(() => { setDisplayName(family.display_name); setLastName(family.last_name ?? ""); setChildren(family.children ?? []); }, [family]);
+  useEffect(() => { setLastName(family.last_name ?? family.display_name ?? ""); setChildren(family.children ?? []); }, [family]);
 
   function updateChild(id: string, patch: Partial<Child>) {
     setChildren((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -159,10 +200,9 @@ function FamilyCard({ family, roleMap, compliance, onSaveFamily, onSaveChild, on
   return <article className="family-card">
     <div className="family-card-head">
       <div className="field-row">
-        <label>Household name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
-        <label>Family last name<input value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
+        <label>Family name<input value={lastName} onChange={(event) => setLastName(event.target.value)} placeholder="Lewis" /></label>
       </div>
-      <button onClick={() => onSaveFamily({ ...family, display_name: displayName, last_name: lastName })}>Save household</button>
+      <button onClick={() => onSaveFamily({ ...family, display_name: lastName, last_name: lastName })}>Save household</button>
     </div>
 
     {family.family_members?.map((member) => {
