@@ -112,6 +112,7 @@ export default {
       .from("signature_requests")
       .insert(signers.map((s) => ({
         document_id: document?.id ?? null,
+        family_requirement_id: familyRequirementId ?? null,
         provider: "opensign",
         signer_email: s.email,
         signer_name: s.name ?? null,
