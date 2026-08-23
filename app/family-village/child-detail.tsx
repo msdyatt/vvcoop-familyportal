@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
 import Avatar from "./avatar";
-import { GRADES } from "./admin/admin-ui";
+import { EditableSection, Field, GRADES } from "./admin/admin-ui";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
 
 type ClassInfo = { id: string; title: string; schedule: string; teachers: string[] };
@@ -29,6 +29,10 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
   const [userId, setUserId] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editBirthdate, setEditBirthdate] = useState<string | null>(null);
+  const [editOverride, setEditOverride] = useState(false);
+  const [editGrade, setEditGrade] = useState<string | null>(null);
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
@@ -132,6 +136,9 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- initial data fetch on mount
   useEffect(() => { load(); }, [childId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the edit form's staged values whenever fresh data loads
+  useEffect(() => { setEditFirstName(child?.first_name ?? ""); setEditBirthdate(child?.birthdate ?? null); setEditOverride(child?.age_band_override ?? false); setEditGrade(child?.age_band ?? null); }, [child]);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) { if (event.key === "Escape") onClose(); }
     document.addEventListener("keydown", onKeyDown);
@@ -159,7 +166,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
    * any other column in the same update), so this is convenience, not the
    * real gate.
    */
-  async function updateChild(patch: { avatar_path?: string; birthdate?: string | null; age_band_override?: boolean; age_band?: string | null }, savedMessage = "Saved.") {
+  async function updateChild(patch: { avatar_path?: string; first_name?: string; birthdate?: string | null; age_band_override?: boolean; age_band?: string | null }, savedMessage = "Saved.") {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { error } = await supabase.from("children").update(patch).eq("id", childId);
@@ -225,24 +232,53 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         </div>
 
         <section>
-          <p className="card-kicker">About {child?.first_name}</p>
-          <div className="field-grid">
-            <label className="file-drop"><span className="field-caption">Photo</span>
-              <input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadAvatar(file); }} />
-            </label>
-            <label>Birthdate<input type="date" value={child?.birthdate ?? ""} onChange={(event) => updateChild({ birthdate: event.target.value || null })} /></label>
-            <label className="checkbox-field">
-              <input type="checkbox" checked={child?.age_band_override ?? false} onChange={(event) => updateChild({ age_band_override: event.target.checked })} /> Set grade manually
-            </label>
-            {child?.age_band_override
-              ? <label>Grade<select value={child?.age_band ?? ""} onChange={(event) => updateChild({ age_band: event.target.value || null })}>
+          <EditableSection
+            label="Details"
+            onSave={() => updateChild({
+              first_name: editFirstName.trim() || child?.first_name,
+              birthdate: editBirthdate || null,
+              age_band_override: editOverride,
+              ...(editOverride ? { age_band: editGrade } : {}),
+            }, "Saved.")}
+            onCancel={() => {
+              setEditFirstName(child?.first_name ?? "");
+              setEditBirthdate(child?.birthdate ?? null);
+              setEditOverride(child?.age_band_override ?? false);
+              setEditGrade(child?.age_band ?? null);
+            }}
+          >
+            {(editing) => <div className="field-grid">
+              {editing && <label className="file-drop"><span className="field-caption">Photo</span>
+                <input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadAvatar(file); }} />
+              </label>}
+              <Field label="Goes by" value={child?.first_name} editing={editing}>
+                <input value={editFirstName} onChange={(event) => setEditFirstName(event.target.value)} />
+              </Field>
+              <Field
+                label="Birthdate"
+                value={child?.birthdate ? new Date(child.birthdate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null}
+                editing={editing}
+              >
+                <input type="date" value={editBirthdate ?? ""} onChange={(event) => setEditBirthdate(event.target.value || null)} />
+              </Field>
+              {editing && <label className="checkbox-field">
+                <input type="checkbox" checked={editOverride} onChange={(event) => setEditOverride(event.target.checked)} /> Set grade manually
+              </label>}
+              <Field
+                label="Grade"
+                value={child?.age_band ? `Grade ${child.age_band}${child.age_band_override ? " (set manually)" : ""}` : null}
+                editing={editing && editOverride}
+              >
+                <select value={editGrade ?? ""} onChange={(event) => setEditGrade(event.target.value || null)}>
                   <option value="">Not set</option>
                   {GRADES.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
-                </select></label>
-              : <p className="field-note">
-                  {child?.birthdate ? `Grade ${child?.age_band ?? "not yet set"}, calculated from birthdate.` : "Add a birthdate to calculate grade automatically."}
-                </p>}
-          </div>
+                </select>
+              </Field>
+              {editing && !editOverride && <p className="field-note">
+                {editBirthdate ? "Grade is calculated automatically from birthdate." : "Add a birthdate to calculate grade automatically."}
+              </p>}
+            </div>}
+          </EditableSection>
           {childStatus && <p className="admin-form-status" role="status">{childStatus}</p>}
         </section>
 
