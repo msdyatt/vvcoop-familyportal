@@ -28,6 +28,7 @@ function ContactSection() {
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarStatus, setAvatarStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -47,14 +48,15 @@ function ContactSection() {
   async function uploadAvatar(file: File) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    setAvatarBusy(true);
+    setAvatarBusy(true); setAvatarStatus("Uploading…");
     const { data } = await supabase.auth.getUser();
     if (!data.user) { setAvatarBusy(false); return; }
     const uploaded = await uploadPrivateFile(supabase, "avatars", file);
-    if ("error" in uploaded) { setAvatarBusy(false); setStatus(uploaded.error); return; }
+    if ("error" in uploaded) { setAvatarBusy(false); setAvatarStatus(uploaded.error); return; }
     const { error } = await supabase.from("profiles").update({ avatar_path: uploaded.path }).eq("id", data.user.id);
     setAvatarBusy(false);
-    if (error) { setStatus(error.message); return; }
+    if (error) { setAvatarStatus(error.message); return; }
+    setAvatarStatus("Photo updated.");
     await load();
   }
 
@@ -85,9 +87,12 @@ function ContactSection() {
     <p className="card-kicker">Your details</p>
     <div className="avatar-uploader">
       <Avatar url={avatarUrl} label={displayName || "?"} size="lg" />
-      <label className="file-drop"><span className="field-caption">Photo</span>
-        <input type="file" accept="image/*" disabled={avatarBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadAvatar(file); }} />
-      </label>
+      <div>
+        <label className="file-drop"><span className="field-caption">Photo</span>
+          <input type="file" accept="image/*" disabled={avatarBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadAvatar(file); }} />
+        </label>
+        <p className="admin-form-status" role="status">{avatarStatus}</p>
+      </div>
     </div>
     <form onSubmit={submit} className="household-form">
       <label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="How your name appears in the Village" disabled={busy} /></label>

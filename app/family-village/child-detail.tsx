@@ -15,7 +15,6 @@ type ChildRecord = { id: string; first_name: string; last_name: string | null; a
 
 type OpenPeriod = { id: string; title: string; closes_at: string; electives_only: boolean };
 type EligibleClass = { id: string; title: string; is_elective: boolean };
-type EnrollRequest = { id: string; class_id: string; period_id: string; status: string; class_title: string };
 
 export default function ChildDetail({ childId, onClose }: { childId: string; onClose: () => void }) {
   const [child, setChild] = useState<ChildRecord | null>(null);
@@ -23,7 +22,6 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
   const [classDates, setClassDates] = useState<ClassDateInfo[]>([]);
   const [openPeriod, setOpenPeriod] = useState<OpenPeriod | null>(null);
   const [eligibleClasses, setEligibleClasses] = useState<EligibleClass[]>([]);
-  const [requests, setRequests] = useState<EnrollRequest[]>([]);
   const [classPick, setClassPick] = useState("");
   const [enrollStatus, setEnrollStatus] = useState("");
   const [childStatus, setChildStatus] = useState("");
@@ -118,19 +116,14 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         .eq("active", true).contains("grades", [childRow.age_band]);
       if (period.electives_only) classQuery = classQuery.eq("is_elective", true);
 
-      const [{ data: classRows2 }, { data: enrolledRows }, { data: requestRows }] = await Promise.all([
+      const [{ data: classRows2 }, { data: enrolledRows }] = await Promise.all([
         classQuery,
         supabase.from("enrollments").select("class_id").eq("child_id", childId).eq("status", "active"),
-        supabase.from("enrollment_requests").select("id,class_id,period_id,status,classes(title)")
-          .eq("child_id", childId).eq("period_id", period.id).order("created_at", { ascending: false }),
       ]);
       const alreadyIn = new Set((enrolledRows ?? []).map((row) => row.class_id));
       setEligibleClasses((classRows2 ?? []).filter((row) => !alreadyIn.has(row.id)));
-      setRequests(((requestRows ?? []) as unknown as { id: string; class_id: string; period_id: string; status: string; classes: { title: string } | null }[])
-        .map((row) => ({ id: row.id, class_id: row.class_id, period_id: row.period_id, status: row.status, class_title: row.classes?.title ?? "" })));
     } else {
       setEligibleClasses([]);
-      setRequests([]);
     }
 
     setLoading(false);
@@ -166,20 +159,22 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
    * any other column in the same update), so this is convenience, not the
    * real gate.
    */
-  async function updateChild(patch: { avatar_path?: string; birthdate?: string | null; age_band_override?: boolean; age_band?: string | null }) {
+  async function updateChild(patch: { avatar_path?: string; birthdate?: string | null; age_band_override?: boolean; age_band?: string | null }, savedMessage = "Saved.") {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { error } = await supabase.from("children").update(patch).eq("id", childId);
     if (error) { setChildStatus(error.message); return; }
+    setChildStatus(savedMessage);
     await load();
   }
 
   async function uploadAvatar(file: File) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+    setChildStatus("Uploading…");
     const uploaded = await uploadPrivateFile(supabase, "avatars", file);
     if ("error" in uploaded) { setChildStatus(uploaded.error); return; }
-    await updateChild({ avatar_path: uploaded.path });
+    await updateChild({ avatar_path: uploaded.path }, "Photo updated.");
   }
 
   async function toggleCompletion(eventId: string, done: boolean) {
@@ -192,33 +187,29 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     if (!error) await load();
   }
 
-  async function requestEnrollment() {
+  /**
+   * Enrolls immediately -- no admin approval step. family_self_enroll
+   * re-checks eligibility server-side (window open, grade matches, no
+   * same-block clash) rather than trusting the picker's own filtering, since
+   * that list was built from what the page loaded with, not the instant of
+   * clicking.
+   */
+  async function enrollInClass() {
     if (!openPeriod || !classPick) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !userId) return;
-    setEnrollStatus("Requesting…");
-    const { error } = await supabase.from("enrollment_requests").insert({
-      period_id: openPeriod.id, class_id: classPick, child_id: childId, requested_by: userId,
+    setEnrollStatus("Enrolling…");
+    const { error } = await supabase.rpc("family_self_enroll", {
+      p_period_id: openPeriod.id, p_class_id: classPick, p_child_id: childId,
     });
     if (error) {
-      // enrollment_request_allowed folds several reasons into one rejection --
-      // a closed window, a grade mismatch, a same-block clash -- so the
-      // household hears "why", not a bare database error.
-      setEnrollStatus(error.message.includes("row-level security")
-        ? "That class can't be requested right now — it may conflict with another class at the same time, or no longer match this child's grade."
-        : error.message);
+      setEnrollStatus(error.message);
       return;
     }
+    const enrolledTitle = eligibleClasses.find((option) => option.id === classPick)?.title ?? "the class";
     setClassPick("");
-    setEnrollStatus("Requested.");
+    setEnrollStatus(`Enrolled in ${enrolledTitle}.`);
     await load();
-  }
-
-  async function cancelRequest(requestId: string) {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const { error } = await supabase.from("enrollment_requests").update({ status: "cancelled" }).eq("id", requestId);
-    if (!error) await load();
   }
 
   return <div className="child-detail-overlay" role="dialog" aria-modal="true">
@@ -278,20 +269,15 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
           <p className="card-kicker">Enrollment is open</p>
           <p className="field-note">
             {openPeriod.title} closes {new Date(openPeriod.closes_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}.
-            {openPeriod.electives_only ? " Choose electives for " : " Choose classes for "}{child?.first_name}.
+            {openPeriod.electives_only ? " Choose electives for " : " Choose classes for "}{child?.first_name} — enrolling is immediate, no approval needed.
           </p>
-          {requests.length > 0 && <ul className="child-detail-list">{requests.map((row) => <li key={row.id}>
-            <b>{row.class_title}</b>
-            <span className={`status-pill ${row.status === "requested" ? "pending" : row.status === "approved" ? "complete" : row.status === "waitlisted" ? "pending" : "waived"}`}>{row.status}</span>
-            {row.status === "requested" && <button className="ghost" onClick={() => cancelRequest(row.id)}>Cancel</button>}
-          </li>)}</ul>}
           {eligibleClasses.length
             ? <div className="row-actions">
                 <select value={classPick} onChange={(event) => setClassPick(event.target.value)}>
                   <option value="">Choose a class…</option>
                   {eligibleClasses.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
                 </select>
-                <button disabled={!classPick} onClick={requestEnrollment}>Request enrollment</button>
+                <button disabled={!classPick} onClick={enrollInClass}>Enroll</button>
               </div>
             : <p className="portal-empty">No open classes match {child?.first_name}&rsquo;s grade right now.</p>}
           {enrollStatus && <p className="admin-form-status" role="status">{enrollStatus}</p>}
