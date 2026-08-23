@@ -87,21 +87,32 @@ Dues amounts are captured when a requirement is opened, not derived on read, so 
 
 ## Known gaps / good next steps (raised but not yet built)
 
-### ⛔ The live OpenSign API token is rejected — this blocks all tracking
-Tracking is fully built and deployed, but **no send or poll can succeed until a
-working token is in place.** Probed on 24 Aug 2026: the token on file
-(`opensign.7JBQ…`) returns `405 {"error":"Invalid API Token!"}` against **every**
-host and both API versions — production, sandbox and EU, `v1.2` and `v1`. The
-*sandbox* token is accepted by the sandbox host in the same test, which proves
-the probe itself is sound and the base URL is right. The live token is simply
-bad: mistyped when copied out, or rotated since.
+### ✅ OpenSign token confirmed good — but `verify_jwt: true` blocked every real user
+The 24 Aug token was rotated by Sam (`opensign.59qxX…`) and confirmed accepted
+by `https://app.opensignlabs.com/api/v1.2` directly via curl. But **Admin →
+Integrations → Test connection** still failed for a real signed-in admin, every
+time, with a browser-side "Edge Function returned a non-2xx status code" and no
+visible feedback ("nothing happens" was the exact symptom reported).
 
-**Fix:** OpenSign → Settings → API Token → generate a fresh one, then
-`supabase secrets set OPENSIGN_API_TOKEN=…`. Confirm it with **Admin →
-Integrations → Test connection**, which reports the answer in one click rather
-than leaving a dead token looking like "nobody has signed yet".
+Root cause, found in `function_edge_logs`: `opensign-sync`/`opensign-send` were
+deployed with `verify_jwt: true`. This project signs sessions with an
+**asymmetric ES256 key** (confirmed via `GET /auth/v1/.well-known/jwks.json`),
+and the Edge Functions platform-level JWT gate rejected real, freshly issued
+user tokens with a 403 — before either function's own code ever ran. The same
+tokens worked fine against `/rest/v1/*` and `/auth/v1/*` directly, which is why
+sign-in and every other query kept working while this one gate did not.
 
-How to re-probe from a shell (creates nothing — an empty body cannot):
+**Fixed 24 Aug 2026:** both functions redeployed with `verify_jwt: false`.
+Neither function got weaker for it — both already do their own real check
+(`userClient.auth.getUser()` against the current Auth API, then an admin-role
+lookup, fail-closed on either) — `opensign-webhook` has run this way from the
+start for the identical reason, one layer further out. **If either function is
+ever redeployed via the Supabase CLI or dashboard instead of the MCP tool,
+explicitly pass `--no-verify-jwt`** (CLI) or uncheck "Enforce JWT verification"
+(dashboard) — the platform default is `true`, and reverting to it silently
+reintroduces this exact outage.
+
+How to re-probe the token from a shell (creates nothing — an empty body cannot):
 ```
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
   https://app.opensignlabs.com/api/v1.2/createdocument \
