@@ -236,11 +236,32 @@ export type DocumentState = {
 };
 
 /**
+ * Reads the roles a template defines for its signers.
+ *
+ * Roles are matched by exact string, and the co-op's templates use roles like
+ * `"Participant "` -- trailing space and all. Guessing `"Signer"` does not match
+ * them, and a signer whose role does not match the template is a signer with no
+ * fields attached: the document arrives with nowhere to sign while the API
+ * still returns 200. Verified against both live templates on 24 August 2026.
+ *
+ * Returned verbatim, deliberately un-trimmed, because the comparison on
+ * OpenSign's side is exact and "helpfully" cleaning the string would break it.
+ */
+export async function getTemplateRoles(baseUrl: string, token: string, templateId: string): Promise<string[]> {
+  const result = await call(baseUrl, token, `/template/${encodeURIComponent(templateId)}`, { method: "GET" });
+  const record = (result ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(record.signers)) return [];
+  return (record.signers as Record<string, unknown>[])
+    .map((signer) => (typeof signer.role === "string" ? signer.role : ""))
+    .filter((role) => role.length > 0);
+}
+
+/**
  * Sends an existing OpenSign template to one signer.
  *
  * The signature fields come from the template, so nothing here places widgets.
- * `role` should match a role defined on the template; OpenSign falls back to
- * its own default when it does not.
+ * Roles come from the template too, unless the caller names one -- see
+ * getTemplateRoles for why guessing at them does not work.
  */
 export async function sendFromTemplate(opts: {
   baseUrl: string;
@@ -252,9 +273,15 @@ export async function sendFromTemplate(opts: {
   sendInOrder?: boolean;
   timeToCompleteDays?: number;
 }): Promise<SendResult> {
+  // Only ask for the roles when the caller did not supply them all; a send that
+  // already knows its roles should not pay for an extra round trip.
+  const templateRoles = opts.signers.some((signer) => !signer.role)
+    ? await getTemplateRoles(opts.baseUrl, opts.token, opts.templateId)
+    : [];
+
   const body: Record<string, unknown> = {
-    signers: opts.signers.map((signer) => ({
-      role: signer.role ?? "Signer",
+    signers: opts.signers.map((signer, index) => ({
+      role: signer.role ?? templateRoles[index] ?? templateRoles[0] ?? "Signer",
       email: signer.email,
       name: signer.name ?? signer.email,
     })),
