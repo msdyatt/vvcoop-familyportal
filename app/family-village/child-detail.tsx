@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
-import { getSignedFileUrl } from "../../lib/storage";
+import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
 import Avatar from "./avatar";
+import { GRADES } from "./admin/admin-ui";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
 
 type ClassInfo = { id: string; title: string; schedule: string; teachers: string[] };
 type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string; completed: boolean };
 type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
 
-type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null; avatar_path: string | null };
+type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null; age_band_override: boolean; birthdate: string | null; avatar_path: string | null };
 
 type OpenPeriod = { id: string; title: string; closes_at: string; electives_only: boolean };
 type EligibleClass = { id: string; title: string; is_elective: boolean };
@@ -25,6 +26,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
   const [requests, setRequests] = useState<EnrollRequest[]>([]);
   const [classPick, setClassPick] = useState("");
   const [enrollStatus, setEnrollStatus] = useState("");
+  const [childStatus, setChildStatus] = useState("");
   const [notes, setNotes] = useState<NoteInfo[]>([]);
   const [userId, setUserId] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     setUserId(uid);
 
     const [{ data: childRow }, { data: enrollments }, { data: noteRows }] = await Promise.all([
-      supabase.from("children").select("id,first_name,last_name,age_band,avatar_path").eq("id", childId).single(),
+      supabase.from("children").select("id,first_name,last_name,age_band,age_band_override,birthdate,avatar_path").eq("id", childId).single(),
       supabase.from("enrollments").select(`class_id,status,classes(id,title,${SCHEDULE_SELECT},teacher_assignments(profiles(display_name,email)))`).eq("child_id", childId).eq("status", "active"),
       supabase.from("teacher_notes").select("id,body,visibility,created_at,author_user_id,class_id").eq("child_id", childId).order("created_at", { ascending: false }),
     ]);
@@ -158,6 +160,28 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     if (!error) await load();
   }
 
+  /**
+   * A family can change a child's photo, birthdate, and grade override --
+   * nothing else. The database enforces the same boundary (a trigger rejects
+   * any other column in the same update), so this is convenience, not the
+   * real gate.
+   */
+  async function updateChild(patch: { avatar_path?: string; birthdate?: string | null; age_band_override?: boolean; age_band?: string | null }) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("children").update(patch).eq("id", childId);
+    if (error) { setChildStatus(error.message); return; }
+    await load();
+  }
+
+  async function uploadAvatar(file: File) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const uploaded = await uploadPrivateFile(supabase, "avatars", file);
+    if ("error" in uploaded) { setChildStatus(uploaded.error); return; }
+    await updateChild({ avatar_path: uploaded.path });
+  }
+
   async function toggleCompletion(eventId: string, done: boolean) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !userId) return;
@@ -208,6 +232,28 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
           <Avatar url={avatarUrl} label={child?.first_name ?? "?"} size="lg" />
           <h2>{child?.first_name} {child?.last_name}</h2>
         </div>
+
+        <section>
+          <p className="card-kicker">About {child?.first_name}</p>
+          <div className="field-grid">
+            <label className="file-drop"><span className="field-caption">Photo</span>
+              <input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadAvatar(file); }} />
+            </label>
+            <label>Birthdate<input type="date" value={child?.birthdate ?? ""} onChange={(event) => updateChild({ birthdate: event.target.value || null })} /></label>
+            <label className="checkbox-field">
+              <input type="checkbox" checked={child?.age_band_override ?? false} onChange={(event) => updateChild({ age_band_override: event.target.checked })} /> Set grade manually
+            </label>
+            {child?.age_band_override
+              ? <label>Grade<select value={child?.age_band ?? ""} onChange={(event) => updateChild({ age_band: event.target.value || null })}>
+                  <option value="">Not set</option>
+                  {GRADES.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+                </select></label>
+              : <p className="field-note">
+                  {child?.birthdate ? `Grade ${child?.age_band ?? "not yet set"}, calculated from birthdate.` : "Add a birthdate to calculate grade automatically."}
+                </p>}
+          </div>
+          {childStatus && <p className="admin-form-status" role="status">{childStatus}</p>}
+        </section>
 
         <section>
           <p className="card-kicker">Classes</p>
