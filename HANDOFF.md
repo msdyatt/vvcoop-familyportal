@@ -86,20 +86,48 @@ Dues amounts are captured when a requirement is opened, not derived on read, so 
 **Auth**: email/password, Google/Apple OAuth (buttons present but **not actually configured** — no OAuth app credentials set up in Supabase yet), and passkeys (WebAuthn, enabled and working). TOTP 2FA available. The login flow checks authenticator-assurance-level and shows a code-challenge screen if 2FA is on.
 
 ## Known gaps / good next steps (raised but not yet built)
+
+### ⛔ The live OpenSign API token is rejected — this blocks all tracking
+Tracking is fully built and deployed, but **no send or poll can succeed until a
+working token is in place.** Probed on 24 Aug 2026: the token on file
+(`opensign.7JBQ…`) returns `405 {"error":"Invalid API Token!"}` against **every**
+host and both API versions — production, sandbox and EU, `v1.2` and `v1`. The
+*sandbox* token is accepted by the sandbox host in the same test, which proves
+the probe itself is sound and the base URL is right. The live token is simply
+bad: mistyped when copied out, or rotated since.
+
+**Fix:** OpenSign → Settings → API Token → generate a fresh one, then
+`supabase secrets set OPENSIGN_API_TOKEN=…`. Confirm it with **Admin →
+Integrations → Test connection**, which reports the answer in one click rather
+than leaving a dead token looking like "nobody has signed yet".
+
+How to re-probe from a shell (creates nothing — an empty body cannot):
+```
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  https://app.opensignlabs.com/api/v1.2/createdocument \
+  -H "x-api-token: $TOKEN" -H 'Content-Type: application/json' -d '{}'
+```
+`400` = token good (it reached validation). `405` = token rejected.
+
 - **Google/Apple OAuth** aren't actually wired up — buttons exist but will error if clicked. Either configure real OAuth apps in the Supabase dashboard, or consider dropping them in favor of passkeys + email/password, which already work.
 - **Dues/payments**: `docs/dues-processor-options.html` compares Stripe, Cheddar Up and Zeffy against the real dues structure. Recommendation is Stripe with ACH as the default method. No payments code exists yet; Sam still owes an actual family count and a board decision on absorbing vs passing on fees.
 - **A parent-only account does not exist yet.** Both current users are administrators, so the family-scoped RLS has been verified at the predicate level (`private.has_family_access` grants each user only their own family, checked both directions) but never exercised end to end by a non-admin. Worth confirming with a real parent account before the co-op relies on it.
 - **Print automation is designed but not built.** Decision made: a small agent on an always-on machine at Sam's house polling `print_requests` for `status = 'pending'`, printing via `lp`/CUPS, and setting `status = 'printed'`. Waiting on hardware. Email-to-print was rejected because it cannot report back whether anything printed — and HP retired ePrint's email service in 2023, Google Cloud Print in 2020, so it is mostly gone anyway. The agent will need its own edge function and secret; do not hand a service-role key to a home machine.
 - **Homeschool co-op features not yet built**, discussed as good candidates: attendance tracking, parent volunteer-hour tracking, field trip/event RSVP with headcount, per-class supply/curriculum lists, a lending library, carpool coordination, a "closed today" alert banner.
+- **Classes now have a real timetable.** `class_blocks` (label + `starts_at`/`ends_at`, per school year) is the single source of a class's meeting time — `classes.block_id` points at one, and `classes.meeting_time`/`block_label` are **dropped**. `rooms` is a managed list with `classes.room_id`. Both are managed from collapsible sections in Admin → Classes. Display goes through `lib/schedule.ts` (`describeSchedule`, `SCHEDULE_SELECT`) — do not format a block time with `toLocaleTimeString`, a bare `time` has no date and the browser timezone will shift it. **Neither table is seeded**: every class reads "No time block" until Sam defines the co-op day. A same-block-same-room double booking shows as a warning chip on the class card, deliberately not a constraint — a co-op does legitimately share a big room.
+- **Two table-level traps worth remembering** (both bit this session): a new table with RLS and policies but **no `GRANT`** fails `42501` for everyone, because privileges are checked before RLS; and a `SECURITY DEFINER` function with a null `proacl` is `EXECUTE` to `PUBLIC`, which PostgREST publishes at `/rest/v1/rpc/<name>` — the Supabase API is **not** behind the Cloudflare password gate. Run `get_advisors(type: "security")` after adding either.
 - **Admin "Publishing" card** doesn't yet cover calendar events (only news posts) — no admin UI exists to create/edit `events` rows yet, despite the family portal displaying them.
-- **Integrations tab** is status-tracking only for every service *except OpenSign*, which is now wired: `opensign-send` and `opensign-webhook` edge functions, a `signature_requests` table, and a **Send for signature** action on each document in Admin → Documents. Both edge functions are **deployed** (`opensign-send`, JWT-gated; `opensign-webhook`, `verify_jwt=false` and fail-closed on a shared secret) and the production base URL is set. Remaining: the two server secrets.
+- **Integrations tab** is notes-only for every service *except OpenSign*, which is genuinely wired. Three edge functions are deployed: `opensign-send` (JWT + admin gated), `opensign-sync` (JWT + admin gated), and `opensign-webhook` (`verify_jwt=false`, fail-closed on a shared secret). The production base URL is set on the `opensign` row.
 
-  **Setup order matters** — OpenSign only issues a webhook signing key once a live webhook URL exists, so it has to be last:
-  1. `supabase secrets set OPENSIGN_API_TOKEN=…` → sending works from here.
+  **Sends go from templates, per family.** `POST /createdocument/:template_id` keeps the signature fields the co-op positioned by hand — the PDF-upload path guesses at them and drops a box on page 1, which is wrong for a ten-page handbook. `requirements.opensign_template_id` is backfilled (`NOWgrVuBcr` handbook, `EmfQUgwGOC` liability waiver). Public `publicsign?templateid=…` links must **not** be used for anything tracked: they carry no link back to a household, which is why Sam's own signature never registered.
+
+  **Completions arrive two ways.** `opensign-sync` polls `GET /document/:id`, stores the signed PDF into `family-village-private/signed/`, writes `certificate_url` and flips the compliance row — driven by **Check for signatures** in Admin → Compliance, and it works with no webhook at all. The webhook is the instant path and still needs its secret (order matters — OpenSign only issues a signing key once a live webhook URL exists):
+  1. `supabase secrets set OPENSIGN_API_TOKEN=…` (see the blocker above — the current one is rejected).
   2. OpenSign → Settings → Webhook → Add Webhook, URL `https://jtwemgyhxylbhjzxgyvh.supabase.co/functions/v1/opensign-webhook?token=<secret you choose>`, Enable Authentication → Generate.
-  3. `supabase secrets set OPENSIGN_WEBHOOK_SECRET=…` with that same value → completions flow back.
+  3. `supabase secrets set OPENSIGN_WEBHOOK_SECRET=…` with that same value.
 
-  Until step 3, statuses stay at `sent`. The webhook returns **503** rather than accepting anything while the secret is unset.
+  Until step 3 the webhook returns **503** and refuses everything; polling still works.
+
 - ~~**MFA/passkey login gating** only on `/home`~~ — **closed.** `lib/use-portal-access.ts` performs the AAL check for every workspace, and all three portals share `MfaChallengeScreen`.
 - **`public.integration_settings` has never appeared in a migration.** It was created by hand early on, so a fresh `supabase db reset` would not reproduce it. Left alone deliberately rather than guessing at a `create table` that might diverge from the live definition — worth reconciling against production before anyone rebuilds the database from scratch.
 - ~~**OpenSign's `/createdocument` body is unverified**~~ — **confirmed** by a real sandbox send on 22 Aug 2026. The API is **v1.2**, not v1. Base URLs: `https://app.opensignlabs.com/api/v1.2` (production, now set on the `opensign` row), `https://sandbox.opensignlabs.com/api/v1.2`, `https://eu-app.opensignlabs.com/api/v1.2`. Body is `{file, title, note, description, timeToCompleteDays, signers[{role, email, name, widgets[]}], send_email, sendInOrder}`; response is `{objectId, signurl[], message}`. **Every signer needs at least one widget or the document has nowhere to sign** — `defaultSignatureWidget()` puts a signature box on page 1, which suits one- and two-page waivers; longer documents should pass explicit widgets through the `signers[].widgets` passthrough rather than editing the default.
