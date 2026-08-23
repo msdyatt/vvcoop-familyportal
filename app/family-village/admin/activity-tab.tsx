@@ -143,19 +143,28 @@ export default function ActivityTab() {
       <p className="activity-count">{visible.length} of {rows.length} entries</p>
     </div>
 
-    {visible.map((row) => <article className="activity-row" key={row.id}>
-      <div className="activity-line">
-        <b>{row.actor_name}</b> {describe(row)}
+    {visible.length > 0 && <div className="activity-table">
+      <div className="activity-row activity-head" aria-hidden="true">
+        <span>When</span><span>Activity</span><span></span>
       </div>
-      <span>{new Date(row.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</span>
-      {row.detail && Object.keys(row.detail).length > 0 && <>
-        <button className="activity-detail-toggle" aria-expanded={openDetail === row.id}
-          onClick={() => setOpenDetail(openDetail === row.id ? null : row.id)}>
-          {openDetail === row.id ? "Hide details" : "Details"}
-        </button>
-        {openDetail === row.id && <code>{JSON.stringify(row.detail, null, 2)}</code>}
-      </>}
-    </article>)}
+      {visible.map((row) => {
+        const hasDetail = row.detail && Object.keys(row.detail).length > 0;
+        return <div className="activity-row" key={row.id}>
+          <time dateTime={row.created_at}>
+            {new Date(row.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            <small>{new Date(row.created_at).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" })}</small>
+          </time>
+          <div className="activity-line"><b>{row.actor_name}</b> {describe(row)}</div>
+          {hasDetail
+            ? <button className="activity-detail-toggle" aria-expanded={openDetail === row.id}
+                onClick={() => setOpenDetail(openDetail === row.id ? null : row.id)}>
+                {openDetail === row.id ? "Hide" : "Details"}
+              </button>
+            : <span />}
+          {hasDetail && openDetail === row.id && <code>{JSON.stringify(row.detail, null, 2)}</code>}
+        </div>;
+      })}
+    </div>}
 
     {!visible.length && <p className="portal-empty">
       {rows.length ? "Nothing matches those filters." : "No activity recorded yet."}

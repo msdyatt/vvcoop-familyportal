@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-
-const groupUrl = "https://www.facebook.com/groups/960994296456160";
+import FacebookGroupLink from "../../facebook-group-link";
 
 const sections = ["Home", "My children", "Classes", "Calendar", "Village news", "Media", "Documents"];
 
@@ -26,7 +25,7 @@ export default function FamilyVillagePreview() {
 
       <section id="classes" className="portal-section"><div className="section-heading"><div><p className="card-kicker">Classes</p><h2>A clear path through the day.</h2></div><p>Only classes connected to your family appear here.</p></div><div className="class-list"><article><time>10:00</time><div><h3>History</h3><p>Teacher, room, weekly plan, and materials will appear here.</p></div><span>Core study</span></article><article><time>11:00</time><div><h3>Science</h3><p>Teacher notes, experiments, and supply reminders will appear here.</p></div><span>Core study</span></article><article><time>1:00 + 2:00</time><div><h3>Electives</h3><p>Your child’s semester electives will appear after placement.</p></div><span>By placement</span></article></div></section>
 
-      <section id="calendar" className="portal-section split-section"><div><p className="card-kicker">Calendar</p><h2>Plans families can trust.</h2><p>The private calendar can include co-op days, deadlines, field trips, teacher meetings, and locations without publishing them to the open web.</p><div className="calendar-placeholder"><span>Shared calendar connection</span><b>Ready for the approved calendar link</b></div></div><div id="village-news"><p className="card-kicker">Village news</p><h2>News that stays findable.</h2><p>Announcements can be written once, pinned when important, and shared with all families or selected classes.</p><a className="facebook-out" href={groupUrl} target="_blank" rel="noreferrer">Open the private Facebook group ↗</a><small>Facebook remains a link-out; private group posts are not copied or exposed.</small></div></section>
+      <section id="calendar" className="portal-section split-section"><div><p className="card-kicker">Calendar</p><h2>Plans families can trust.</h2><p>The private calendar can include co-op days, deadlines, field trips, teacher meetings, and locations without publishing them to the open web.</p><div className="calendar-placeholder"><span>Shared calendar connection</span><b>Ready for the approved calendar link</b></div></div><div id="village-news"><p className="card-kicker">Village news</p><h2>News that stays findable.</h2><p>Announcements can be written once, pinned when important, and shared with all families or selected classes.</p><FacebookGroupLink className="facebook-out">Open the private Facebook group ↗</FacebookGroupLink><small>Facebook remains a link-out; private group posts are not copied or exposed.</small></div></section>
 
       <section id="media" className="portal-section"><div className="section-heading"><div><p className="card-kicker">Media</p><h2>Shared with permission.</h2></div><p>Albums can be restricted by family, class, or the whole co-op, with consent recorded before a photo is shown.</p></div><div className="media-empty"><span>◇</span><p>Private class and community albums will live here.</p><small>No photographs have been added to this preview.</small></div></section>
 

@@ -5,15 +5,24 @@ import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
 
 type ClassInfo = { id: string; title: string; schedule: string; teachers: string[] };
-type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string };
+type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string; completed: boolean };
 type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
 
-type ChildRecord = { id: string; first_name: string; last_name: string | null };
+type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null };
+
+type OpenPeriod = { id: string; title: string; closes_at: string; electives_only: boolean };
+type EligibleClass = { id: string; title: string; is_elective: boolean };
+type EnrollRequest = { id: string; class_id: string; period_id: string; status: string; class_title: string };
 
 export default function ChildDetail({ childId, onClose }: { childId: string; onClose: () => void }) {
   const [child, setChild] = useState<ChildRecord | null>(null);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [classDates, setClassDates] = useState<ClassDateInfo[]>([]);
+  const [openPeriod, setOpenPeriod] = useState<OpenPeriod | null>(null);
+  const [eligibleClasses, setEligibleClasses] = useState<EligibleClass[]>([]);
+  const [requests, setRequests] = useState<EnrollRequest[]>([]);
+  const [classPick, setClassPick] = useState("");
+  const [enrollStatus, setEnrollStatus] = useState("");
   const [notes, setNotes] = useState<NoteInfo[]>([]);
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -26,7 +35,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     setUserId(uid);
 
     const [{ data: childRow }, { data: enrollments }, { data: noteRows }] = await Promise.all([
-      supabase.from("children").select("id,first_name,last_name").eq("id", childId).single(),
+      supabase.from("children").select("id,first_name,last_name,age_band").eq("id", childId).single(),
       supabase.from("enrollments").select(`class_id,status,classes(id,title,${SCHEDULE_SELECT},teacher_assignments(profiles(display_name,email)))`).eq("child_id", childId).eq("status", "active"),
       supabase.from("teacher_notes").select("id,body,visibility,created_at,author_user_id,class_id").eq("child_id", childId).order("created_at", { ascending: false }),
     ]);
@@ -74,9 +83,50 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         .eq("audience", "class").in("class_id", classIds)
         .gte("starts_at", new Date().toISOString())
         .order("starts_at", { ascending: true }).limit(10);
-      setClassDates(((dateRows ?? []) as unknown as { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; classes: { title: string } }[])
-        .map((row) => ({ id: row.id, title: row.title, starts_at: row.starts_at, location: row.location, requires_prework: row.requires_prework, class_title: row.classes?.title ?? "" })));
+      const dateBase = (dateRows ?? []) as unknown as { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; classes: { title: string } }[];
+      const eventIds = dateBase.filter((row) => row.requires_prework).map((row) => row.id);
+      const { data: completionRows } = eventIds.length
+        ? await supabase.from("event_completions").select("event_id").eq("child_id", childId).in("event_id", eventIds)
+        : { data: [] };
+      const completed = new Set((completionRows ?? []).map((row) => row.event_id));
+      setClassDates(dateBase.map((row) => ({
+        id: row.id, title: row.title, starts_at: row.starts_at, location: row.location,
+        requires_prework: row.requires_prework, class_title: row.classes?.title ?? "",
+        completed: completed.has(row.id),
+      })));
     }
+
+    // Enrollment: is a window open right now, and what can this child request
+    // in it. A child with no grade set yet can't be matched against anything,
+    // so the section quietly has nothing to offer rather than showing every
+    // class in the co-op.
+    const nowIso = new Date().toISOString();
+    const { data: periodRows } = await supabase.from("enrollment_periods")
+      .select("id,title,closes_at,electives_only").eq("active", true)
+      .lte("opens_at", nowIso).gte("closes_at", nowIso).limit(1);
+    const period = (periodRows ?? [])[0] as OpenPeriod | undefined;
+    setOpenPeriod(period ?? null);
+
+    if (period && childRow?.age_band) {
+      let classQuery = supabase.from("classes").select("id,title,is_elective")
+        .eq("active", true).contains("grades", [childRow.age_band]);
+      if (period.electives_only) classQuery = classQuery.eq("is_elective", true);
+
+      const [{ data: classRows2 }, { data: enrolledRows }, { data: requestRows }] = await Promise.all([
+        classQuery,
+        supabase.from("enrollments").select("class_id").eq("child_id", childId).eq("status", "active"),
+        supabase.from("enrollment_requests").select("id,class_id,period_id,status,classes(title)")
+          .eq("child_id", childId).eq("period_id", period.id).order("created_at", { ascending: false }),
+      ]);
+      const alreadyIn = new Set((enrolledRows ?? []).map((row) => row.class_id));
+      setEligibleClasses((classRows2 ?? []).filter((row) => !alreadyIn.has(row.id)));
+      setRequests(((requestRows ?? []) as unknown as { id: string; class_id: string; period_id: string; status: string; classes: { title: string } | null }[])
+        .map((row) => ({ id: row.id, class_id: row.class_id, period_id: row.period_id, status: row.status, class_title: row.classes?.title ?? "" })));
+    } else {
+      setEligibleClasses([]);
+      setRequests([]);
+    }
+
     setLoading(false);
   }
 
@@ -104,6 +154,45 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     if (!error) await load();
   }
 
+  async function toggleCompletion(eventId: string, done: boolean) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !userId) return;
+    const action = done
+      ? supabase.from("event_completions").delete().eq("event_id", eventId).eq("child_id", childId)
+      : supabase.from("event_completions").insert({ event_id: eventId, child_id: childId, completed_by: userId });
+    const { error } = await action;
+    if (!error) await load();
+  }
+
+  async function requestEnrollment() {
+    if (!openPeriod || !classPick) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !userId) return;
+    setEnrollStatus("Requesting…");
+    const { error } = await supabase.from("enrollment_requests").insert({
+      period_id: openPeriod.id, class_id: classPick, child_id: childId, requested_by: userId,
+    });
+    if (error) {
+      // enrollment_request_allowed folds several reasons into one rejection --
+      // a closed window, a grade mismatch, a same-block clash -- so the
+      // household hears "why", not a bare database error.
+      setEnrollStatus(error.message.includes("row-level security")
+        ? "That class can't be requested right now — it may conflict with another class at the same time, or no longer match this child's grade."
+        : error.message);
+      return;
+    }
+    setClassPick("");
+    setEnrollStatus("Requested.");
+    await load();
+  }
+
+  async function cancelRequest(requestId: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("enrollment_requests").update({ status: "cancelled" }).eq("id", requestId);
+    if (!error) await load();
+  }
+
   return <div className="child-detail-overlay" role="dialog" aria-modal="true">
     {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- decorative backdrop; Escape and the close button provide keyboard access */}
     <div className="child-detail-backdrop" onClick={onClose} />
@@ -124,10 +213,36 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
             ? <ul className="child-detail-list">{classDates.map((row) => <li key={row.id}>
                 <b>{row.title}</b>
                 <span>{[row.class_title, new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }), row.location].filter(Boolean).join(" · ")}</span>
-                {row.requires_prework && <span className="prep-flag">Something to do before class</span>}
+                {row.requires_prework && <label className={`prep-flag${row.completed ? " prep-done" : ""}`}>
+                  <input type="checkbox" checked={row.completed} onChange={() => toggleCompletion(row.id, row.completed)} />
+                  {row.completed ? "Assignment ready" : "Assignment"}
+                </label>}
               </li>)}</ul>
             : <p className="portal-empty">Nothing scheduled in this child&rsquo;s classes right now.</p>}
         </section>
+
+        {openPeriod && <section>
+          <p className="card-kicker">Enrollment is open</p>
+          <p className="field-note">
+            {openPeriod.title} closes {new Date(openPeriod.closes_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}.
+            {openPeriod.electives_only ? " Choose electives for " : " Choose classes for "}{child?.first_name}.
+          </p>
+          {requests.length > 0 && <ul className="child-detail-list">{requests.map((row) => <li key={row.id}>
+            <b>{row.class_title}</b>
+            <span className={`status-pill ${row.status === "requested" ? "pending" : row.status === "approved" ? "complete" : row.status === "waitlisted" ? "pending" : "waived"}`}>{row.status}</span>
+            {row.status === "requested" && <button className="ghost" onClick={() => cancelRequest(row.id)}>Cancel</button>}
+          </li>)}</ul>}
+          {eligibleClasses.length
+            ? <div className="row-actions">
+                <select value={classPick} onChange={(event) => setClassPick(event.target.value)}>
+                  <option value="">Choose a class…</option>
+                  {eligibleClasses.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
+                </select>
+                <button disabled={!classPick} onClick={requestEnrollment}>Request enrollment</button>
+              </div>
+            : <p className="portal-empty">No open classes match {child?.first_name}&rsquo;s grade right now.</p>}
+          {enrollStatus && <p className="admin-form-status" role="status">{enrollStatus}</p>}
+        </section>}
 
         <section>
           <p className="card-kicker">Teacher notes</p>

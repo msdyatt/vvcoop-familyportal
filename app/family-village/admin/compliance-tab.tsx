@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import { uploadPrivateFile } from "../../../lib/storage";
 import {
   FamilyRequirement, Requirement, SchoolYear,
   duesFor, formatMoney, isSettled, statusLabel, statusTone,
@@ -320,6 +321,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
 
     <p className="admin-form-status" role="status">{status || "Add what families must sign or pay this year, then open each requirement to every household. School years live in Classes."}</p>
 
+    {yearId && <UploadDocument onSaved={load} onStatus={setStatus} />}
     {yearId && <RequirementForm yearId={yearId} documents={documents} onSaved={load} onStatus={setStatus} />}
 
     {yearId && <DuesImport
@@ -461,6 +463,55 @@ function AttachDocument({ requirement, documents, onSaved, onStatus }: {
     <option value="">No document attached</option>
     {documents.map((doc) => <option key={doc.id} value={doc.id}>{doc.title}</option>)}
   </select>;
+}
+
+/**
+ * Puts a co-op-wide PDF into storage without going through one household's
+ * own documents -- the only upload path that existed before this. Without it,
+ * getting a brand-new form ready to send meant no path from "I have a PDF" to
+ * "families can sign it" inside the app at all.
+ *
+ * Sent via the PDF-upload path (defaultSignatureWidget, page 1) unless an
+ * administrator later pastes in an OpenSign template id for it -- a template
+ * built by hand in OpenSign keeps its own signature placement, which matters
+ * for anything longer than a page or two.
+ */
+function UploadDocument({ onSaved, onStatus }: { onSaved: () => void; onStatus: (message: string) => void }) {
+  const [title, setTitle] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !file || !title.trim()) return;
+    setBusy(true);
+    const uploaded = await uploadPrivateFile(supabase, "documents", file);
+    if ("error" in uploaded) { setBusy(false); onStatus(uploaded.error); return; }
+    const { data: user } = await supabase.auth.getUser();
+    const { error } = await supabase.from("documents").insert({
+      kind: "form", title: title.trim(), storage_path: uploaded.path, uploaded_by_user_id: user.user?.id,
+    });
+    setBusy(false);
+    if (error) { onStatus(error.message); return; }
+    setTitle(""); setFile(null);
+    onStatus(`Uploaded "${title.trim()}". It's ready to attach to a requirement below.`);
+    onSaved();
+  }
+
+  return <details className="record-section">
+    <summary className="card-kicker">Upload a document</summary>
+    <p className="field-note">Add a PDF here first, then choose it under a requirement below to send it for signature.</p>
+    <form onSubmit={submit} className="portal-form">
+      <label><span className="field-caption">Title</span>
+        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Field trip permission slip" disabled={busy} />
+      </label>
+      <label className="file-drop"><span className="field-caption">PDF</span>
+        <input required type="file" accept="application/pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} />
+      </label>
+      <button disabled={busy || !title.trim() || !file}>{busy ? "Uploading…" : "Upload"}</button>
+    </form>
+  </details>;
 }
 
 function RequirementForm({ yearId, documents, onSaved, onStatus }: { yearId: string; documents: { id: string; title: string }[]; onSaved: () => void; onStatus: (message: string) => void }) {

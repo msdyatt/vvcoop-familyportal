@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import ChildDetail from "../child-detail";
-import { CollapsibleRecord, EditableSection, Field } from "./admin-ui";
+import { CollapsibleRecord, EditableSection, Field, GRADES } from "./admin-ui";
 import FamilyDocuments from "./family-documents";
 import { FamilyRequirement, Requirement, isSettled, statusLabel, statusTone } from "../../../lib/compliance";
 
-type Child = { id: string; first_name: string; last_name: string | null; last_initial: string | null; age_band: string | null; active: boolean; last_name_override: boolean };
+type Child = {
+  id: string; first_name: string; last_name: string | null; last_initial: string | null;
+  age_band: string | null; birthdate: string | null; age_band_override: boolean;
+  active: boolean; last_name_override: boolean;
+};
 type Member = { user_id: string; relationship: string | null; profiles: { email: string; display_name: string | null; status: string; phone: string | null } | null };
 type Family = { id: string; display_name: string; last_name: string | null; children: Child[]; family_members: Member[] };
 type ComplianceRow = FamilyRequirement & { requirements: Requirement | null };
@@ -26,7 +30,7 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("families")
-      .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,active,last_name_override),family_members(user_id,relationship,profiles(email,display_name,status,phone))")
+      .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,birthdate,age_band_override,active,last_name_override),family_members(user_id,relationship,profiles(email,display_name,status,phone))")
       .order("display_name");
     if (!error) setFamilies((data ?? []) as unknown as Family[]);
 
@@ -72,6 +76,11 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     if (!supabase) return;
     const { error } = await supabase.from("children").update({
       first_name: child.first_name, last_name: child.last_name, active: child.active, last_name_override: child.last_name_override,
+      birthdate: child.birthdate, age_band_override: child.age_band_override,
+      // The trigger derives age_band from birthdate unless overridden; sending
+      // it here too only matters for the override case, where it's the value
+      // the admin just typed.
+      ...(child.age_band_override ? { age_band: child.age_band } : {}),
     }).eq("id", child.id);
     if (error) { setStatus(error.message); return; }
     await log(child.active ? "child_updated" : "child_deactivated", "child", child.id, { first_name: child.first_name, active: child.active });
@@ -255,10 +264,22 @@ function FamilyCard({ family, roleMap, compliance, onSaveFamily, onSaveChild, on
               <label>Last name<input value={child.last_name ?? ""} onChange={(event) => updateChild(child.id, { last_name: event.target.value, last_name_override: true })} /></label>
               <label className="checkbox-field"><input type="checkbox" checked={child.last_name_override} onChange={(event) => updateChild(child.id, { last_name_override: event.target.checked })} /> Custom name</label>
               <label className="checkbox-field"><input type="checkbox" checked={child.active} onChange={(event) => updateChild(child.id, { active: event.target.checked })} /> Active</label>
+              <label>Birthdate<input type="date" value={child.birthdate ?? ""} onChange={(event) => updateChild(child.id, { birthdate: event.target.value || null })} /></label>
+              <label className="checkbox-field">
+                <input type="checkbox" checked={child.age_band_override} onChange={(event) => updateChild(child.id, { age_band_override: event.target.checked })} /> Set grade manually
+              </label>
+              {child.age_band_override
+                ? <label>Grade<select value={child.age_band ?? ""} onChange={(event) => updateChild(child.id, { age_band: event.target.value || null })}>
+                    <option value="">Not set</option>
+                    {GRADES.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+                  </select></label>
+                : <p className="field-note">
+                    {child.birthdate ? `Grade ${child.age_band ?? "not yet set"}, calculated from birthdate.` : "Add a birthdate to calculate grade automatically."}
+                  </p>}
             </div>
           : <div className="child-line" key={child.id}>
               <b>{child.first_name} {child.last_name}</b>
-              <span>{child.age_band ? `Grade ${child.age_band}` : "Grade not set"}{child.active ? "" : " · inactive"}</span>
+              <span>{child.age_band ? `Grade ${child.age_band}` : "Grade not set"}{child.age_band_override ? " · manual" : ""}{child.active ? "" : " · inactive"}</span>
               <button onClick={() => setViewingChildId(child.id)}>View</button>
             </div>)}
         {!children.length && <p className="portal-empty">No children on this household yet.</p>}

@@ -5,6 +5,13 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 
 type Integration = { id: string; display_name: string; status: string; public_note: string | null; external_url: string | null; api_base_url: string | null };
 
+/**
+ * Every row here is real -- both OpenSign and the Facebook group link are
+ * actually read by the app. This page used to list six services, five of
+ * which nothing was wired to; a page that implies five connections exist
+ * when one does is worse than a short one that's telling the truth. If a new
+ * service gets genuinely integrated later, it earns a row here then.
+ */
 export default function IntegrationsTab({ actorUserId }: { actorUserId: string }) {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +59,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
   if (loading) return <p>Loading integrations…</p>;
 
   return <section className="integrations-manage">
-    <p className="admin-form-status" role="status">{status || "One of these is a real connection. The rest are notes."}</p>
+    <p className="admin-form-status" role="status">{status || "Everything on this page is a real, working connection."}</p>
     <aside className="integration-help">
       <p className="card-kicker">OpenSign setup</p>
       <ol>
@@ -63,22 +70,19 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
       <p>Sending works as soon as the base URL and API token are set. Until the webhook secret is in place, signature completions will not flow back on their own and statuses stay at <b>sent</b>.</p>
     </aside>
     <div className="integrations-list">
-      {/* Split on purpose. A page that lists six services as though six are
-          connected is worse than one that admits only OpenSign is. */}
-      <p className="card-kicker">Connected</p>
-      {integrations.filter((row) => row.id === "opensign").map((row) => <IntegrationCard key={row.id} row={row} onSave={save} live onTest={testOpenSign} />)}
-
-      <p className="card-kicker integrations-divider">Notes only</p>
-      <p className="field-note">
-        Nothing below is wired to anything. These rows are somewhere to record what the co-op uses and where it
-        lives — changing a status here changes nothing in the portal.
-      </p>
-      {integrations.filter((row) => row.id !== "opensign").map((row) => <IntegrationCard key={row.id} row={row} onSave={save} />)}
+      {integrations.map((row) => <IntegrationCard
+        key={row.id} row={row} onSave={save}
+        live={row.id === "opensign"}
+        onTest={row.id === "opensign" ? testOpenSign : undefined}
+        showApiBase={row.id === "opensign"}
+      />)}
     </div>
   </section>;
 }
 
-function IntegrationCard({ row, onSave, live = false, onTest }: { row: Integration; onSave: (row: Integration) => void; live?: boolean; onTest?: () => void }) {
+function IntegrationCard({ row, onSave, live = false, onTest, showApiBase = false }: {
+  row: Integration; onSave: (row: Integration) => void; live?: boolean; onTest?: () => void; showApiBase?: boolean;
+}) {
   const [local, setLocal] = useState(row);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- resync local edit buffer when parent data reloads
@@ -96,11 +100,16 @@ function IntegrationCard({ row, onSave, live = false, onTest }: { row: Integrati
     </div>
     <label>Note<textarea value={local.public_note ?? ""} onChange={(event) => setLocal({ ...local, public_note: event.target.value })} /></label>
     <div className="field-row">
-      <label>External URL<input value={local.external_url ?? ""} onChange={(event) => setLocal({ ...local, external_url: event.target.value })} placeholder="https://…" /></label>
-      <label>API base URL<input value={local.api_base_url ?? ""} onChange={(event) => setLocal({ ...local, api_base_url: event.target.value })} placeholder="https://api…" /></label>
+      <label>{row.id === "facebook" ? "Group URL — shown on the site" : "External URL"}
+        <input value={local.external_url ?? ""} onChange={(event) => setLocal({ ...local, external_url: event.target.value })} placeholder="https://…" />
+      </label>
+      {showApiBase && <label>API base URL<input value={local.api_base_url ?? ""} onChange={(event) => setLocal({ ...local, api_base_url: event.target.value })} placeholder="https://api…" /></label>}
     </div>
     {live && <p className="field-note">
       This base URL is read by the signing function every time a document is sent — changing it changes real behaviour.
+    </p>}
+    {row.id === "facebook" && <p className="field-note">
+      This link is what shows on the public site and in the family portal — saving it here updates it everywhere at once.
     </p>}
     <div className="row-actions">
       <button onClick={() => onSave(local)}>Save</button>

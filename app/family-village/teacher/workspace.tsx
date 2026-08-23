@@ -12,7 +12,8 @@ import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../../lib/s
 type ClassRow = { id: string; title: string; description: string | null } & ClassSchedule;
 type Assignment = { class_id: string; assignment_role: string; classes: ClassRow };
 type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string };
-type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string; author_name: string; read_count: number };
+type NoteRead = { name: string; read_at: string };
+type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string; author_name: string; reads: NoteRead[] };
 type Handout = { id: string; title: string; storage_path: string; class_id: string | null; created_at: string };
 type PrintRequest = { id: string; title: string; quantity: number; status: string; storage_path: string; created_at: string; class_id: string | null };
 type ClassEvent = { id: string; class_id: string | null; title: string; description: string | null; starts_at: string; location: string | null; requires_prework: boolean };
@@ -29,6 +30,19 @@ function noteCountLabel(count: number) {
 
 function formatDay(value: string) {
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/** Unlike formatDay, this is a real timestamptz -- shown in the reader's own
+    local time, not pinned to UTC, since "read at 3:15" should mean their 3:15. */
+function formatReadTime(value: string) {
+  return new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function summarizeReads(reads: { name: string; read_at: string }[]): string | null {
+  if (!reads.length) return null;
+  const latest = reads[reads.length - 1];
+  const rest = reads.length - 1;
+  return `Read by ${latest.name} on ${formatReadTime(latest.read_at)}${rest ? ` · +${rest} more` : ""}`;
 }
 
 export default function TeacherWorkspace() {
@@ -67,17 +81,27 @@ export default function TeacherWorkspace() {
     setRoster(((enrollments ?? []) as unknown as { children: { id: string; first_name: string; last_name: string | null }; class_id: string }[])
       .map((row) => ({ ...row.children, class_id: row.class_id })));
 
-    const noteBase = (noteRows ?? []) as Omit<Note, "author_name" | "read_count">[];
+    const noteBase = (noteRows ?? []) as Omit<Note, "author_name" | "reads">[];
     const authorIds = [...new Set(noteBase.map((row) => row.author_user_id))];
     const noteIds = noteBase.map((row) => row.id);
     const [{ data: authorRows }, { data: readRows }] = await Promise.all([
       authorIds.length ? supabase.from("profiles").select("id,display_name,email").in("id", authorIds) : Promise.resolve({ data: [] }),
-      noteIds.length ? supabase.from("teacher_note_reads").select("note_id").in("note_id", noteIds) : Promise.resolve({ data: [] }),
+      // read_at is what makes this a receipt rather than a bare tally -- a
+      // teacher asking "did the Smules see this" wants to know when, not just
+      // that someone, at some point, did.
+      noteIds.length ? supabase.from("teacher_note_reads").select("note_id,read_at,profiles(display_name,email)").in("note_id", noteIds) : Promise.resolve({ data: [] }),
     ]);
     const authorMap = new Map((authorRows ?? []).map((row) => [row.id, row.display_name || row.email]));
-    const readCounts = new Map<string, number>();
-    (readRows ?? []).forEach((row) => readCounts.set(row.note_id, (readCounts.get(row.note_id) ?? 0) + 1));
-    setNotes(noteBase.map((row) => ({ ...row, author_name: authorMap.get(row.author_user_id) ?? "Teacher", read_count: readCounts.get(row.id) ?? 0 })));
+    const reads = new Map<string, NoteRead[]>();
+    ((readRows ?? []) as unknown as { note_id: string; read_at: string; profiles: { display_name: string | null; email: string } | null }[])
+      .forEach((row) => {
+        const name = row.profiles?.display_name || row.profiles?.email || "A family member";
+        reads.set(row.note_id, [...(reads.get(row.note_id) ?? []), { name, read_at: row.read_at }]);
+      });
+    setNotes(noteBase.map((row) => ({
+      ...row, author_name: authorMap.get(row.author_user_id) ?? "Teacher",
+      reads: (reads.get(row.id) ?? []).sort((a, b) => a.read_at.localeCompare(b.read_at)),
+    })));
 
     setHandouts((handoutRows ?? []) as Handout[]);
     setPrintQueue((printRows ?? []) as PrintRequest[]);
@@ -241,7 +265,7 @@ function StudentNotes({ child, classId, notes, userId, onSaved, onDelete, onClos
 
     <div className="portal-stack">
       {notes.map((note) => <div key={note.id} className="note-card">
-        <span className="note-meta">{note.author_name} · {note.visibility} · {formatDay(note.created_at)}{note.read_count > 0 ? ` · Read by ${note.read_count}` : ""}</span>
+        <span className="note-meta">{note.author_name} · {note.visibility} · {formatDay(note.created_at)}{summarizeReads(note.reads) ? ` · ${summarizeReads(note.reads)}` : " · Not read yet"}</span>
         <p>{note.body}</p>
         {note.author_user_id === userId && <button className="danger" onClick={() => onDelete(note.id)}>Delete</button>}
       </div>)}

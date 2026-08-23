@@ -1940,9 +1940,23 @@ footer {
 }
 
 .portal-people div.person-card {
+  position:relative;
   min-width:180px;
   padding:18px;
   border:1px solid rgba(var(--cream-rgb),.25);
+}
+
+.enroll-dot {
+  position:absolute;
+  top:10px;
+  right:10px;
+  padding:2px 7px;
+  background:var(--terracotta);
+  color:var(--cream);
+  font:700 9px var(--sans);
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  border-radius:10px;
 }
 
 .portal-people div.person-card span {
@@ -3264,33 +3278,67 @@ footer {
   gap:10px;
 }
 
-.activity-row {
-  padding:14px 16px;
+/* A real table: three fixed columns so the date lands in the same place on
+   every row regardless of how long that row's description happens to run --
+   the old flex layout let a long sentence push the date wherever the wrap
+   landed, which is what "askew" meant. */
+.activity-table {
+  border:1px solid rgba(var(--navy-rgb),.12);
   background:var(--surface);
-  border:1px solid rgba(var(--navy-rgb),.1);
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:space-between;
-  gap:8px;
-  align-items:center;
 }
 
-.activity-row span {
-  color:var(--sage-text);
-  font-size:11px;
+.activity-row {
+  display:grid;
+  grid-template-columns:132px 1fr 84px;
+  align-items:center;
+  gap:16px;
+  padding:11px 16px;
+  border-bottom:1px solid rgba(var(--navy-rgb),.08);
 }
+
+.activity-row:last-child { border-bottom:none; }
+
+.activity-head {
+  background:var(--surface-sunken);
+  color:var(--sage-text);
+  font:700 11px var(--sans);
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+.activity-row time {
+  display:flex;
+  flex-direction:column;
+  color:var(--sage-text);
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+}
+
+.activity-row time small { font-size:11px; opacity:.8; }
 
 .activity-row code {
-  flex-basis:100%;
+  grid-column:1 / -1;
   display:block;
-  margin-top:6px;
+  margin-top:2px;
   padding:8px;
   background:var(--panel);
-  font-size:11px;
+  font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
   color:var(--sage-text);
   overflow-x:auto;
   white-space:pre-wrap;
   word-break:break-word;
+}
+
+@media(max-width:700px) {
+  .activity-row {
+    grid-template-columns:1fr auto;
+    grid-template-areas:"when detail" "line line";
+    row-gap:4px;
+  }
+  .activity-row time { grid-area:when; flex-direction:row; gap:6px; }
+  .activity-row .activity-detail-toggle, .activity-row > span:empty { grid-area:detail; }
+  .activity-row .activity-line { grid-area:line; }
+  .activity-head { display:none; }
 }
 
 .account-settings {
@@ -4247,7 +4295,9 @@ footer {
 /* The prep flag also appears in the child detail list, which styles its spans
    the same way the portal list does -- so it needs the same weight there. */
 .child-detail-list .prep-flag {
-  display:inline-block;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
   margin-top:4px;
   padding:3px 8px;
   background:var(--terracotta-text);
@@ -4256,6 +4306,17 @@ footer {
   letter-spacing:.06em;
   text-transform:uppercase;
   border-radius:2px;
+  cursor:pointer;
+}
+
+.child-detail-list .prep-flag input { margin:0; }
+
+/* Checked off: fades back into the list instead of still shouting for
+   attention -- the whole point of letting a family clear it. */
+.child-detail-list .prep-flag.prep-done {
+  background:transparent;
+  color:var(--sage-text);
+  border:1px solid rgba(var(--navy-rgb),.15);
 }
 
 /* --- Files attached to a news post ---------------------------------------- */
@@ -4421,8 +4482,7 @@ footer {
 }
 
 .activity-detail-toggle {
-  justify-self:start;
-  margin-top:6px;
+  justify-self:end;
   padding:4px 9px;
   background:transparent;
   color:var(--sage-text);
@@ -4430,17 +4490,6 @@ footer {
   border:1px solid rgba(var(--navy-rgb),.2);
   border-radius:2px;
   cursor:pointer;
-}
-
-.activity-row code {
-  display:block;
-  margin-top:8px;
-  padding:10px 12px;
-  overflow-x:auto;
-  background:var(--surface-sunken);
-  color:var(--sage-text);
-  font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
-  white-space:pre;
 }
 
 /* ===========================================================================

@@ -22,6 +22,7 @@ type PortalData = {
   documents: { id: string; title: string; kind: string; signature_status: string | null; storage_path: string | null }[];
   compliance: ComplianceItem[];
   roles: string[];
+  enrollmentPeriod: { title: string; closesAt: string } | null;
 };
 
 /**
@@ -98,7 +99,18 @@ export default function PortalGate() {
     const children = childrenResult;
     const failed = [children, classes, posts, events, documents, roles].find((item) => item.error);
     if (failed?.error) { setState("error"); return; }
-    setPortal({ familyId: safeFamilyIds[0] ?? "", children: children.data ?? [], classes: classes.data ?? [], posts: posts.data ?? [], events: events.data ?? [], documents: documents.data ?? [], compliance: toComplianceItems(compliance.data), roles: (roles.data ?? []).map((item) => item.role) } as PortalData);
+
+    const nowIso = new Date().toISOString();
+    const { data: periodRows } = await supabase.from("enrollment_periods")
+      .select("title,closes_at").eq("active", true).lte("opens_at", nowIso).gte("closes_at", nowIso).limit(1);
+    const period = (periodRows ?? [])[0];
+
+    setPortal({
+      familyId: safeFamilyIds[0] ?? "", children: children.data ?? [], classes: classes.data ?? [], posts: posts.data ?? [],
+      events: events.data ?? [], documents: documents.data ?? [], compliance: toComplianceItems(compliance.data),
+      roles: (roles.data ?? []).map((item) => item.role),
+      enrollmentPeriod: period ? { title: period.title, closesAt: period.closes_at } : null,
+    } as PortalData);
     setState("active");
   }
 
@@ -144,8 +156,16 @@ export default function PortalGate() {
   return <main className="live-portal">
     <AppHeader current="home" roles={portal?.roles ?? []} title="Family Village" subtitle="Your household’s week, gathered in one place." />
     <ComplianceBanner items={portal?.compliance ?? []} />
+    {portal?.enrollmentPeriod && <aside className="compliance-banner" role="status">
+      <span className="compliance-banner-count">✓</span>
+      <div>
+        <b>Enrollment is open</b>
+        <span>{portal.enrollmentPeriod.title} closes {new Date(portal.enrollmentPeriod.closesAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} — open a child below to choose classes.</span>
+      </div>
+      <a href="#my-children">Choose classes →</a>
+    </aside>}
     <div className="portal-grid">
-      <section className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><span>{child.first_name.slice(0,1)}</span><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3></div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
+      <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><span>{child.first_name.slice(0,1)}</span><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
       </section>
       <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}</section>
@@ -163,7 +183,7 @@ export default function PortalGate() {
               <div>
                 <b>{event.title}</b>
                 <span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span>
-                {event.requires_prework && <span className="prep-flag">Something to do before class</span>}
+                {event.requires_prework && <span className="prep-flag">Assignment · see your child&rsquo;s page</span>}
               </div>
             </div>
           </li>)}</ol>
