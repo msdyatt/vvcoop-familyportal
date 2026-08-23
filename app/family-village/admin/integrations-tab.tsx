@@ -32,6 +32,23 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
     await load();
   }
 
+  /**
+   * Asks the server whether OpenSign accepts the stored API token.
+   *
+   * The token lives in a server secret, so the browser cannot check it and an
+   * administrator otherwise has no way to tell a wrong token from a quiet one.
+   * That ambiguity is exactly what let this integration sit broken.
+   */
+  async function testOpenSign() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setStatus("Testing the OpenSign connection…");
+    const { data, error } = await supabase.functions.invoke("opensign-sync", { body: { mode: "test" } });
+    if (error) { setStatus(`Could not run the test: ${error.message}`); return; }
+    setStatus(data?.detail ?? (data?.ok ? "OpenSign accepted the API token." : "OpenSign rejected the API token."));
+    await load();
+  }
+
   if (loading) return <p>Loading integrations…</p>;
 
   return <section className="integrations-manage">
@@ -49,7 +66,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
       {/* Split on purpose. A page that lists six services as though six are
           connected is worse than one that admits only OpenSign is. */}
       <p className="card-kicker">Connected</p>
-      {integrations.filter((row) => row.id === "opensign").map((row) => <IntegrationCard key={row.id} row={row} onSave={save} live />)}
+      {integrations.filter((row) => row.id === "opensign").map((row) => <IntegrationCard key={row.id} row={row} onSave={save} live onTest={testOpenSign} />)}
 
       <p className="card-kicker integrations-divider">Notes only</p>
       <p className="field-note">
@@ -61,7 +78,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
   </section>;
 }
 
-function IntegrationCard({ row, onSave, live = false }: { row: Integration; onSave: (row: Integration) => void; live?: boolean }) {
+function IntegrationCard({ row, onSave, live = false, onTest }: { row: Integration; onSave: (row: Integration) => void; live?: boolean; onTest?: () => void }) {
   const [local, setLocal] = useState(row);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- resync local edit buffer when parent data reloads
@@ -85,6 +102,9 @@ function IntegrationCard({ row, onSave, live = false }: { row: Integration; onSa
     {live && <p className="field-note">
       This base URL is read by the signing function every time a document is sent — changing it changes real behaviour.
     </p>}
-    <button onClick={() => onSave(local)}>Save</button>
+    <div className="row-actions">
+      <button onClick={() => onSave(local)}>Save</button>
+      {onTest && <button type="button" className="ghost" onClick={onTest}>Test connection</button>}
+    </div>
   </article>;
 }

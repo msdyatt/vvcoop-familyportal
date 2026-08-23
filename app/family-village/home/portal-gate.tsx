@@ -16,7 +16,7 @@ type Profile = { display_name: string | null; email: string; status: "pending" |
 type PortalData = {
   familyId: string;
   children: { id: string; first_name: string; last_initial: string | null }[];
-  classes: { id: string; title: string; description: string | null; meeting_time: string | null }[];
+  classes: { id: string; title: string; description: string | null }[];
   posts: { id: string; title: string; body: string; published_at: string | null; audience: string }[];
   events: { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; class_id: string | null; audience: string; requires_prework: boolean }[];
   documents: { id: string; title: string; kind: string; signature_status: string | null; storage_path: string | null }[];
@@ -76,7 +76,7 @@ export default function PortalGate() {
     const safeClassIds = classIds.length ? classIds : ["00000000-0000-0000-0000-000000000000"];
 
     const [classes, posts, events, documents, roles] = await Promise.all([
-      supabase.from("classes").select("id,title,description,meeting_time").in("id", safeClassIds).order("title"),
+      supabase.from("classes").select("id,title,description").in("id", safeClassIds).order("title"),
       // Ask for family news explicitly. Leaning on RLS alone leaked staff news
       // here: it permits a teacher to read `teachers` posts, so anyone who is
       // both a parent and a teacher saw them on their family dashboard.

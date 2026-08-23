@@ -440,3 +440,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/opensign-webhook/deno.json"
 entrypoint = "./functions/opensign-webhook/index.ts"
+
+[functions.opensign-sync]
+enabled = true
+verify_jwt = true
+import_map = "./functions/opensign-sync/deno.json"
+entrypoint = "./functions/opensign-sync/index.ts"

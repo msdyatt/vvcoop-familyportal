@@ -7,8 +7,9 @@ import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
 import AppHeader from "../app-header";
 import NewsSection from "./news-section";
+import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../../lib/schedule";
 
-type ClassRow = { id: string; title: string; description: string | null; meeting_time: string | null };
+type ClassRow = { id: string; title: string; description: string | null } & ClassSchedule;
 type Assignment = { class_id: string; assignment_role: string; classes: ClassRow };
 type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string };
 type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string; author_name: string; read_count: number };
@@ -47,7 +48,7 @@ export default function TeacherWorkspace() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { data: assignments } = await supabase.from("teacher_assignments")
-      .select("class_id,assignment_role,classes(id,title,description,meeting_time)").eq("user_id", uid);
+      .select(`class_id,assignment_role,classes(id,title,description,${SCHEDULE_SELECT})`).eq("user_id", uid);
     const rows = (assignments ?? []) as unknown as Assignment[];
     const myClasses = rows.map((row) => row.classes).filter(Boolean);
     setClasses(myClasses);
@@ -136,7 +137,7 @@ export default function TeacherWorkspace() {
               onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setActiveClassId(row.id); setOpenChildId(null); } }}>
               <div>
                 <b>{row.title}</b>
-                <span>{row.meeting_time || "Schedule to be announced"}{roleByClass[row.id] === "assistant" ? " · assisting" : ""}</span>
+                <span>{describeSchedule(row)}{roleByClass[row.id] === "assistant" ? " · assisting" : ""}</span>
               </div>
             </div>)}
           </div>

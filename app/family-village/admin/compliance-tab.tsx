@@ -59,7 +59,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
     if (!activeYear) { setRequirements([]); setRows([]); setLoading(false); return; }
 
     const [{ data: reqRows }, { data: familyRows }, { data: docRows }] = await Promise.all([
-      supabase.from("requirements").select("id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,amount_per_family,amount_per_child,payment_url,due_on")
+      supabase.from("requirements").select("id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,opensign_template_id,amount_per_family,amount_per_child,payment_url,due_on")
         .eq("school_year_id", activeYear).order("sort_order").order("title"),
       supabase.from("families").select("id,display_name,children(id,active),family_members(user_id,profiles(email,display_name,status))").order("display_name"),
       // Candidates to attach to a document requirement -- anything with a file.
@@ -74,7 +74,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
     if (reqs.length) {
       const { data: statusRows } = await supabase
         .from("family_requirements")
-        .select("id,requirement_id,family_id,status,signed_document_id,signed_at,signing_url,provider_document_id,amount_due,amount_paid,paid_at,payment_method,payment_reference,note")
+        .select("id,requirement_id,family_id,status,signed_document_id,signed_at,signing_url,provider_document_id,amount_due,amount_paid,paid_at,payment_method,payment_reference,certificate_url,last_synced_at,note")
         .in("requirement_id", reqs.map((r) => r.id));
       setRows((statusRows ?? []) as FamilyRequirement[]);
     } else {
@@ -157,39 +157,57 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
   }
 
   /**
-   * Sends the requirement's master PDF to one adult in the household and stores
-   * the returned signing link on their compliance row, so the family signs from
-   * inside the portal. Email is suppressed -- the link lives on the page.
+   * Sends the requirement to one adult in the household and stores the returned
+   * signing link on their compliance row, so the family can sign from inside the
+   * portal as well as from the email OpenSign sends them.
+   *
+   * Returns null on success, or the reason it failed. Returning the reason
+   * rather than a bare false matters: when something is wrong with the OpenSign
+   * account itself -- a rotated token, an exhausted plan -- every household
+   * fails for the same reason, and a list of names with no cause tells an
+   * administrator nothing about what to go and fix.
    */
   async function sendForSignature(
     requirement: Requirement, family: FamilyRow, row: FamilyRequirement | null,
     signerEmail: string, opts: { quiet?: boolean } = {},
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) return false;
-    if (!requirement.document_id) { setStatus(`"${requirement.title}" has no document attached. Upload it in Documents and link it to the requirement first.`); return false; }
+    if (!supabase) return "The portal is not connected to Supabase.";
+    if (!requirement.opensign_template_id && !requirement.document_id) {
+      const reason = `"${requirement.title}" has neither an OpenSign template nor an attached document, so there is nothing to send.`;
+      setStatus(reason);
+      return reason;
+    }
 
     let targetId = row?.id;
     if (!targetId) {
       const { data: created, error: createError } = await supabase.from("family_requirements")
         .insert({ requirement_id: requirement.id, family_id: family.id, updated_by: actorUserId })
         .select("id").single();
-      if (createError) { setStatus(createError.message); return false; }
+      if (createError) { setStatus(createError.message); return createError.message; }
       targetId = created.id;
     }
 
     if (!opts.quiet) setStatus(`Sending "${requirement.title}" to ${signerEmail}…`);
     const { data, error } = await supabase.functions.invoke("opensign-send", {
       body: {
-        documentId: requirement.document_id,
+        // The template carries the signature field positions the co-op placed
+        // by hand; the stored PDF is only a fallback, and guesses at them.
+        ...(requirement.opensign_template_id
+          ? { templateId: requirement.opensign_template_id }
+          : { documentId: requirement.document_id }),
         familyRequirementId: targetId,
+        title: requirement.title,
         signers: [{ email: signerEmail }],
-        sendEmail: false,
+        // Emailed as well as shown in the portal -- a family that never signs in
+        // still needs to hear about a waiver.
+        sendEmail: true,
       },
     });
     if (error || data?.error) {
-      if (!opts.quiet) { setStatus(data?.error || "The signing link could not be created."); await load(); }
-      return false;
+      const reason = data?.error || error?.message || "The signing link could not be created.";
+      if (!opts.quiet) { setStatus(reason); await load(); }
+      return reason;
     }
     await log("signature_link_created", targetId!, { family: family.display_name, requirement: requirement.title, signer: signerEmail });
     if (!opts.quiet) {
@@ -199,7 +217,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
       setEditing(null);
       await load();
     }
-    return true;
+    return null;
   }
 
   /**
@@ -211,7 +229,9 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
    * degrades into slower, not failed.
    */
   async function sendToAllFamilies(requirement: Requirement) {
-    if (!requirement.document_id) { setStatus(`"${requirement.title}" has no document attached yet.`); return; }
+    if (!requirement.opensign_template_id && !requirement.document_id) {
+      setStatus(`"${requirement.title}" has no OpenSign template or attached document yet.`); return;
+    }
     const pending = families.filter((family) => {
       const row = cell(requirement.id, family.id);
       return !row || (!isSettled(row.status) && !row.signing_url);
@@ -221,16 +241,50 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
 
     let sent = 0;
     const failures: string[] = [];
+    let firstReason = "";
     for (const family of pending) {
       const adult = (family.family_members ?? []).find((m) => m.profiles && m.profiles.status === "active");
       if (!adult?.profiles) { failures.push(`${family.display_name} (no active adult)`); continue; }
       setStatus(`Creating links… ${sent + failures.length + 1} of ${pending.length}`);
-      const ok = await sendForSignature(requirement, family, cell(requirement.id, family.id), adult.profiles.email, { quiet: true });
-      if (ok) sent += 1; else failures.push(family.display_name);
+      const reason = await sendForSignature(requirement, family, cell(requirement.id, family.id), adult.profiles.email, { quiet: true });
+      if (!reason) { sent += 1; continue; }
+      failures.push(family.display_name);
+      // Every household usually fails for the same reason, so one copy of it is
+      // the useful part of the message; repeating it forty times is not.
+      if (!firstReason) firstReason = reason;
     }
     setStatus(failures.length
       ? `Created ${sent} link${sent === 1 ? "" : "s"}. Could not send to: ${failures.join(", ")}.`
+        + (firstReason ? ` OpenSign said: ${firstReason}` : "")
       : `Created ${sent} signing link${sent === 1 ? "" : "s"}. They are on the families' dashboards now.`);
+    await load();
+  }
+
+  /**
+   * Asks OpenSign what happened to everything still outstanding.
+   *
+   * Runs on demand so an administrator never has to wonder whether tracking is
+   * working; the same function is also scheduled, and the webhook updates
+   * instantly once its secret is set.
+   */
+  async function syncSignatures() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setStatus("Checking OpenSign for signatures…");
+    const { data, error } = await supabase.functions.invoke("opensign-sync", { body: {} });
+    if (error || data?.error) { setStatus(data?.error || error?.message || "Could not reach OpenSign."); return; }
+
+    // A poll that fails on every document still returns ok:true with a list of
+    // problems. Reporting only the counts is how tracking looked healthy while
+    // silently doing nothing, so the problems lead the message.
+    const problems: string[] = data.problems ?? [];
+    if (problems.length) {
+      setStatus(`Checked ${data.checked}, but ${problems.length} could not be read from OpenSign. First problem: ${problems[0]}`);
+    } else {
+      setStatus(data.checked
+        ? `Checked ${data.checked} document${data.checked === 1 ? "" : "s"}; ${data.completed} newly signed.`
+        : "Nothing is waiting on a signature. Documents appear here once they have been sent from this page.");
+    }
     await load();
   }
 
@@ -258,6 +312,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
       <span className="current-year-note">
         {selectedYear?.is_current ? "This is the current year." : "Not the current year."} School years are managed in Classes.
       </span>
+      <button className="make-current" onClick={syncSignatures}>Check for signatures</button>
       {requirements.length > 0 && <p className="compliance-summary">
         <b>{completeFamilies}</b> of <b>{families.length}</b> families are fully up to date
       </p>}
@@ -287,8 +342,8 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
                 <b>{req.title}</b>
                 <span>{req.kind === "dues"
                   ? `${formatMoney(Number(req.amount_per_family ?? 0))} per family + ${formatMoney(Number(req.amount_per_child ?? 0))} per child`
-                  : req.public_sign_url
-                    ? "Signature required · shared OpenSign link"
+                  : req.opensign_template_id
+                    ? `Signature required · OpenSign template ${req.opensign_template_id}`
                     : req.document_id
                       ? `Signature required · ${documents.find((d) => d.id === req.document_id)?.title ?? "document attached"}`
                       : "Signature required · no signing link or document yet"} · open to {opened} of {families.length}</span>
@@ -298,7 +353,8 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
                 {req.kind === "dues" && opened > 0 && <button onClick={() => recalculateDues(req)}>Recalculate balances</button>}
                 {req.kind === "document" && <PublicSignLink requirement={req} onSaved={load} onStatus={setStatus} />}
                 {req.kind === "document" && <AttachDocument requirement={req} documents={documents} onSaved={load} onStatus={setStatus} />}
-                {req.kind === "document" && req.document_id && <button onClick={() => sendToAllFamilies(req)}>Create signing links for all</button>}
+                {req.kind === "document" && (req.opensign_template_id || req.document_id) &&
+                  <button onClick={() => sendToAllFamilies(req)}>Send to all families</button>}
               </div>
             </article>;
           })}

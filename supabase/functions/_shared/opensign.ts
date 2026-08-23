@@ -17,6 +17,13 @@
  *     cloud, EU and self-hosted all work without a code change.
  *   - POST /createdocument returns
  *       { objectId, signurl: [...], message: "Document sent successfully!" }
+ *   - POST /createdocument/:template_id sends an existing template. Documented
+ *     v1.2 contract: body takes title, signers[], send_email, sendInOrder,
+ *     timeToCompleteDays. Preferred over uploading a PDF, because the template
+ *     already has its signature fields positioned -- uploading instead means
+ *     guessing, and a page-1 guess is wrong on a ten-page handbook.
+ *   - GET /document/:id returns { status, file, certificate, signers, ... },
+ *     which is what makes tracking possible without a webhook.
  *
  * Note on widgets: every signer needs at least one widget, or the document
  * arrives with nowhere to sign. See defaultSignatureWidget below.
@@ -210,6 +217,133 @@ export function mapStatus(raw: string | null | undefined): string | null {
   if (value.includes("expire")) return "expired";
   if (value.includes("complet") || value.includes("signed") || value.includes("finish")) return "signed";
   if (value.includes("view") || value.includes("open")) return "viewed";
-  if (value.includes("sent") || value.includes("creat")) return "sent";
+  // GET /document/:id reports "in-progress" for a document that is out but
+  // unsigned. Without this it fell through to null and read as unrecognised.
+  if (value.includes("sent") || value.includes("creat") || value.includes("progress") || value.includes("pending")) return "sent";
   return null;
+}
+
+
+/** What a poll of GET /document/:id tells us. */
+export type DocumentState = {
+  status: string | null;
+  /** Signed PDF, once the document is complete. */
+  fileUrl: string | null;
+  /** Completion certificate, once the document is complete. */
+  certificateUrl: string | null;
+  signers: { email: string | null; status: string | null }[];
+  raw: unknown;
+};
+
+/**
+ * Sends an existing OpenSign template to one signer.
+ *
+ * The signature fields come from the template, so nothing here places widgets.
+ * `role` should match a role defined on the template; OpenSign falls back to
+ * its own default when it does not.
+ */
+export async function sendFromTemplate(opts: {
+  baseUrl: string;
+  token: string;
+  templateId: string;
+  title?: string;
+  signers: OpenSignSigner[];
+  sendEmail?: boolean;
+  sendInOrder?: boolean;
+  timeToCompleteDays?: number;
+}): Promise<SendResult> {
+  const body: Record<string, unknown> = {
+    signers: opts.signers.map((signer) => ({
+      role: signer.role ?? "Signer",
+      email: signer.email,
+      name: signer.name ?? signer.email,
+    })),
+    send_email: opts.sendEmail ?? true,
+    sendInOrder: opts.sendInOrder ?? false,
+    timeToCompleteDays: opts.timeToCompleteDays ?? 15,
+  };
+  if (opts.title) body.title = opts.title;
+
+  const result = await call(opts.baseUrl, opts.token, `/createdocument/${encodeURIComponent(opts.templateId)}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+  const providerDocumentId = extractDocumentId(result);
+  if (!providerDocumentId) {
+    throw new OpenSignError(
+      "OpenSign accepted the template send but returned no objectId, so the signature could never be matched back to a family.",
+      200, result,
+    );
+  }
+  return { providerDocumentId, signingUrls: extractSigningUrls(result, opts.signers), raw: result };
+}
+
+/** Reads back the current state of a document we previously sent. */
+export async function getDocumentState(baseUrl: string, token: string, documentId: string): Promise<DocumentState> {
+  const result = await call(baseUrl, token, `/document/${encodeURIComponent(documentId)}`, { method: "GET" });
+  const record = (result ?? {}) as Record<string, unknown>;
+  const str = (key: string) => (typeof record[key] === "string" && record[key] ? record[key] as string : null);
+
+  const signers = Array.isArray(record.signers)
+    ? (record.signers as Record<string, unknown>[]).map((signer) => ({
+        email: typeof signer.email === "string" ? signer.email : null,
+        status: typeof signer.status === "string" ? signer.status
+          : typeof signer.signed === "boolean" ? (signer.signed ? "signed" : "pending")
+          : null,
+      }))
+    : [];
+
+  return {
+    status: str("status"),
+    fileUrl: str("file"),
+    certificateUrl: str("certificate"),
+    signers,
+    raw: result,
+  };
+}
+
+/**
+ * Answers one question: does OpenSign accept our API token?
+ *
+ * There is no dedicated whoami endpoint in v1.2, so this posts an empty body to
+ * /createdocument. Nothing is created -- an empty body cannot be -- but the two
+ * failures are distinguishable, and that distinction is the whole point:
+ *
+ *   bad token   405 {"error":"Invalid API Token!"}
+ *   good token  400 {"error":"Please provide all required parameters."}
+ *
+ * Both were confirmed against the live and sandbox hosts on 22 August 2026.
+ * Without this, a rotated token looks exactly like "no signatures yet", which is
+ * how this integration sat broken without anyone being able to tell.
+ */
+export async function checkCredentials(baseUrl: string, token: string): Promise<{ ok: boolean; detail: string }> {
+  let response: Response;
+  try {
+    response = await fetch(joinUrl(baseUrl, "/createdocument"), {
+      method: "POST",
+      headers: { "x-api-token": token, "Content-Type": "application/json" },
+      body: "{}",
+    });
+  } catch (error) {
+    return { ok: false, detail: `OpenSign could not be reached at ${baseUrl}: ${error instanceof Error ? error.message : String(error)}` };
+  }
+
+  const text = await response.text();
+  let message = text.slice(0, 200);
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    const found = parsed.error ?? parsed.message;
+    if (typeof found === "string") message = found;
+  } catch { /* keep the raw text */ }
+
+  // Anything mentioning the token is an auth failure; anything else means the
+  // request got past auth and into validation, which is what we wanted to know.
+  if (/api\s*token/i.test(message)) {
+    return { ok: false, detail: `OpenSign rejected the API token (${response.status}: ${message}). Generate a new token in OpenSign under Settings → API Token and set it as the OPENSIGN_API_TOKEN secret.` };
+  }
+  if (/not\s*found|cannot\s+post/i.test(message) || response.status === 404) {
+    return { ok: false, detail: `No OpenSign API at ${baseUrl} (${response.status}). Check the base URL ends in /api/v1.2.` };
+  }
+  return { ok: true, detail: `OpenSign accepted the API token at ${baseUrl}.` };
 }

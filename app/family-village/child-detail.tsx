@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
+import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
 
-type ClassInfo = { id: string; title: string; meeting_time: string | null; teachers: string[] };
+type ClassInfo = { id: string; title: string; schedule: string; teachers: string[] };
 type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string };
 type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
 
@@ -26,15 +27,15 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
 
     const [{ data: childRow }, { data: enrollments }, { data: noteRows }] = await Promise.all([
       supabase.from("children").select("id,first_name,last_name").eq("id", childId).single(),
-      supabase.from("enrollments").select("class_id,status,classes(id,title,meeting_time,teacher_assignments(profiles(display_name,email)))").eq("child_id", childId).eq("status", "active"),
+      supabase.from("enrollments").select(`class_id,status,classes(id,title,${SCHEDULE_SELECT},teacher_assignments(profiles(display_name,email)))`).eq("child_id", childId).eq("status", "active"),
       supabase.from("teacher_notes").select("id,body,visibility,created_at,author_user_id,class_id").eq("child_id", childId).order("created_at", { ascending: false }),
     ]);
     setChild(childRow as ChildRecord | null);
-    const rows = (enrollments ?? []) as unknown as { classes: { id: string; title: string; meeting_time: string | null; teacher_assignments: { profiles: { display_name: string | null; email: string } | null }[] } }[];
+    const rows = (enrollments ?? []) as unknown as { classes: { id: string; title: string; teacher_assignments: { profiles: { display_name: string | null; email: string } | null }[] } & ClassSchedule }[];
     const classInfos = rows.map((row) => ({
       id: row.classes.id,
       title: row.classes.title,
-      meeting_time: row.classes.meeting_time,
+      schedule: describeSchedule(row.classes),
       teachers: row.classes.teacher_assignments.map((assignment) => assignment.profiles?.display_name || assignment.profiles?.email || "").filter(Boolean),
     }));
     setClasses(classInfos);
@@ -114,7 +115,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
 
         <section>
           <p className="card-kicker">Classes</p>
-          {classes.length ? <ul className="child-detail-list">{classes.map((row) => <li key={row.id}><b>{row.title}</b><span>{row.meeting_time || "Schedule to be announced"}{row.teachers.length ? ` · ${row.teachers.join(", ")}` : ""}</span></li>)}</ul> : <p className="portal-empty">Not enrolled in any classes yet.</p>}
+          {classes.length ? <ul className="child-detail-list">{classes.map((row) => <li key={row.id}><b>{row.title}</b><span>{row.schedule}{row.teachers.length ? ` · ${row.teachers.join(", ")}` : ""}</span></li>)}</ul> : <p className="portal-empty">Not enrolled in any classes yet.</p>}
         </section>
 
         <section>

@@ -19,6 +19,8 @@ export type Requirement = {
   document_id: string | null;
   /** OpenSign public template link, shared by every family. */
   public_sign_url: string | null;
+  /** OpenSign template sent per family. Preferred: it carries the signature field positions. */
+  opensign_template_id: string | null;
   amount_per_family: number | null;
   amount_per_child: number | null;
   payment_url: string | null;
@@ -39,6 +41,8 @@ export type FamilyRequirement = {
   paid_at: string | null;
   payment_method: string | null;
   payment_reference: string | null;
+  certificate_url: string | null;
+  last_synced_at: string | null;
   note: string | null;
 };
 
