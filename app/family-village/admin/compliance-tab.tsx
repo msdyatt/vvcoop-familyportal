@@ -325,7 +325,10 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
     {yearId && <RequirementForm yearId={yearId} documents={documents} onSaved={load} onStatus={setStatus} />}
 
     {yearId && <DuesImport
-      families={families.map((family) => ({ id: family.id, name: family.display_name }))}
+      families={families.map((family) => ({
+        id: family.id, name: family.display_name,
+        emails: family.family_members.map((member) => member.profiles?.email).filter((email): email is string => !!email),
+      }))}
       rows={rows}
       requirements={requirements}
       actorUserId={actorUserId}

@@ -1959,16 +1959,6 @@ footer {
   border-radius:10px;
 }
 
-.portal-people div.person-card span {
-  display:grid;
-  place-items:center;
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  background:var(--terracotta);
-  font:700 20px var(--serif);
-}
-
 .portal-people h3 {
   margin:12px 0 0;
   font:700 21px var(--serif);
@@ -2724,8 +2714,15 @@ footer {
   box-shadow:0 24px 60px rgba(0,0,0,.25);
 }
 
-.child-detail-panel h2 {
+.child-detail-heading {
+  display:flex;
+  align-items:center;
+  gap:16px;
   margin:4px 0 22px;
+}
+
+.child-detail-heading h2 {
+  margin:0;
   color:var(--navy);
   font:700 clamp(28px,4vw,38px) var(--serif);
 }
@@ -3346,6 +3343,28 @@ footer {
   gap:20px;
 }
 
+/* --- Avatars ---------------------------------------------------------------
+   One shape everywhere a person's photo (or initial) appears, so a real photo
+   and its fallback are interchangeable in any layout that already expected
+   the fallback circle. */
+.avatar {
+  display:inline-grid;
+  place-items:center;
+  border-radius:50%;
+  object-fit:cover;
+  flex-shrink:0;
+}
+
+.avatar-fallback {
+  background:var(--terracotta);
+  color:var(--cream);
+  font:700 1em var(--serif);
+}
+
+.avatar-sm { width:28px; height:28px; font-size:12px; }
+.avatar-md { width:40px; height:40px; font-size:18px; }
+.avatar-lg { width:72px; height:72px; font-size:28px; }
+
 .settings-block {
   padding-top:16px;
   border-top:1px solid rgba(var(--cream-rgb),.15);
@@ -3359,6 +3378,15 @@ footer {
 .settings-block .card-kicker {
   color:var(--terracotta-on-navy);
 }
+
+.avatar-uploader {
+  display:flex;
+  align-items:center;
+  gap:16px;
+  margin:14px 0 20px;
+}
+
+.avatar-uploader .file-drop { margin:0; }
 
 .danger-zone .card-kicker {
   color:var(--terracotta-on-navy);
@@ -4195,10 +4223,14 @@ footer {
   cursor:pointer;
 }
 
-.workspace-main button.roster-pick span {
+.workspace-main button.roster-pick .roster-note-count {
   color:var(--sage-text);
   font-size:12px;
   font-weight:400;
+}
+
+.workspace-main button.roster-pick .roster-pick-name {
+  flex:1;
 }
 
 .workspace-main button.roster-pick:hover { background:var(--surface-sunken); }

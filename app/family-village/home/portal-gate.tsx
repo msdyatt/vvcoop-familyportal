@@ -2,8 +2,9 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "../../../lib/supabase";
-import { getSignedFileUrl } from "../../../lib/storage";
+import { getSignedFileUrl, getSignedFileUrls } from "../../../lib/storage";
 import ChildDetail from "../child-detail";
+import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
 import AppHeader from "../app-header";
 import MfaChallengeScreen from "../mfa-challenge";
@@ -15,7 +16,7 @@ type PortalState = "loading" | "signed-out" | "mfa-challenge" | "pending" | "act
 type Profile = { display_name: string | null; email: string; status: "pending" | "active" | "suspended" };
 type PortalData = {
   familyId: string;
-  children: { id: string; first_name: string; last_initial: string | null }[];
+  children: { id: string; first_name: string; last_initial: string | null; avatar_path: string | null }[];
   classes: { id: string; title: string; description: string | null }[];
   posts: { id: string; title: string; body: string; published_at: string | null; audience: string }[];
   events: { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; class_id: string | null; audience: string; requires_prework: boolean }[];
@@ -50,6 +51,7 @@ export default function PortalGate() {
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const [openDocumentId, setOpenDocumentId] = useState<string | null>(null);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
@@ -67,7 +69,7 @@ export default function PortalGate() {
     const familyIds = (membership.data ?? []).map((row) => row.family_id);
     const safeFamilyIds = familyIds.length ? familyIds : ["00000000-0000-0000-0000-000000000000"];
 
-    const childrenResult = await supabase.from("children").select("id,first_name,last_initial").in("family_id", safeFamilyIds).order("first_name");
+    const childrenResult = await supabase.from("children").select("id,first_name,last_initial,avatar_path").in("family_id", safeFamilyIds).order("first_name");
     if (childrenResult.error) { setState("error"); return; }
     const childIds = (childrenResult.data ?? []).map((row) => row.id);
     const safeChildIds = childIds.length ? childIds : ["00000000-0000-0000-0000-000000000000"];
@@ -112,6 +114,9 @@ export default function PortalGate() {
       enrollmentPeriod: period ? { title: period.title, closesAt: period.closes_at } : null,
     } as PortalData);
     setState("active");
+
+    const avatarPaths = (children.data ?? []).map((row) => row.avatar_path).filter((path): path is string => !!path);
+    if (avatarPaths.length) setAvatarUrls(await getSignedFileUrls(supabase, avatarPaths));
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
@@ -165,7 +170,7 @@ export default function PortalGate() {
       <a href="#my-children">Choose classes →</a>
     </aside>}
     <div className="portal-grid">
-      <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><span>{child.first_name.slice(0,1)}</span><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
+      <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
       </section>
       <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}</section>

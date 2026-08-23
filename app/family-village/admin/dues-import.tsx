@@ -4,11 +4,12 @@ import { useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { FamilyRequirement, Requirement, formatMoney } from "../../../lib/compliance";
 
-type FamilyLite = { id: string; name: string };
+type FamilyLite = { id: string; name: string; emails: string[] };
 
 type ParsedRow = {
   line: number;
   rawName: string;
+  rawEmail: string;
   amount: number;
   reference: string | null;
   paidOn: string | null;
@@ -27,6 +28,7 @@ type ParsedRow = {
  * Nothing is written until the preview has been reviewed and confirmed.
  */
 const NAME_KEYS = ["family", "family name", "household", "name", "payer", "customer", "from"];
+const EMAIL_KEYS = ["email", "email address", "payer email"];
 const AMOUNT_KEYS = ["amount", "total", "paid", "payment", "amount paid"];
 const REF_KEYS = ["reference", "ref", "transaction", "transaction id", "id", "invoice"];
 const DATE_KEYS = ["date", "paid on", "paid at", "created", "timestamp"];
@@ -63,9 +65,22 @@ function money(raw: string): number {
   return Number(raw.replace(/[^0-9.-]/g, "")) || 0;
 }
 
-/** Loose match: exact, then case-insensitive, then "the Lewis family" contains "Lewis". */
-function matchFamily(raw: string, families: FamilyLite[]): string | null {
-  const value = raw.trim().toLowerCase();
+/**
+ * Matches a payment row to a household.
+ *
+ * Crowded's export lists whichever *person* paid -- "Raven Monaco" -- not a
+ * household name, so matching against families.display_name alone missed
+ * almost every row on a real export. Email is the reliable link: any adult in
+ * the household, matched exactly, case-insensitive. The name-based match is
+ * kept as a fallback for exports that carry a household or payer name instead.
+ */
+function matchFamily(rawEmail: string, rawName: string, families: FamilyLite[]): string | null {
+  const email = rawEmail.trim().toLowerCase();
+  if (email) {
+    const byEmail = families.find((family) => family.emails.some((candidate) => candidate.toLowerCase() === email));
+    if (byEmail) return byEmail.id;
+  }
+  const value = rawName.trim().toLowerCase();
   if (!value) return null;
   const exact = families.find((family) => family.name.toLowerCase() === value);
   if (exact) return exact.id;
@@ -109,14 +124,17 @@ export default function DuesImport({ families, rows, requirements, actorUserId, 
 
     const refCol = findColumn(lower, REF_KEYS);
     const dateCol = findColumn(lower, DATE_KEYS);
+    const emailCol = findColumn(lower, EMAIL_KEYS);
 
     setParsed(table.slice(1).map((cells, index) => {
       const rawName = (cells[nameCol] ?? "").trim();
-      const familyId = matchFamily(rawName, families);
+      const rawEmail = emailCol >= 0 ? (cells[emailCol] ?? "").trim() : "";
+      const familyId = matchFamily(rawEmail, rawName, families);
       const amount = money(cells[amountCol] ?? "");
       return {
         line: index + 2,
         rawName,
+        rawEmail,
         amount,
         reference: refCol >= 0 ? (cells[refCol] ?? "").trim() || null : null,
         paidOn: dateCol >= 0 ? (cells[dateCol] ?? "").trim() || null : null,
@@ -200,7 +218,7 @@ export default function DuesImport({ families, rows, requirements, actorUserId, 
             <tbody>
               {parsed.map((row) => <tr key={row.line} className={row.note ? "import-skip" : ""}>
                 <td className="num">{row.line}</td>
-                <td>{row.rawName || <em>blank</em>}</td>
+                <td>{row.rawName || <em>blank</em>}{row.rawEmail ? <small className="field-note">{row.rawEmail}</small> : null}</td>
                 <td>{row.familyId ? families.find((family) => family.id === row.familyId)?.name : <em>unmatched</em>}</td>
                 <td className="num">{formatMoney(row.amount)}</td>
                 <td>{row.note || "Will be recorded"}</td>

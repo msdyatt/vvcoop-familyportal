@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import { getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import ChildDetail from "../child-detail";
+import Avatar from "../avatar";
 import { CollapsibleRecord, EditableSection, Field, GRADES } from "./admin-ui";
 import FamilyDocuments from "./family-documents";
 import { FamilyRequirement, Requirement, isSettled, statusLabel, statusTone } from "../../../lib/compliance";
@@ -10,7 +12,7 @@ import { FamilyRequirement, Requirement, isSettled, statusLabel, statusTone } fr
 type Child = {
   id: string; first_name: string; last_name: string | null; last_initial: string | null;
   age_band: string | null; birthdate: string | null; age_band_override: boolean;
-  active: boolean; last_name_override: boolean;
+  active: boolean; last_name_override: boolean; avatar_path: string | null;
 };
 type Member = { user_id: string; relationship: string | null; profiles: { email: string; display_name: string | null; status: string; phone: string | null } | null };
 type Family = { id: string; display_name: string; last_name: string | null; children: Child[]; family_members: Member[] };
@@ -22,6 +24,7 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   const [families, setFamilies] = useState<Family[]>([]);
   const [roleMap, setRoleMap] = useState<Record<string, string[]>>({});
   const [compliance, setCompliance] = useState<ComplianceRow[]>([]);
+  const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
 
@@ -30,7 +33,7 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("families")
-      .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,birthdate,age_band_override,active,last_name_override),family_members(user_id,relationship,profiles(email,display_name,status,phone))")
+      .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,birthdate,age_band_override,active,last_name_override,avatar_path),family_members(user_id,relationship,profiles(email,display_name,status,phone))")
       .order("display_name");
     if (!error) setFamilies((data ?? []) as unknown as Family[]);
 
@@ -49,6 +52,11 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
       .eq("requirements.active", true)
       .eq("requirements.school_years.is_current", true);
     setCompliance((complianceRows ?? []) as unknown as ComplianceRow[]);
+
+    const avatarPaths = ((data ?? []) as unknown as Family[])
+      .flatMap((family) => family.children.map((child) => child.avatar_path))
+      .filter((path): path is string => !!path);
+    if (avatarPaths.length) setAvatarUrls(await getSignedFileUrls(supabase, avatarPaths));
 
     setLoading(false);
   }
@@ -85,6 +93,17 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     if (error) { setStatus(error.message); return; }
     await log(child.active ? "child_updated" : "child_deactivated", "child", child.id, { first_name: child.first_name, active: child.active });
     setStatus(`Saved ${child.first_name}.`);
+    await load();
+  }
+
+  async function uploadChildAvatar(childId: string, file: File) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const uploaded = await uploadPrivateFile(supabase, "avatars", file);
+    if ("error" in uploaded) { setStatus(uploaded.error); return; }
+    const { error } = await supabase.from("children").update({ avatar_path: uploaded.path }).eq("id", childId);
+    if (error) { setStatus(error.message); return; }
+    setStatus("Photo updated.");
     await load();
   }
 
@@ -177,18 +196,20 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   return <section className="family-manage">
     <p className="admin-form-status" role="status">{status || `${families.length} household${families.length === 1 ? "" : "s"}. Open one to see its details; nothing is editable until you choose to edit it.`}</p>
     <div className="family-manage-list">
-      {families.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
+      {families.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
     </div>
   </section>;
 }
 
-function FamilyCard({ family, roleMap, compliance, onSaveFamily, onSaveChild, onAddChild, onRemoveUser, onGrantRole, onRevokeRole }: {
+function FamilyCard({ family, roleMap, compliance, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onUploadAvatar, onRemoveUser, onGrantRole, onRevokeRole }: {
   family: Family;
   roleMap: Record<string, string[]>;
   compliance: ComplianceRow[];
+  avatarUrls: Map<string, string>;
   onSaveFamily: (f: Family) => void;
   onSaveChild: (c: Child) => void;
   onAddChild: (familyId: string, firstName: string) => void;
+  onUploadAvatar: (childId: string, file: File) => void;
   onRemoveUser: (familyId: string, userId: string, displayName: string) => void;
   onGrantRole: (userId: string, role: string) => void;
   onRevokeRole: (userId: string, role: string) => void;
@@ -276,8 +297,12 @@ function FamilyCard({ family, roleMap, compliance, onSaveFamily, onSaveChild, on
                 : <p className="field-note">
                     {child.birthdate ? `Grade ${child.age_band ?? "not yet set"}, calculated from birthdate.` : "Add a birthdate to calculate grade automatically."}
                   </p>}
+              <label className="file-drop"><span className="field-caption">Photo</span>
+                <input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) onUploadAvatar(child.id, file); }} />
+              </label>
             </div>
           : <div className="child-line" key={child.id}>
+              <Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} size="sm" />
               <b>{child.first_name} {child.last_name}</b>
               <span>{child.age_band ? `Grade ${child.age_band}` : "Grade not set"}{child.age_band_override ? " · manual" : ""}{child.active ? "" : " · inactive"}</span>
               <button onClick={() => setViewingChildId(child.id)}>View</button>

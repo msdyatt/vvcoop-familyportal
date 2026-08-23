@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
+import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
+import Avatar from "./avatar";
 
 export default function AccountSettings({ email, onSignOut }: { email: string; onSignOut: () => void }) {
   return <div className="account-settings">
@@ -24,6 +26,8 @@ function ContactSection() {
   const [phone, setPhone] = useState("");
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -33,10 +37,25 @@ function ContactSection() {
     if (!supabase) return;
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
-    const { data: profile } = await supabase.from("profiles").select("display_name,phone,emergency_contact_name,emergency_contact_phone").eq("id", data.user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("display_name,phone,emergency_contact_name,emergency_contact_phone,avatar_path").eq("id", data.user.id).single();
     setDisplayName(profile?.display_name ?? "");
     setPhone(profile?.phone ?? ""); setEmergencyName(profile?.emergency_contact_name ?? ""); setEmergencyPhone(profile?.emergency_contact_phone ?? "");
+    setAvatarUrl(profile?.avatar_path ? await getSignedFileUrl(supabase, profile.avatar_path) : null);
     setLoading(false);
+  }
+
+  async function uploadAvatar(file: File) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setAvatarBusy(true);
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) { setAvatarBusy(false); return; }
+    const uploaded = await uploadPrivateFile(supabase, "avatars", file);
+    if ("error" in uploaded) { setAvatarBusy(false); setStatus(uploaded.error); return; }
+    const { error } = await supabase.from("profiles").update({ avatar_path: uploaded.path }).eq("id", data.user.id);
+    setAvatarBusy(false);
+    if (error) { setStatus(error.message); return; }
+    await load();
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
@@ -64,6 +83,12 @@ function ContactSection() {
 
   return <div className="settings-block">
     <p className="card-kicker">Your details</p>
+    <div className="avatar-uploader">
+      <Avatar url={avatarUrl} label={displayName || "?"} size="lg" />
+      <label className="file-drop"><span className="field-caption">Photo</span>
+        <input type="file" accept="image/*" disabled={avatarBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadAvatar(file); }} />
+      </label>
+    </div>
     <form onSubmit={submit} className="household-form">
       <label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="How your name appears in the Village" disabled={busy} /></label>
       <label>Phone number<input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="(555) 555-5555" disabled={busy} /></label>

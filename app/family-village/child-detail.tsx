@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
+import { getSignedFileUrl } from "../../lib/storage";
+import Avatar from "./avatar";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
 
 type ClassInfo = { id: string; title: string; schedule: string; teachers: string[] };
 type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string; completed: boolean };
 type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
 
-type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null };
+type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null; avatar_path: string | null };
 
 type OpenPeriod = { id: string; title: string; closes_at: string; electives_only: boolean };
 type EligibleClass = { id: string; title: string; is_elective: boolean };
@@ -25,6 +27,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
   const [enrollStatus, setEnrollStatus] = useState("");
   const [notes, setNotes] = useState<NoteInfo[]>([]);
   const [userId, setUserId] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -35,11 +38,12 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     setUserId(uid);
 
     const [{ data: childRow }, { data: enrollments }, { data: noteRows }] = await Promise.all([
-      supabase.from("children").select("id,first_name,last_name,age_band").eq("id", childId).single(),
+      supabase.from("children").select("id,first_name,last_name,age_band,avatar_path").eq("id", childId).single(),
       supabase.from("enrollments").select(`class_id,status,classes(id,title,${SCHEDULE_SELECT},teacher_assignments(profiles(display_name,email)))`).eq("child_id", childId).eq("status", "active"),
       supabase.from("teacher_notes").select("id,body,visibility,created_at,author_user_id,class_id").eq("child_id", childId).order("created_at", { ascending: false }),
     ]);
     setChild(childRow as ChildRecord | null);
+    setAvatarUrl(childRow?.avatar_path ? await getSignedFileUrl(supabase, childRow.avatar_path) : null);
     const rows = (enrollments ?? []) as unknown as { classes: { id: string; title: string; teacher_assignments: { profiles: { display_name: string | null; email: string } | null }[] } & ClassSchedule }[];
     const classInfos = rows.map((row) => ({
       id: row.classes.id,
@@ -200,7 +204,10 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
       <button className="child-detail-close" onClick={onClose} aria-label="Close">×</button>
       {loading ? <p>Loading…</p> : <>
         <p className="eyebrow">Student</p>
-        <h2>{child?.first_name} {child?.last_name}</h2>
+        <div className="child-detail-heading">
+          <Avatar url={avatarUrl} label={child?.first_name ?? "?"} size="lg" />
+          <h2>{child?.first_name} {child?.last_name}</h2>
+        </div>
 
         <section>
           <p className="card-kicker">Classes</p>

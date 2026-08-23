@@ -2,16 +2,17 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
-import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
+import { getSignedFileUrl, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
+import Avatar from "../avatar";
 import AppHeader from "../app-header";
 import NewsSection from "./news-section";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../../lib/schedule";
 
 type ClassRow = { id: string; title: string; description: string | null } & ClassSchedule;
 type Assignment = { class_id: string; assignment_role: string; classes: ClassRow };
-type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string };
+type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string; avatar_path: string | null };
 type NoteRead = { name: string; read_at: string };
 type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string; author_name: string; reads: NoteRead[] };
 type Handout = { id: string; title: string; storage_path: string; class_id: string | null; created_at: string };
@@ -52,6 +53,7 @@ export default function TeacherWorkspace() {
   const [roleByClass, setRoleByClass] = useState<Record<string, string>>({});
   const [activeClassId, setActiveClassId] = useState("");
   const [roster, setRoster] = useState<RosterChild[]>([]);
+  const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const [notes, setNotes] = useState<Note[]>([]);
   const [handouts, setHandouts] = useState<Handout[]>([]);
   const [printQueue, setPrintQueue] = useState<PrintRequest[]>([]);
@@ -72,14 +74,17 @@ export default function TeacherWorkspace() {
     if (!classIds.length) return;
 
     const [{ data: enrollments }, { data: noteRows }, { data: handoutRows }, { data: printRows }, { data: eventRows }] = await Promise.all([
-      supabase.from("enrollments").select("child_id,class_id,children(id,first_name,last_name)").in("class_id", classIds).eq("status", "active"),
+      supabase.from("enrollments").select("child_id,class_id,children(id,first_name,last_name,avatar_path)").in("class_id", classIds).eq("status", "active"),
       supabase.from("teacher_notes").select("id,body,visibility,created_at,child_id,class_id,author_user_id").in("class_id", classIds).order("created_at", { ascending: false }).limit(60),
       supabase.from("documents").select("id,title,storage_path,class_id,created_at").in("class_id", classIds).order("created_at", { ascending: false }),
       supabase.from("print_requests").select("id,title,quantity,status,storage_path,created_at,class_id").eq("requested_by_user_id", uid).is("cleared_at", null).order("created_at", { ascending: false }),
       supabase.from("events").select("id,class_id,title,description,starts_at,location,requires_prework").in("class_id", classIds).order("starts_at", { ascending: true }),
     ]);
-    setRoster(((enrollments ?? []) as unknown as { children: { id: string; first_name: string; last_name: string | null }; class_id: string }[])
-      .map((row) => ({ ...row.children, class_id: row.class_id })));
+    const rosterRows = ((enrollments ?? []) as unknown as { children: { id: string; first_name: string; last_name: string | null; avatar_path: string | null }; class_id: string }[])
+      .map((row) => ({ ...row.children, class_id: row.class_id }));
+    setRoster(rosterRows);
+    const avatarPaths = rosterRows.map((row) => row.avatar_path).filter((path): path is string => !!path);
+    if (avatarPaths.length) setAvatarUrls(await getSignedFileUrls(supabase, avatarPaths));
 
     const noteBase = (noteRows ?? []) as Omit<Note, "author_name" | "reads">[];
     const authorIds = [...new Set(noteBase.map((row) => row.author_user_id))];
@@ -177,8 +182,9 @@ export default function TeacherWorkspace() {
                       className={`roster-pick${child.id === openChildId ? " active" : ""}`}
                       aria-expanded={child.id === openChildId}
                       onClick={() => setOpenChildId(child.id === openChildId ? null : child.id)}>
-                      {child.first_name} {child.last_name}
-                      <span>{noteCountLabel(notes.filter((n) => n.child_id === child.id && n.class_id === activeClassId).length)}</span>
+                      <Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} size="sm" />
+                      <span className="roster-pick-name">{child.first_name} {child.last_name}</span>
+                      <span className="roster-note-count">{noteCountLabel(notes.filter((n) => n.child_id === child.id && n.class_id === activeClassId).length)}</span>
                     </button>
                   </li>)}
                 </ul>
