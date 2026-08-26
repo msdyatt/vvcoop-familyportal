@@ -1066,22 +1066,6 @@ footer {
   opacity:.6;
 }
 
-.month-calendar>div.clickable {
-  cursor:pointer;
-}
-
-.month-calendar>div.clickable:hover {
-  background:var(--surface-sunken);
-}
-
-.month-calendar>div>span.clickable {
-  cursor:pointer;
-}
-
-.month-calendar>div>span.clickable:hover {
-  background:var(--surface-sunken);
-}
-
 .month-calendar>div.today time {
   display:grid;
   place-items:center;
@@ -1092,19 +1076,128 @@ footer {
   border-radius:50%;
 }
 
-.month-calendar>div>span {
+.calendar-day-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.calendar-add {
+  padding:1px 7px;
+  font-size:13px;
+  line-height:1.4;
+}
+
+.calendar-day-view {
+  grid-template-columns:1fr;
+  min-width:0;
+}
+
+.calendar-day-view>div {
+  min-height:220px;
+}
+
+.calendar-week-cell {
+  min-height:160px;
+}
+
+.calendar-event-chip {
   display:grid;
   gap:1px;
+  width:100%;
   margin-top:5px;
   padding:5px 6px;
   background:var(--panel);
   color:var(--navy);
+  font:inherit;
   font-size:10px;
   line-height:1.25;
+  text-align:left;
+  border:0;
+  cursor:pointer;
 }
 
-.month-calendar>div>span small {
+.calendar-event-chip:hover:not(:disabled) {
+  background:var(--surface-sunken);
+}
+
+.calendar-event-chip:disabled {
+  cursor:default;
+  opacity:.75;
+}
+
+.calendar-event-chip small {
   color:var(--sage-text);
+}
+
+.calendar-list-view {
+  display:grid;
+  gap:12px;
+}
+
+.calendar-list-item {
+  display:flex;
+  gap:16px;
+  align-items:center;
+  width:100%;
+  padding:14px 18px;
+  background:var(--surface);
+  color:inherit;
+  font:inherit;
+  text-align:left;
+  border:1px solid rgba(var(--navy-rgb),.1);
+  cursor:pointer;
+}
+
+.calendar-list-item:hover:not(:disabled) {
+  background:var(--surface-sunken);
+}
+
+.calendar-list-item:disabled {
+  cursor:default;
+  opacity:.7;
+}
+
+.calendar-list-item time {
+  flex:0 0 auto;
+  color:var(--sage-text);
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+}
+
+.calendar-list-item b {
+  display:block;
+  font:600 16px var(--sans);
+  color:var(--navy);
+}
+
+.calendar-list-item span {
+  display:block;
+  color:var(--sage-text);
+  font-size:12px;
+}
+
+.calendar-subscribe-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:16px;
+  margin-top:18px;
+  padding-top:14px;
+  border-top:1px solid rgba(var(--navy-rgb),.12);
+}
+
+.subscribe-link {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+}
+
+.subscribe-link small {
+  flex-basis:100%;
+  color:var(--sage-text);
+  font-size:11px;
 }
 
 /* --- Family enrollment and assignment completion ------------------------- */
@@ -1300,6 +1393,32 @@ footer {
   font-size:12px;
 }
 
+.master-roster-table {
+  margin-bottom:20px;
+}
+
+.master-roster-table thead tr:first-child th {
+  padding-top:16px;
+  padding-bottom:4px;
+  color:var(--terracotta-text);
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  border-bottom:0;
+}
+
+.master-roster-table thead tr:nth-child(2) th {
+  color:var(--sage-text);
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+}
+
+.master-roster-page {
+  break-after:page;
+}
+
 @media(max-width:900px) {
   .admin-workspace-layout {
     grid-template-columns:1fr;
@@ -1352,22 +1471,44 @@ footer {
     align-items:start;
     flex-direction:column;
   }
+  .month-calendar {
+    min-width:520px;
+  }
+  .month-calendar>div {
+    min-height:80px;
+    padding:5px;
+  }
+  .calendar-week-cell {
+    min-height:120px;
+  }
+  .calendar-list-item {
+    flex-direction:column;
+    align-items:start;
+    gap:4px;
+  }
 }
 
 @media print {
   body.printing-report * {
-    visibility:hidden !important;
+    display:none !important;
+  }
+  /* The target's ancestor chain up to <body> stays in the flow (so the
+     target itself still renders at all) but contributes no content of its
+     own; the target and everything inside it reverts to each element's own
+     native display so table/list layout inside it still works. */
+  body.printing-report .print-ancestor {
+    display:revert !important;
   }
   body.printing-report .print-target,
   body.printing-report .print-target * {
-    visibility:visible !important;
+    display:revert !important;
   }
   body.printing-report .print-target {
-    position:absolute;
-    inset:0;
-    width:100%;
-    padding:0;
-    border:0;
+    position:static !important;
+    width:auto !important;
+    margin:0 !important;
+    padding:0 !important;
+    border:0 !important;
   }
   .no-print {
     display:none !important;
@@ -1375,6 +1516,10 @@ footer {
   .roster-print-sheet {
     padding:0;
     border:0;
+  }
+  .roster-print-sheet tr,
+  .printable-report tr {
+    break-inside:avoid;
   }
 }
 

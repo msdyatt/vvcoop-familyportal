@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { edgeFunctionUrl, getSupabaseBrowserClient } from "../../../lib/supabase";
+import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import SubscribeLink, { PersonalSubscribeLink } from "../subscribe-link";
 import { getSignedFileUrl, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
@@ -156,7 +157,7 @@ export default function TeacherWorkspace() {
       <div className="workspace-main">
         <NewsSection classes={classes} />
 
-        <MonthCalendar events={classEvents} classes={classes} roleByClass={roleByClass} activeClassId={activeClassId} onSaved={reload} />
+        <TeacherCalendar events={classEvents} classes={classes} roleByClass={roleByClass} activeClassId={activeClassId} userId={userId} onSaved={reload} />
 
         {/* One class selection drives the whole page. Every section below is
             scoped to it, so the per-section class dropdowns are gone. */}
@@ -178,7 +179,6 @@ export default function TeacherWorkspace() {
 
           {activeClass && <div className="class-roster">
             <p className="card-kicker">Students in {activeClass.title}</p>
-            <p className="composer-hint"><a href={`${edgeFunctionUrl("calendar-feed")}?scope=class&id=${activeClass.id}`} target="_blank" rel="noreferrer">Subscribe to this class&rsquo;s calendar ↗</a></p>
             {/* Notes stay closed until a student is chosen -- one child's record
                 should not be on screen while another parent is at the desk. */}
             {classRoster.length
@@ -243,55 +243,144 @@ export default function TeacherWorkspace() {
  * clicking those does nothing, matching what they're actually allowed to
  * write.
  */
-function MonthCalendar({ events, classes, roleByClass, activeClassId, onSaved }: {
-  events: ClassEvent[]; classes: ClassRow[]; roleByClass: Record<string, string>; activeClassId: string; onSaved: () => void;
+type CalendarView = "list" | "day" | "week" | "month";
+const CALENDAR_VIEWS: { id: CalendarView; label: string }[] = [
+  { id: "list", label: "List" }, { id: "day", label: "Day" }, { id: "week", label: "Week" }, { id: "month", label: "Month" },
+];
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function startOfWeek(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+}
+
+/**
+ * A lead teacher schedules curriculum by attaching dated, class-scoped events
+ * directly here -- "requires prework" is what makes a date an assignment
+ * families see a checkbox for (child-detail.tsx / portal-gate.tsx already
+ * read that flag). Nothing new to build there; this just gives a lead
+ * teacher a way to create/edit/delete their own class's events, which the
+ * RLS policy events_teacher_write already allows and this calendar simply
+ * didn't expose.
+ *
+ * Read-only for an assistant, and for any event on a class this teacher
+ * doesn't lead (a village-wide event, or a class they only assist with) --
+ * those render as disabled rather than doing nothing on click, so it's
+ * visible rather than a dead end.
+ *
+ * List is the default view -- "what's coming up" is the question most days;
+ * Day/Week/Month share one cursor date, so switching between them keeps
+ * whatever day you were looking at in view.
+ */
+function TeacherCalendar({ events, classes, roleByClass, activeClassId, userId, onSaved }: {
+  events: ClassEvent[]; classes: ClassRow[]; roleByClass: Record<string, string>; activeClassId: string; userId: string; onSaved: () => void;
 }) {
-  const now = new Date();
-  const [month, setMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const today = new Date();
+  const [view, setView] = useState<CalendarView>("list");
+  const [cursor, setCursor] = useState(today);
   const [editing, setEditing] = useState<{ date: string; classId: string; event: ClassEvent | null } | null>(null);
-  const first = new Date(month.getFullYear(), month.getMonth(), 1);
-  const gridStart = new Date(first);
-  gridStart.setDate(first.getDate() - first.getDay());
-  const days = Array.from({ length: 42 }, (_, index) => { const day = new Date(gridStart); day.setDate(gridStart.getDate() + index); return day; });
-  const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  const eventsFor = (day: Date) => events.filter((event) => dateKey(new Date(event.starts_at)) === dateKey(day));
-  const className = (id: string | null) => classes.find((klass) => klass.id === id)?.title;
   const activeLead = roleByClass[activeClassId] === "lead";
+  const activeClassTitle = classes.find((klass) => klass.id === activeClassId)?.title ?? "";
   const editingClass = editing ? classes.find((klass) => klass.id === editing.classId) : null;
+
+  const eventsFor = (day: Date) => events.filter((event) => dateKey(new Date(event.starts_at)) === dateKey(day));
+  const classTitle = (id: string | null) => classes.find((klass) => klass.id === id)?.title;
+  const canEdit = (event: ClassEvent) => !!event.class_id && roleByClass[event.class_id] === "lead";
 
   function openDay(day: Date) {
     if (!activeLead) return;
     setEditing({ date: dateKey(day), classId: activeClassId, event: null });
   }
 
-  function openEvent(event: ClassEvent, domEvent: React.SyntheticEvent) {
-    domEvent.stopPropagation();
-    if (!event.class_id || roleByClass[event.class_id] !== "lead") return;
-    setEditing({ date: dateKey(new Date(event.starts_at)), classId: event.class_id, event });
+  function openEvent(event: ClassEvent) {
+    if (!canEdit(event)) return;
+    setEditing({ date: dateKey(new Date(event.starts_at)), classId: event.class_id!, event });
   }
 
-  return <section id="calendar" className="teacher-calendar">
-    <div className="teacher-calendar-head"><div><p className="card-kicker">Calendar</p><h2>{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h2></div><div className="row-actions"><button className="ghost" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><button className="ghost" onClick={() => setMonth(new Date(now.getFullYear(), now.getMonth(), 1))}>Today</button><button className="ghost" aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div></div>
-    {activeLead && <p className="composer-hint">Click a day to schedule curriculum or an assignment for {classes.find((klass) => klass.id === activeClassId)?.title}.</p>}
-    <div className="month-calendar" role="grid" aria-label={month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}>
-      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <b key={day} role="columnheader">{day}</b>)}
-      {days.map((day) => <div
-        key={day.toISOString()} role="gridcell" tabIndex={0}
-        className={`${day.getMonth() === month.getMonth() ? "" : "outside"}${dateKey(day) === dateKey(now) ? " today" : ""}${activeLead ? " clickable" : ""}`}
-        onClick={() => openDay(day)}
-        onKeyDown={(domEvent) => { if (domEvent.key === "Enter" || domEvent.key === " ") { domEvent.preventDefault(); openDay(day); } }}
-      >
+  function step(amount: number) {
+    if (view === "day") setCursor((current) => { const next = new Date(current); next.setDate(next.getDate() + amount); return next; });
+    else if (view === "week") setCursor((current) => { const next = new Date(current); next.setDate(next.getDate() + amount * 7); return next; });
+    else setCursor((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
+  }
+
+  function eventChip(event: ClassEvent) {
+    const editable = canEdit(event);
+    return <button
+      key={event.id} type="button" className="calendar-event-chip" disabled={!editable}
+      title={[event.title, classTitle(event.class_id), event.location].filter(Boolean).join(" · ")}
+      onClick={() => openEvent(event)}
+    ><strong>{event.title}</strong>{classTitle(event.class_id) && <small>{classTitle(event.class_id)}</small>}</button>;
+  }
+
+  function dayCell(day: Date, key: string, extraClass = "") {
+    return <div key={key} role="gridcell" className={`${extraClass}${dateKey(day) === dateKey(today) ? " today" : ""}`}>
+      <div className="calendar-day-head">
         <time dateTime={dateKey(day)}>{day.getDate()}</time>
-        {eventsFor(day).map((event) => <span
-          key={event.id}
-          role="button" tabIndex={0}
-          className={event.class_id && roleByClass[event.class_id] === "lead" ? "clickable" : ""}
-          title={[event.title, className(event.class_id), event.location].filter(Boolean).join(" · ")}
-          onClick={(domEvent) => openEvent(event, domEvent)}
-          onKeyDown={(domEvent) => { if (domEvent.key === "Enter" || domEvent.key === " ") { domEvent.preventDefault(); openEvent(event, domEvent); } }}
-        ><strong>{event.title}</strong>{className(event.class_id) && <small>{className(event.class_id)}</small>}</span>)}
-      </div>)}
+        {activeLead && <button type="button" className="ghost calendar-add" aria-label={`Schedule something for ${activeClassTitle} on ${dateKey(day)}`} onClick={() => openDay(day)}>+</button>}
+      </div>
+      {eventsFor(day).map(eventChip)}
+    </div>;
+  }
+
+  const heading = view === "list" ? "What's coming up"
+    : view === "day" ? cursor.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+    : view === "week" ? `Week of ${startOfWeek(cursor).toLocaleDateString("en-US", { month: "long", day: "numeric" })}`
+    : cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  return <section id="calendar" className="teacher-calendar">
+    <div className="teacher-calendar-head">
+      <div><p className="card-kicker">Calendar</p><h2>{heading}</h2></div>
+      {view !== "list" && <div className="row-actions">
+        <button className="ghost" aria-label={`Previous ${view}`} onClick={() => step(-1)}>←</button>
+        <button className="ghost" onClick={() => setCursor(today)}>Today</button>
+        <button className="ghost" aria-label={`Next ${view}`} onClick={() => step(1)}>→</button>
+      </div>}
     </div>
+    <div className="publishing-switch" role="tablist" aria-label="Calendar view">
+      {CALENDAR_VIEWS.map((option) => <button key={option.id} role="tab" aria-selected={view === option.id} className={view === option.id ? "active" : ""} onClick={() => setView(option.id)}>{option.label}</button>)}
+    </div>
+    {activeLead && view !== "list" && <p className="composer-hint">Click + on a day to schedule curriculum or an assignment for {activeClassTitle}.</p>}
+
+    {view === "list" && <div className="calendar-list-view">
+      {activeLead && <button type="button" className="ghost" onClick={() => openDay(today)} style={{ marginBottom: 12 }}>+ Schedule something for {activeClassTitle}</button>}
+      {events.length
+        ? events.map((event) => <button key={event.id} type="button" className="calendar-list-item" disabled={!canEdit(event)} onClick={() => openEvent(event)}>
+            <time>{new Date(event.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</time>
+            <div><b>{event.title}</b><span>{[classTitle(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div>
+          </button>)
+        : <p className="portal-empty">Nothing scheduled yet.</p>}
+    </div>}
+
+    {view === "day" && <div className="month-calendar calendar-day-view" role="grid" aria-label={heading}>
+      {dayCell(cursor, "day")}
+    </div>}
+
+    {view === "week" && <div className="month-calendar" role="grid" aria-label={heading}>
+      {WEEKDAY_NAMES.map((day) => <b key={day} role="columnheader">{day}</b>)}
+      {Array.from({ length: 7 }, (_, index) => { const day = new Date(startOfWeek(cursor)); day.setDate(day.getDate() + index); return day; })
+        .map((day) => dayCell(day, dateKey(day), "calendar-week-cell"))}
+    </div>}
+
+    {view === "month" && <div className="month-calendar" role="grid" aria-label={heading}>
+      {WEEKDAY_NAMES.map((day) => <b key={day} role="columnheader">{day}</b>)}
+      {(() => {
+        const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+        const gridStart = startOfWeek(first);
+        return Array.from({ length: 42 }, (_, index) => { const day = new Date(gridStart); day.setDate(gridStart.getDate() + index); return day; })
+          .map((day) => dayCell(day, day.toISOString(), day.getMonth() === cursor.getMonth() ? "" : "outside"));
+      })()}
+    </div>}
+
+    <div className="calendar-subscribe-row">
+      <PersonalSubscribeLink userId={userId} />
+      {activeClassId && <SubscribeLink query={`scope=class&id=${activeClassId}`} label={`Subscribe to ${activeClassTitle}’s calendar`} />}
+    </div>
+
     {editing && editingClass && <EventEditor
       classId={editing.classId} classTitle={editingClass.title} date={editing.date} event={editing.event}
       onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onSaved(); }}
@@ -302,25 +391,25 @@ function MonthCalendar({ events, classes, roleByClass, activeClassId, onSaved }:
 function EventEditor({ classId, classTitle, date, event, onClose, onSaved }: {
   classId: string; classTitle: string; date: string; event: ClassEvent | null; onClose: () => void; onSaved: () => void;
 }) {
+  const [when, setWhen] = useState(date);
   const [title, setTitle] = useState(event?.title ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
   const [location, setLocation] = useState(event?.location ?? "");
   const [requiresPrework, setRequiresPrework] = useState(event?.requires_prework ?? false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const displayDate = new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 
   async function save(formEvent: FormEvent) {
     formEvent.preventDefault();
     const supabase = getSupabaseBrowserClient();
-    if (!supabase || !title.trim()) return;
+    if (!supabase || !title.trim() || !when) return;
     setBusy(true); setStatus("");
     const payload = {
       title: title.trim(), description: description.trim() || null, location: location.trim() || null,
       requires_prework: requiresPrework, audience: "class", class_id: classId,
       // Class dates are date-only -- a teacher scheduling curriculum is
       // marking a day, not booking a specific meeting time.
-      starts_at: `${date}T00:00:00.000Z`, ends_at: null, all_day: true,
+      starts_at: `${when}T00:00:00.000Z`, ends_at: null, all_day: true,
     };
     const { error } = event
       ? await supabase.from("events").update(payload).eq("id", event.id)
@@ -341,8 +430,11 @@ function EventEditor({ classId, classTitle, date, event, onClose, onSaved }: {
     onSaved();
   }
 
-  return <DetailModal title={`${classTitle} · ${displayDate}`} onClose={onClose}>
+  return <DetailModal title={classTitle} onClose={onClose}>
     <form onSubmit={save} className="portal-form">
+      <label><span className="field-caption">Date</span>
+        <input required type="date" value={when} onChange={(domEvent) => setWhen(domEvent.target.value)} disabled={busy} />
+      </label>
       <label><span className="field-caption">What&rsquo;s scheduled</span>
         <input required value={title} onChange={(domEvent) => setTitle(domEvent.target.value)} placeholder="Chapter 4 reading" disabled={busy} />
       </label>

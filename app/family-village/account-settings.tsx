@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { edgeFunctionUrl, getSupabaseBrowserClient } from "../../lib/supabase";
+import { calendarFeedUrl, calendarSubscribeUrl, getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
 import Avatar from "./avatar";
 import AvatarCropper from "./avatar-cropper";
@@ -246,14 +246,14 @@ function CalendarSection() {
   }
 
   if (token === null) return null;
-  const link = `${edgeFunctionUrl("calendar-feed")}?scope=personal&token=${token}`;
+  const query = `scope=personal&token=${token}`;
 
   return <div className="settings-block">
     <p className="card-kicker">Calendar</p>
     <p className="portal-empty">Subscribe in your phone or computer&rsquo;s calendar app to see your schedule alongside everything else.</p>
-    <p className="admin-form-status" style={{ wordBreak: "break-all" }}><a href={link} target="_blank" rel="noreferrer">{link}</a></p>
+    <p className="admin-form-status" style={{ wordBreak: "break-all" }}><a href={calendarSubscribeUrl(query)}>{calendarFeedUrl(query)}</a></p>
     <div className="row-actions">
-      <button type="button" onClick={() => copy(link)} disabled={busy}>Copy link</button>
+      <button type="button" onClick={() => copy(calendarFeedUrl(query))} disabled={busy}>Copy link for Google Calendar</button>
       <button type="button" className="ghost" onClick={regenerate} disabled={busy}>{busy ? "Working…" : "Get a new link"}</button>
     </div>
     <p className="admin-form-status" role="status">{message}</p>

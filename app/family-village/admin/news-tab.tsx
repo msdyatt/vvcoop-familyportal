@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { edgeFunctionUrl, getSupabaseBrowserClient } from "../../../lib/supabase";
+import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import SubscribeLink from "../subscribe-link";
 import { uploadPrivateFile } from "../../../lib/storage";
 import { sanitizeRichText, stripRichText } from "../../../lib/rich-text";
 import { PostThumbnail, usePostAttachments } from "../post-attachments";
@@ -179,7 +180,7 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
     setEndsAt("");
   }
 
-  return <><p className="composer-hint">Anyone can subscribe to the co-op-wide calendar in their own calendar app: <a href={`${edgeFunctionUrl("calendar-feed")}?scope=public`} target="_blank" rel="noreferrer">Subscribe to this calendar ↗</a></p>
+  return <>
   <form className="news-composer event-composer" onSubmit={createEvent}>
     <input required placeholder="Event title" value={title} onChange={(event) => setTitle(event.target.value)} disabled={busy} />
     <textarea placeholder="Details families should know" value={description} onChange={(event) => setDescription(event.target.value)} disabled={busy} />
@@ -199,5 +200,7 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
       <label><span className="field-caption">Audience</span><select value={audience} onChange={(event) => setAudience(event.target.value)} disabled={busy}><option value="families">Every family</option><option value="teachers">Teaching team</option><option value="public">Public audience</option></select></label>
     </div>
     <div className="row-actions"><button disabled={busy}>{busy ? "Saving…" : editingId ? "Save event" : "Add calendar event"}</button>{editingId && <button type="button" className="ghost" onClick={cancelEdit} disabled={busy}>Cancel edit</button>}</div><p className="admin-form-status" role="status">{status}</p>
-  </form><div className="news-list calendar-admin-list">{events.map((row) => <article className="news-item" key={row.id}><time>{new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: row.all_day ? "UTC" : undefined })}</time><div><b>{row.title}</b><span>{row.all_day ? "All day" : new Date(row.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}{row.location ? ` · ${row.location}` : ""} · {row.audience}</span></div><div className="row-actions"><button onClick={() => editEvent(row)}>Edit</button><button className="danger" onClick={() => removeEvent(row)}>Delete</button></div></article>)}{!events.length && <p className="portal-empty">No co-op-wide events have been added yet.</p>}</div></>;
+  </form><div className="news-list calendar-admin-list">{events.map((row) => <article className="news-item" key={row.id}><time>{new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: row.all_day ? "UTC" : undefined })}</time><div><b>{row.title}</b><span>{row.all_day ? "All day" : new Date(row.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}{row.location ? ` · ${row.location}` : ""} · {row.audience}</span></div><div className="row-actions"><button onClick={() => editEvent(row)}>Edit</button><button className="danger" onClick={() => removeEvent(row)}>Delete</button></div></article>)}{!events.length && <p className="portal-empty">No co-op-wide events have been added yet.</p>}</div>
+  <SubscribeLink query="scope=public" label="Subscribe to this calendar" />
+  </>;
 }

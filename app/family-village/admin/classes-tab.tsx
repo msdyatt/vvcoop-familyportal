@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { edgeFunctionUrl, getSupabaseBrowserClient } from "../../../lib/supabase";
+import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
+import SubscribeLink from "../subscribe-link";
 import { SchoolYear, formatDate } from "../../../lib/compliance";
 import { ClassBlock, Room, WEEKDAYS, formatBlock, formatBlockTime, formatWeekday } from "../../../lib/schedule";
 import { printElement } from "../../../lib/dom";
-import { CollapsibleRecord, EditableSection, Field, GradePicker, formatGrades } from "./admin-ui";
+import { CollapsibleRecord, EditableSection, Field, GRADES, GradePicker, formatGrades } from "./admin-ui";
 import EnrollmentPeriods from "./enrollment-periods";
 import DetailModal from "../detail-modal";
 
@@ -44,6 +45,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
   const [search, setSearch] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [adding, setAdding] = useState(false);
+  const [masterRosterOpen, setMasterRosterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
 
@@ -92,6 +94,8 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
   useEffect(() => { load(); }, []);
 
   const currentYear = years.find((year) => year.is_current) ?? null;
+  const targetYearId = yearFilter === "all" ? null : yearFilter === "current" ? currentYear?.id ?? null : yearFilter;
+  const targetYear = years.find((year) => year.id === targetYearId) ?? null;
 
   const yearClasses = useMemo(() => {
     if (yearFilter === "all") return classes;
@@ -221,7 +225,8 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
 
   if (loading) return <p>Loading classes…</p>;
 
-  return <section className="classes-manage">
+  return <>
+  <section className="classes-manage">
     <div className="compliance-toolbar">
       <label><span className="field-caption">School year</span>
         <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
@@ -230,6 +235,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
           <option value="all">Every year</option>
         </select>
       </label>
+      {targetYear && <button className="ghost" onClick={() => setMasterRosterOpen(true)}>Print master roster</button>}
       {!adding
         ? <button className="make-current" onClick={() => setAdding(true)}>Add a class</button>
         : <form className="inline-edit" onSubmit={addClass}>
@@ -289,7 +295,11 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
         <EnrollmentPeriods years={years} currentYearId={currentYear?.id ?? null} onStatus={setStatus} />
       </div>
     </details>
-  </section>;
+  </section>
+  {masterRosterOpen && targetYear && <DetailModal title={`${targetYear.label} master roster`} onClose={() => setMasterRosterOpen(false)}>
+    <MasterRoster classes={yearClasses.filter((row) => row.active)} blocks={blocks} rooms={rooms} terms={terms.filter((term) => term.school_year_id === targetYear.id)} year={targetYear} />
+  </DetailModal>}
+  </>;
 }
 
 /**
@@ -795,7 +805,8 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
     </div>
 
     <div className="record-section">
-      <div className="editable-head"><p className="card-kicker">Roster</p><div className="row-actions"><a className="compliance-cta ghost" href={`${edgeFunctionUrl("calendar-feed")}?scope=class&id=${row.id}`} target="_blank" rel="noreferrer">Subscribe to this class&rsquo;s calendar ↗</a><button onClick={() => setRosterOpen(true)}>Printable roster</button></div></div>
+      <div className="editable-head"><p className="card-kicker">Roster</p><button onClick={() => setRosterOpen(true)}>Printable roster</button></div>
+      <SubscribeLink query={`scope=class&id=${row.id}`} label="Subscribe to this class’s calendar" />
       {active.map((entry) => <div className="child-line" key={entry.child_id}>
         <b>{entry.children?.first_name} {entry.children?.last_name}</b>
         <span>enrolled</span>
@@ -908,6 +919,74 @@ function ClassCurriculum({ classId, classTitle, actorUserId }: { classId: string
       </div>)}
       {!files.length && <p className="portal-empty">No files attached to {classTitle} yet.</p>}
     </div>
+  </div>;
+}
+
+function nameOf(assignment: TeacherAssignment) {
+  return assignment.profiles?.display_name || assignment.profiles?.email || "Unassigned";
+}
+
+function minGradeIndex(row: ClassRow) {
+  const indexes = row.grades.map((grade) => GRADES.indexOf(grade)).filter((index) => index >= 0);
+  return indexes.length ? Math.min(...indexes) : GRADES.length;
+}
+
+/**
+ * Every class for one school year, one printed page per term, grouped by
+ * meeting period within the page -- the shape of the master roster the
+ * co-op already builds by hand each year (class / room / age / teacher /
+ * assistant / roster / total), just generated from the same records the
+ * rest of this tab edits instead of kept separately.
+ *
+ * A class with no term assigned is treated as year-round (same convention
+ * private.classes_terms_overlap uses for the enrollment clash check), so it
+ * shows up on every term's page rather than vanishing because nobody
+ * happened to assign it one.
+ */
+function MasterRoster({ classes, blocks, rooms, terms, year }: {
+  classes: ClassRow[]; blocks: ClassBlock[]; rooms: Room[]; terms: AcademicTerm[]; year: SchoolYear;
+}) {
+  const reportRef = useRef<HTMLElement>(null);
+  const orderedTerms = [...terms].sort((a, b) => a.sort_order - b.sort_order);
+  const pages = orderedTerms.length ? orderedTerms : [null];
+
+  return <div className="roster-report-shell">
+    <div className="roster-report-actions no-print"><p>{classes.length} class{classes.length === 1 ? "" : "es"} across {orderedTerms.length || 1} page{orderedTerms.length === 1 ? "" : "s"}</p><button onClick={() => printElement(reportRef.current)}>Print master roster</button></div>
+    <section ref={reportRef} className="roster-print-sheet master-roster">
+      {pages.map((term, pageIndex) => {
+        const forTerm = classes.filter((row) => !term || !row.term_ids.length || row.term_ids.includes(term.id));
+        const usedBlockIds = new Set(forTerm.map((row) => row.block_id).filter((id): id is string => !!id));
+        const groups: { label: string; rows: ClassRow[] }[] = [
+          ...blocks.filter((block) => usedBlockIds.has(block.id)).map((block) => ({
+            label: `${block.label} · ${formatWeekday(block.day_of_week)} ${formatBlockTime(block)}`,
+            rows: forTerm.filter((row) => row.block_id === block.id).sort((a, b) => minGradeIndex(a) - minGradeIndex(b) || a.title.localeCompare(b.title)),
+          })),
+          { label: "No time block", rows: forTerm.filter((row) => !row.block_id).sort((a, b) => a.title.localeCompare(b.title)) },
+        ].filter((group) => group.rows.length);
+
+        return <div key={term?.id ?? "all"} className={pageIndex < pages.length - 1 ? "master-roster-page" : ""}>
+          <div className="roster-print-head"><div><p>VERITAS VILLAGE</p><h2>{year.label} Class Roster{term ? ` – ${term.label}` : ""}</h2></div></div>
+          {groups.map((group) => <table key={group.label} className="master-roster-table">
+            <thead><tr><th colSpan={7}>{group.label}</th></tr><tr><th>Class</th><th>Room</th><th>Age</th><th>Teacher</th><th>Assistant</th><th>Roster</th><th>Total</th></tr></thead>
+            <tbody>{group.rows.map((row) => {
+              const room = rooms.find((option) => option.id === row.room_id);
+              const roster = row.enrollments.filter((entry) => entry.status === "active" && entry.children?.first_name)
+                .map((entry) => entry.children!.first_name).sort((a, b) => a.localeCompare(b));
+              return <tr key={row.id}>
+                <td>{row.title}</td>
+                <td>{room?.name ?? "—"}</td>
+                <td>{formatGrades(row.grades)}</td>
+                <td>{row.teacher_assignments.filter((a) => a.assignment_role === "lead").map(nameOf).join(", ") || "—"}</td>
+                <td>{row.teacher_assignments.filter((a) => a.assignment_role === "assistant").map(nameOf).join(", ") || "—"}</td>
+                <td>{roster.join(", ") || "—"}</td>
+                <td>{roster.length}</td>
+              </tr>;
+            })}</tbody>
+          </table>)}
+          {!groups.length && <p className="portal-empty">No active classes {term ? `in ${term.label}` : "this year"}.</p>}
+        </div>;
+      })}
+    </section>
   </div>;
 }
 
