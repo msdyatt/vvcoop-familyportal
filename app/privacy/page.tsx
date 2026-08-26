@@ -1,12 +1,12 @@
 import Image from "next/image";
-import Link from "next/link";
 
 export const metadata = {
   title: "Privacy Policy | Veritas Village",
 };
 
 export default function PrivacyPolicy() { return <>
-  <header className="site-header"><Link href="/" className="mini-brand" aria-label="Veritas Village"><Image src="/brand/lockup-horizontal-navy.png" alt="Veritas Village" width={900} height={310} priority/></Link><nav aria-label="Main navigation"><Link href="/">Home</Link></nav><a className="header-link" href="https://family.veritasvillage.org/family-village">Family sign in</a></header>
+  {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next/link's RSC prefetch errors in this vinext runtime; the rest of the site deliberately uses plain <a> for every route, this included */}
+  <header className="site-header"><a href="/" className="mini-brand" aria-label="Veritas Village"><Image src="/brand/lockup-horizontal-navy.png" alt="Veritas Village" width={900} height={310} priority/></a><nav aria-label="Main navigation"><a href="/">Home</a></nav><a className="header-link" href="https://family.veritasvillage.org/family-village">Family sign in</a></header>
 
   <main className="legal-page">
     <p className="eyebrow">Privacy Policy</p>
