@@ -2,14 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
-import { PersonalSubscribeLink } from "../subscribe-link";
 import { getSignedFileUrl, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
 import Avatar from "../avatar";
 import AppHeader from "../app-header";
-import DetailModal from "../detail-modal";
 import NewsSection from "./news-section";
+import { CollapsibleRecord } from "../admin/admin-ui";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../../lib/schedule";
 
 type ClassRow = { id: string; title: string; description: string | null } & ClassSchedule;
@@ -53,14 +52,12 @@ export default function TeacherWorkspace() {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   /** class_id -> 'lead' | 'assistant'. Assistants are shown a smaller page. */
   const [roleByClass, setRoleByClass] = useState<Record<string, string>>({});
-  const [activeClassId, setActiveClassId] = useState("");
   const [roster, setRoster] = useState<RosterChild[]>([]);
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const [notes, setNotes] = useState<Note[]>([]);
   const [handouts, setHandouts] = useState<Handout[]>([]);
   const [printQueue, setPrintQueue] = useState<PrintRequest[]>([]);
   const [classEvents, setClassEvents] = useState<ClassEvent[]>([]);
-  const [openChildId, setOpenChildId] = useState<string | null>(null);
 
   async function loadAll(uid: string) {
     const supabase = getSupabaseBrowserClient();
@@ -71,17 +68,15 @@ export default function TeacherWorkspace() {
     const myClasses = rows.map((row) => row.classes).filter(Boolean);
     setClasses(myClasses);
     setRoleByClass(Object.fromEntries(rows.map((row) => [row.class_id, row.assignment_role])));
-    setActiveClassId((current) => current || myClasses[0]?.id || "");
     const classIds = myClasses.map((row) => row.id);
     if (!classIds.length) return;
 
-    const [{ data: enrollments }, { data: noteRows }, { data: handoutRows }, { data: printRows }, { data: eventRows }, { data: villageEventRows }] = await Promise.all([
+    const [{ data: enrollments }, { data: noteRows }, { data: handoutRows }, { data: printRows }, { data: eventRows }] = await Promise.all([
       supabase.from("enrollments").select("child_id,class_id,children(id,first_name,last_name,avatar_path)").in("class_id", classIds).eq("status", "active"),
       supabase.from("teacher_notes").select("id,body,visibility,created_at,child_id,class_id,author_user_id").in("class_id", classIds).order("created_at", { ascending: false }).limit(60),
       supabase.from("documents").select("id,title,kind,storage_path,class_id,created_at").in("class_id", classIds).order("created_at", { ascending: false }),
       supabase.from("print_requests").select("id,title,quantity,status,storage_path,created_at,class_id").eq("requested_by_user_id", uid).is("cleared_at", null).order("created_at", { ascending: false }),
       supabase.from("events").select("id,class_id,title,description,starts_at,location,requires_prework,audience").in("class_id", classIds).order("starts_at", { ascending: true }),
-      supabase.from("events").select("id,class_id,title,description,starts_at,location,requires_prework,audience").is("class_id", null).order("starts_at", { ascending: true }),
     ]);
     const rosterRows = ((enrollments ?? []) as unknown as { children: { id: string; first_name: string; last_name: string | null; avatar_path: string | null }; class_id: string }[])
       .map((row) => ({ ...row.children, class_id: row.class_id }));
@@ -113,7 +108,7 @@ export default function TeacherWorkspace() {
 
     setHandouts((handoutRows ?? []) as Handout[]);
     setPrintQueue((printRows ?? []) as PrintRequest[]);
-    setClassEvents([...(eventRows ?? []), ...(villageEventRows ?? [])] as ClassEvent[]);
+    setClassEvents((eventRows ?? []) as ClassEvent[]);
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch once access resolves
@@ -131,12 +126,6 @@ export default function TeacherWorkspace() {
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private teacher workspace</p><h1>Teacher access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
 
-  const activeClass = classes.find((row) => row.id === activeClassId);
-  const classRoster = roster.filter((child) => child.class_id === activeClassId);
-  const openChild = classRoster.find((child) => child.id === openChildId) ?? null;
-  // A lead runs the class; an assistant helps with it. The page only offers what
-  // the row-level policies would actually accept, so nobody meets a denied write.
-  const isLead = roleByClass[activeClassId] === "lead";
   const reload = () => loadAll(userId);
 
   return <main className="workspace-preview">
@@ -147,221 +136,86 @@ export default function TeacherWorkspace() {
     {classes.length > 0 && <section className="workspace-grid">
       <article className="workspace-nav">
         <a className="active" href="#news">Teaching team news</a>
-        <a href="#calendar">Calendar</a>
         <a href="#classes">Classes</a>
-        <a href="#planning">Class dates</a>
-        <a href="#resources">Class files</a>
         <a href="#lounge">Print queue</a>
       </article>
 
       <div className="workspace-main">
         <NewsSection classes={classes} />
 
-        <TeacherCalendar events={classEvents} classes={classes} roleByClass={roleByClass} userId={userId} onSaved={reload} />
-
-        {/* One class selection drives the whole page. Every section below is
-            scoped to it, so the per-section class dropdowns are gone. */}
+        {/* Each class rolls up its own roster, notes, class dates, and files
+            into one dropdown -- clicking a class is the only navigation this
+            needs, instead of a separate class picker driving several
+            sections further down the page. */}
         <section id="classes">
           <p className="card-kicker">My classes</p>
           <h2>Your classroom, organized.</h2>
-          <div className="teacher-class-list">
-            {classes.map((row) => <div
-              className={`teacher-class clickable${row.id === activeClassId ? " active" : ""}`}
-              key={row.id} role="button" tabIndex={0}
-              onClick={() => { setActiveClassId(row.id); setOpenChildId(null); }}
-              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setActiveClassId(row.id); setOpenChildId(null); } }}>
-              <div>
-                <b>{row.title}</b>
-                <span>{describeSchedule(row)}{roleByClass[row.id] === "assistant" ? " · assisting" : ""}</span>
-              </div>
-            </div>)}
+          <div className="teacher-class-accordion">
+            {classes.map((row) => {
+              const isLead = roleByClass[row.id] === "lead";
+              return <CollapsibleRecord key={row.id}
+                summary={<b>{row.title}</b>}
+                meta={`${describeSchedule(row)}${isLead ? "" : " · assisting"}`}
+              >
+                <ClassRoster
+                  klass={row}
+                  roster={roster.filter((child) => child.class_id === row.id)}
+                  notes={notes.filter((note) => note.class_id === row.id)}
+                  avatarUrls={avatarUrls}
+                  userId={userId}
+                  onSaved={reload}
+                  onDelete={deleteNote}
+                />
+                <ClassDatesSection klass={row} isLead={isLead} events={classEvents.filter((event) => event.class_id === row.id)} onSaved={reload} />
+                <ResourcesSection klass={row} isLead={isLead} userId={userId} handouts={handouts.filter((handout) => handout.class_id === row.id)} onSaved={reload} />
+              </CollapsibleRecord>;
+            })}
           </div>
-
-          {activeClass && <div className="class-roster">
-            <p className="card-kicker">Students in {activeClass.title}</p>
-            {/* Notes stay closed until a student is chosen -- one child's record
-                should not be on screen while another parent is at the desk. */}
-            {classRoster.length
-              ? <ul className="roster-list roster-pickable">
-                  {classRoster.map((child) => <li key={child.id}>
-                    <button
-                      className={`roster-pick${child.id === openChildId ? " active" : ""}`}
-                      aria-expanded={child.id === openChildId}
-                      onClick={() => setOpenChildId(child.id === openChildId ? null : child.id)}>
-                      <Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} size="sm" />
-                      <span className="roster-pick-name">{child.first_name} {child.last_name}</span>
-                      <span className="roster-note-count">{noteCountLabel(notes.filter((n) => n.child_id === child.id && n.class_id === activeClassId).length)}</span>
-                    </button>
-                  </li>)}
-                </ul>
-              : <p className="portal-empty">No students enrolled in this class yet.</p>}
-
-            {openChild && <StudentNotes
-              child={openChild}
-              classId={activeClassId}
-              notes={notes.filter((note) => note.child_id === openChild.id && note.class_id === activeClassId)}
-              userId={userId}
-              onSaved={reload}
-              onDelete={deleteNote}
-              onClose={() => setOpenChildId(null)}
-            />}
-          </div>}
         </section>
 
-        {activeClass && <ClassDatesSection
-          klass={activeClass} isLead={isLead}
-          events={classEvents.filter((row) => row.class_id === activeClassId)}
-          onSaved={reload}
-        />}
-
-        {activeClass && <ResourcesSection
-          klass={activeClass} isLead={isLead} userId={userId}
-          handouts={handouts.filter((row) => row.class_id === activeClassId)}
-          onSaved={reload}
-        />}
-
-        {activeClass && <PrintSection
-          klass={activeClass} isLead={isLead} userId={userId}
-          queue={printQueue} classes={classes} onSaved={reload}
-        />}
+        <PrintSection classes={classes} roleByClass={roleByClass} userId={userId} queue={printQueue} onSaved={reload} />
       </div>
     </section>}
   </main>;
 }
 
-/**
- * A lead teacher schedules curriculum by attaching dated, class-scoped events
- * directly here -- "requires prework" is what makes a date an assignment
- * families see a checkbox for (child-detail.tsx / portal-gate.tsx already
- * read that flag). Nothing new to build there; this just gives a lead
- * teacher a way to create/edit/delete their own class's events, which the
- * RLS policy events_teacher_write already allows and this calendar simply
- * didn't expose.
- *
- * Read-only for an assistant, and for any event on a class this teacher
- * doesn't lead (a village-wide event, or a class they only assist with) --
- * clicking those does nothing, matching what they're actually allowed to
- * write.
- */
-function dateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-/**
- * A plain list of everything on the calendar -- village events and every
- * class's dated items, across every class this teacher is on, not just the
- * active one. Clicking an item they lead opens it for editing (title,
- * "requires prework", notes, or Remove); "requires prework" is what makes a
- * date an assignment families see a checkbox for (child-detail.tsx /
- * portal-gate.tsx already read that flag), so nothing new had to be built
- * there for editing to work end to end.
- *
- * Deliberately just a list -- an earlier version added Day/Week/Month grid
- * views and a "+" to add an item from any cell, which read as busy rather
- * than useful day to day.
- */
-function TeacherCalendar({ events, classes, roleByClass, userId, onSaved }: {
-  events: ClassEvent[]; classes: ClassRow[]; roleByClass: Record<string, string>; userId: string; onSaved: () => void;
+/** One class's roster, with a student's notes opening inline when picked. Local to this class's dropdown, so opening one class's roster never disturbs another's. */
+function ClassRoster({ klass, roster, notes, avatarUrls, userId, onSaved, onDelete }: {
+  klass: ClassRow; roster: RosterChild[]; notes: Note[]; avatarUrls: Map<string, string>; userId: string;
+  onSaved: () => void; onDelete: (id: string) => void;
 }) {
-  const [editing, setEditing] = useState<{ date: string; classId: string; event: ClassEvent } | null>(null);
-  const classTitle = (id: string | null) => classes.find((klass) => klass.id === id)?.title;
-  const canEdit = (event: ClassEvent) => !!event.class_id && roleByClass[event.class_id] === "lead";
-  const editingClass = editing ? classes.find((klass) => klass.id === editing.classId) : null;
+  const [openChildId, setOpenChildId] = useState<string | null>(null);
+  const openChild = roster.find((child) => child.id === openChildId) ?? null;
 
-  function openEvent(event: ClassEvent) {
-    if (!canEdit(event)) return;
-    setEditing({ date: dateKey(new Date(event.starts_at)), classId: event.class_id!, event });
-  }
+  return <div className="class-roster">
+    <p className="card-kicker">Students</p>
+    {/* Notes stay closed until a student is chosen -- one child's record
+        should not be on screen while another parent is at the desk. */}
+    {roster.length
+      ? <ul className="roster-list roster-pickable">
+          {roster.map((child) => <li key={child.id}>
+            <button
+              className={`roster-pick${child.id === openChildId ? " active" : ""}`}
+              aria-expanded={child.id === openChildId}
+              onClick={() => setOpenChildId(child.id === openChildId ? null : child.id)}>
+              <Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} size="sm" />
+              <span className="roster-pick-name">{child.first_name} {child.last_name}</span>
+              <span className="roster-note-count">{noteCountLabel(notes.filter((n) => n.child_id === child.id).length)}</span>
+            </button>
+          </li>)}
+        </ul>
+      : <p className="portal-empty">No students enrolled in this class yet.</p>}
 
-  return <section id="calendar" className="teacher-calendar">
-    <div className="teacher-calendar-head"><div><p className="card-kicker">Calendar</p><h2>What&rsquo;s coming up</h2></div></div>
-
-    <div className="calendar-list-view">
-      {events.length
-        ? events.map((event) => <button key={event.id} type="button" className="calendar-list-item" disabled={!canEdit(event)} onClick={() => openEvent(event)}>
-            <time>{new Date(event.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</time>
-            <div><b>{event.title}</b><span>{[classTitle(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div>
-          </button>)
-        : <p className="portal-empty">Nothing scheduled yet.</p>}
-    </div>
-
-    <div className="calendar-subscribe-row">
-      <PersonalSubscribeLink userId={userId} />
-    </div>
-
-    {editing && editingClass && <EventEditor
-      classId={editing.classId} classTitle={editingClass.title} date={editing.date} event={editing.event}
-      onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onSaved(); }}
+    {openChild && <StudentNotes
+      child={openChild}
+      classId={klass.id}
+      notes={notes.filter((note) => note.child_id === openChild.id)}
+      userId={userId}
+      onSaved={onSaved}
+      onDelete={onDelete}
+      onClose={() => setOpenChildId(null)}
     />}
-  </section>;
-}
-
-/** Editing an existing class-scoped calendar item -- there's no "add" path from the calendar list, only editing what's already there. */
-function EventEditor({ classId, classTitle, date, event, onClose, onSaved }: {
-  classId: string; classTitle: string; date: string; event: ClassEvent; onClose: () => void; onSaved: () => void;
-}) {
-  const [when, setWhen] = useState(date);
-  const [title, setTitle] = useState(event.title);
-  const [description, setDescription] = useState(event.description ?? "");
-  const [location, setLocation] = useState(event.location ?? "");
-  const [requiresPrework, setRequiresPrework] = useState(event.requires_prework);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("");
-
-  async function save(formEvent: FormEvent) {
-    formEvent.preventDefault();
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !title.trim() || !when) return;
-    setBusy(true); setStatus("");
-    const payload = {
-      title: title.trim(), description: description.trim() || null, location: location.trim() || null,
-      requires_prework: requiresPrework, audience: "class", class_id: classId,
-      // Class dates are date-only -- a teacher scheduling curriculum is
-      // marking a day, not booking a specific meeting time.
-      starts_at: `${when}T00:00:00.000Z`, ends_at: null, all_day: true,
-    };
-    const { error } = await supabase.from("events").update(payload).eq("id", event.id);
-    setBusy(false);
-    if (error) { setStatus(error.message); return; }
-    onSaved();
-  }
-
-  async function remove() {
-    if (!confirm(`Remove "${event.title}" from the calendar?`)) return;
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setBusy(true);
-    const { error } = await supabase.from("events").delete().eq("id", event.id);
-    setBusy(false);
-    if (error) { setStatus(error.message); return; }
-    onSaved();
-  }
-
-  return <DetailModal title={classTitle} onClose={onClose}>
-    <form onSubmit={save} className="portal-form">
-      <label><span className="field-caption">Date</span>
-        <input required type="date" value={when} onChange={(domEvent) => setWhen(domEvent.target.value)} disabled={busy} />
-      </label>
-      <label><span className="field-caption">What&rsquo;s scheduled</span>
-        <input required value={title} onChange={(domEvent) => setTitle(domEvent.target.value)} placeholder="Chapter 4 reading" disabled={busy} />
-      </label>
-      <label className="checkbox-field">
-        <input type="checkbox" checked={requiresPrework} onChange={(domEvent) => setRequiresPrework(domEvent.target.checked)} disabled={busy} />
-        Students need to prepare before this (shows as an assignment families can check off)
-      </label>
-      <label><span className="field-caption">Notes <i>optional</i></span>
-        <textarea value={description} onChange={(domEvent) => setDescription(domEvent.target.value)} placeholder="What to bring, what to read, ..." disabled={busy} />
-      </label>
-      <label><span className="field-caption">Location <i>optional</i></span>
-        <input value={location} onChange={(domEvent) => setLocation(domEvent.target.value)} disabled={busy} />
-      </label>
-      <div className="row-actions">
-        <button disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
-        <button type="button" className="danger" onClick={remove} disabled={busy}>Remove</button>
-      </div>
-      <p className="admin-form-status" role="status">{status}</p>
-    </form>
-  </DetailModal>;
+  </div>;
 }
 
 /** One student's notes, plus the form to add another. Only rendered on demand. */
@@ -476,11 +330,10 @@ function ClassDatesSection({ klass, isLead, events, onSaved }: {
     onSaved();
   }
 
-  return <section id="planning">
+  return <section>
     <p className="card-kicker">Class dates</p>
-    <h2>What&rsquo;s coming up in {klass.title}.</h2>
     <p className="portal-empty">
-      Only the families with a child in {klass.title} see these. They do not go on the co-op calendar.
+      Only families with a child in this class see these. They do not go on the co-op calendar.
     </p>
 
     {isLead ? <form onSubmit={submit} className="portal-form">
@@ -551,9 +404,8 @@ function ResourcesSection({ klass, isLead, userId, handouts, onSaved }: {
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  return <section id="resources">
+  return <section>
     <p className="card-kicker">Class files</p>
-    <h2>Handouts &amp; curriculum for {klass.title}.</h2>
 
     {isLead ? <form onSubmit={submit} className="portal-form">
       <label><span className="field-caption">Title</span>
@@ -577,16 +429,21 @@ function ResourcesSection({ klass, isLead, userId, handouts, onSaved }: {
   </section>;
 }
 
-function PrintSection({ klass, isLead, userId, queue, classes, onSaved }: {
-  klass: ClassRow; isLead: boolean; userId: string;
-  queue: PrintRequest[]; classes: ClassRow[]; onSaved: () => void;
+/**
+ * Not scoped to one class the way the roster/dates/files sections are --
+ * a teacher's print queue naturally spans every class they teach, so this
+ * gets its own class picker instead of losing "for which class" entirely
+ * now that there's no single active class driving the page.
+ */
+function PrintSection({ classes, roleByClass, userId, queue, onSaved }: {
+  classes: ClassRow[]; roleByClass: Record<string, string>; userId: string;
+  queue: PrintRequest[]; onSaved: () => void;
 }) {
+  const ledClasses = classes.filter((row) => roleByClass[row.id] === "lead");
   const [title, setTitle] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [file, setFile] = useState<File | null>(null);
-  /** Printing genuinely isn't always for a class, so this stays -- as a
-      checkbox rather than another class dropdown. */
-  const [forThisClass, setForThisClass] = useState(true);
+  const [classId, setClassId] = useState(() => ledClasses[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -598,7 +455,7 @@ function PrintSection({ klass, isLead, userId, queue, classes, onSaved }: {
     const uploaded = await uploadPrivateFile(supabase, "print-requests", file);
     if ("error" in uploaded) { setStatus(uploaded.error); setBusy(false); return; }
     const { error } = await supabase.from("print_requests").insert({
-      class_id: forThisClass ? klass.id : null, requested_by_user_id: userId,
+      class_id: classId || null, requested_by_user_id: userId,
       title: title.trim(), storage_path: uploaded.path, quantity,
     });
     setBusy(false);
@@ -611,9 +468,9 @@ function PrintSection({ klass, isLead, userId, queue, classes, onSaved }: {
 
   return <section id="lounge">
     <p className="card-kicker">Print queue</p>
-    <h2>Printing for {klass.title}.</h2>
+    <h2>Send something to be printed.</h2>
 
-    {isLead ? <form onSubmit={submit} className="portal-form">
+    {ledClasses.length ? <form onSubmit={submit} className="portal-form">
       <label><span className="field-caption">What is it?</span>
         <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Class worksheet packet" disabled={busy} />
       </label>
@@ -623,13 +480,15 @@ function PrintSection({ klass, isLead, userId, queue, classes, onSaved }: {
       <label className="file-drop"><span className="field-caption">File to print</span>
         <input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} />
       </label>
-      <label className="checkbox-field">
-        <input type="checkbox" checked={forThisClass} onChange={(event) => setForThisClass(event.target.checked)} />
-        This printing is for {klass.title}
+      <label><span className="field-caption">Which class</span>
+        <select value={classId} onChange={(event) => setClassId(event.target.value)} disabled={busy}>
+          <option value="">Not class-specific</option>
+          {ledClasses.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+        </select>
       </label>
       <button disabled={busy}>{busy ? "Sending…" : `Send to print queue`}</button>
       <p className="admin-form-status" role="status">{status}</p>
-    </form> : <p className="portal-empty">The lead teacher for {klass.title} sends print requests.</p>}
+    </form> : <p className="portal-empty">The lead teacher for a class sends its print requests.</p>}
 
     {/* The list is everything this teacher has queued, across every class --
         not just the selected one. Someone printing for three classes needs to

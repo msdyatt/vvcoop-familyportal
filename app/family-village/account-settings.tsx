@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
+import { PersonalSubscribeLink } from "./subscribe-link";
 import Avatar from "./avatar";
 import AvatarCropper from "./avatar-cropper";
 
@@ -12,7 +13,24 @@ export default function AccountSettings({ email, onSignOut, onProfileUpdated }: 
     <PasswordSection email={email} />
     <PasskeySection />
     <TwoFactorSection />
+    <CalendarSection />
     <DangerZone onSignOut={onSignOut} />
+  </div>;
+}
+
+/** Everything on the family/teaching calendars this account can see, as a feed any calendar app can subscribe to. */
+function CalendarSection() {
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSupabaseBrowserClient()?.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+  }, []);
+
+  if (!userId) return null;
+  return <div className="settings-block">
+    <p className="card-kicker">Calendar</p>
+    <p className="portal-empty">A live feed of your classes and events, for your phone or computer&rsquo;s calendar app.</p>
+    <PersonalSubscribeLink userId={userId} />
   </div>;
 }
 

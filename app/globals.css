@@ -3726,25 +3726,13 @@ footer {
   min-height:50px;
 }
 
-.teacher-class-list {
+.teacher-class-accordion {
   display:grid;
-  gap:10px;
+  gap:16px;
 }
 
-.teacher-class.clickable {
-  cursor:pointer;
-}
-
-.teacher-class.active {
-  border-left:4px solid var(--terracotta);
-  background:var(--warm-tint);
-}
-
-.class-roster {
-  margin-top:18px;
-  padding-top:16px;
-  border-top:1px dashed rgba(var(--navy-rgb),.15);
-}
+/* Sits inside a CollapsibleRecord's body, whose own gap and top border already separate it from the record head -- no border/margin of its own needed. */
+.class-roster {}
 
 .roster-list {
   margin:10px 0 0;

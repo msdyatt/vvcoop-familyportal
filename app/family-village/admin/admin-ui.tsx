@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useId, useState } from "react";
+import DetailModal from "../detail-modal";
 
 /**
  * Shared shape for the admin lists.
@@ -119,4 +120,38 @@ export function formatGrades(grades: string[] | null): string {
     else runs.push([grade]);
   });
   return runs.map((run) => (run.length > 2 ? `${run[0]}–${run[run.length - 1]}` : run.join(", "))).join(", ");
+}
+
+/**
+ * A second, deliberate confirmation for a delete that's hard or impossible
+ * to undo -- typing the word beats a plain confirm() dialog, which a
+ * reflexive click-through defeats in a way a typed word doesn't.
+ *
+ * Case-insensitive, trimmed -- the point is a deliberate act, not a typing
+ * test.
+ */
+export function ConfirmDeleteModal({ title, description, confirmWord = "DELETE", confirmLabel, busy = false, onConfirm, onCancel }: {
+  title: string; description: ReactNode; confirmWord?: string; confirmLabel?: string; busy?: boolean;
+  onConfirm: () => void; onCancel: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const ready = typed.trim().toUpperCase() === confirmWord.toUpperCase();
+
+  return <DetailModal title={title} onClose={onCancel}>
+    <div className="portal-form">
+      <p className="portal-empty">{description}</p>
+      <label><span className="field-caption">Type {confirmWord} to confirm</span>
+        <input
+          value={typed} onChange={(event) => setTyped(event.target.value)}
+          placeholder={confirmWord} disabled={busy} autoComplete="off"
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- this field is the only thing on the modal, so focusing it follows the reason it was opened
+          autoFocus
+        />
+      </label>
+      <div className="row-actions">
+        <button className="danger" disabled={busy || !ready} onClick={onConfirm}>{busy ? "Working…" : confirmLabel ?? `${confirmWord === "DELETE" ? "Delete" : "Remove"} permanently`}</button>
+        <button type="button" className="ghost" onClick={onCancel} disabled={busy}>Cancel</button>
+      </div>
+    </div>
+  </DetailModal>;
 }

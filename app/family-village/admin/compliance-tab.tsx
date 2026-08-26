@@ -8,6 +8,7 @@ import {
   duesFor, formatMoney, isSettled, statusLabel, statusTone,
 } from "../../../lib/compliance";
 import DuesImport from "./dues-import";
+import { ConfirmDeleteModal } from "./admin-ui";
 
 /**
  * Academic years the co-op could plausibly be setting up.
@@ -60,6 +61,8 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
   const [editing, setEditing] = useState<{ requirement: Requirement; family: FamilyRow; row: FamilyRequirement | null } | null>(null);
+  const [deletingRequirement, setDeletingRequirement] = useState<Requirement | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   async function load(selectedYear?: string) {
     const supabase = getSupabaseBrowserClient();
@@ -107,6 +110,20 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
   async function log(action: string, subjectId: string, detail: Record<string, unknown>) {
     const supabase = getSupabaseBrowserClient();
     await supabase?.from("audit_log").insert({ actor_user_id: actorUserId, action, subject_type: "family_requirement", subject_id: subjectId, detail });
+  }
+
+  /** Deleting a requirement takes every family's status against it with it -- signed waivers, paid dues, all of it -- so this is the one action on this tab behind a typed confirmation. */
+  async function removeRequirement(requirement: Requirement) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setDeleteBusy(true);
+    const { error } = await supabase.from("requirements").delete().eq("id", requirement.id);
+    setDeleteBusy(false);
+    if (error) { setStatus(error.message); return; }
+    await supabase.from("audit_log").insert({ actor_user_id: actorUserId, action: "requirement_deleted", subject_type: "requirement", subject_id: requirement.id, detail: { title: requirement.title } });
+    setDeletingRequirement(null);
+    setStatus(`Deleted "${requirement.title}" and every family's status against it.`);
+    await load();
   }
 
   /** Creates a status row per family, so the requirement starts showing up for everyone. */
@@ -380,6 +397,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
                 {req.kind === "document" && <AttachDocument requirement={req} documents={documents} onSaved={load} onStatus={setStatus} />}
                 {req.kind === "document" && (req.opensign_template_id || req.document_id) &&
                   <button onClick={() => sendToAllFamilies(req)}>Send to all families</button>}
+                <button className="danger" onClick={() => setDeletingRequirement(req)}>Delete</button>
               </div>
             </article>;
           })}
@@ -421,6 +439,14 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
       onCancel={() => setEditing(null)}
       onSave={(patch) => saveCell(editing.row, editing.requirement, editing.family, patch)}
       onSend={(email) => sendForSignature(editing.requirement, editing.family, editing.row, email)}
+    />}
+
+    {deletingRequirement && <ConfirmDeleteModal
+      title={`Delete "${deletingRequirement.title}"`}
+      description={`This removes the requirement itself and every family's status against it -- signed waivers, payment records, all of it. This cannot be undone.`}
+      busy={deleteBusy}
+      onConfirm={() => removeRequirement(deletingRequirement)}
+      onCancel={() => setDeletingRequirement(null)}
     />}
   </section>;
 }

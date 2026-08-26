@@ -16,9 +16,9 @@ export default function SubscribeLink({ query, label = "Subscribe to this calend
   async function copy() {
     try {
       await navigator.clipboard.writeText(calendarFeedUrl(query));
-      setStatus("Link copied -- paste it into Google Calendar's “Other calendars → From URL”.");
+      setStatus("Link copied.");
     } catch {
-      setStatus("Could not copy automatically -- select and copy the link instead.");
+      setStatus("Could not copy automatically.");
     }
   }
 
@@ -53,7 +53,7 @@ export function PersonalSubscribeLink({ userId }: { userId: string }) {
   }, [userId]);
 
   async function regenerate() {
-    if (!confirm("Get a new calendar link? The old one will stop working, so update it anywhere you've subscribed.")) return;
+    if (!confirm("Get a new link? The old one will stop working.")) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setBusy(true); setMessage("");

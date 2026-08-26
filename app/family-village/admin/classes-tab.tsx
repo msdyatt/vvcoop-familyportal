@@ -7,7 +7,7 @@ import SubscribeLink from "../subscribe-link";
 import { SchoolYear, formatDate } from "../../../lib/compliance";
 import { ClassBlock, Room, WEEKDAYS, formatBlock, formatBlockTime, formatWeekday } from "../../../lib/schedule";
 import { printElement } from "../../../lib/dom";
-import { CollapsibleRecord, EditableSection, Field, GRADES, GradePicker, formatGrades } from "./admin-ui";
+import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES, GradePicker, formatGrades } from "./admin-ui";
 import EnrollmentPeriods from "./enrollment-periods";
 import DetailModal from "../detail-modal";
 
@@ -310,6 +310,8 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
  */
 function SchoolYears({ years, onSaved, onStatus }: { years: SchoolYear[]; onSaved: () => void; onStatus: (message: string) => void }) {
   const [open, setOpen] = useState(false);
+  const [deletingYear, setDeletingYear] = useState<SchoolYear | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   async function makeCurrent(year: SchoolYear) {
     const supabase = getSupabaseBrowserClient();
@@ -336,6 +338,19 @@ function SchoolYears({ years, onSaved, onStatus }: { years: SchoolYear[]; onSave
     onSaved();
   }
 
+  /** Terms, meeting blocks, and enrollment windows for the year go with it; its classes are kept but become unassigned to any year. */
+  async function removeYear(year: SchoolYear) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setDeleteBusy(true);
+    const { error } = await supabase.from("school_years").delete().eq("id", year.id);
+    setDeleteBusy(false);
+    if (error) { onStatus(error.message); return; }
+    setDeletingYear(null);
+    onStatus(`Deleted ${year.label}.`);
+    onSaved();
+  }
+
   const taken = new Set(years.map((year) => year.label));
   const start = new Date().getMonth() >= 7 ? new Date().getFullYear() : new Date().getFullYear() - 1;
   const available = [0, 1, 2].map((offset) => `${start + offset}-${start + offset + 1}`).filter((label) => !taken.has(label));
@@ -350,12 +365,23 @@ function SchoolYears({ years, onSaved, onStatus }: { years: SchoolYear[]; onSave
       {years.map((year) => <div className="child-line" key={year.id}>
         <b>{year.label}</b>
         <span>{year.is_current ? "Current year" : "Not current"}</span>
-        {!year.is_current && <button onClick={() => makeCurrent(year)}>Make current</button>}
+        {!year.is_current && <div className="row-actions">
+          <button onClick={() => makeCurrent(year)}>Make current</button>
+          <button className="danger" onClick={() => setDeletingYear(year)}>Delete</button>
+        </div>}
       </div>)}
       {available.length > 0 && <div className="row-actions">
         {available.map((label) => <button key={label} className="ghost" onClick={() => addYear(label)}>Add {label}</button>)}
       </div>}
     </div>}
+
+    {deletingYear && <ConfirmDeleteModal
+      title={`Delete ${deletingYear.label}`}
+      description="This removes the year's terms, meeting blocks, and enrollment windows, and every compliance requirement tied to it -- signed waivers and payment records included. Its classes are kept but become unassigned to any year. This cannot be undone."
+      busy={deleteBusy}
+      onConfirm={() => removeYear(deletingYear)}
+      onCancel={() => setDeletingYear(null)}
+    />}
   </div>;
 }
 
