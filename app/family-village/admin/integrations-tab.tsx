@@ -68,6 +68,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
         <li><b>Webhook, last</b> — OpenSign only issues a signing key once a live webhook URL is registered, so this step comes after the functions are deployed. In OpenSign → Settings → Webhook, add the deployed <code>opensign-webhook</code> URL, enable authentication, generate the key, then set it as <code>OPENSIGN_WEBHOOK_SECRET</code>.</li>
       </ol>
       <p>Sending works as soon as the base URL and API token are set. Until the webhook secret is in place, signature completions will not flow back on their own and statuses stay at <b>sent</b>.</p>
+      <p>Once the base URL is set, the Compliance tab can open OpenSign in a new tab to build a template with real field placement -- paste the template&rsquo;s id back onto the requirement there when it&rsquo;s ready.</p>
     </aside>
     <div className="integrations-list">
       {integrations.map((row) => <IntegrationCard

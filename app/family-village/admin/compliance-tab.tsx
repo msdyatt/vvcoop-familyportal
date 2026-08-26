@@ -18,6 +18,20 @@ import DuesImport from "./dues-import";
  * inviting a typo -- the labels were previously free text, which is how
  * "2026-27" and "2028-2029" ended up side by side.
  */
+/**
+ * OpenSign's signing API and its web app share one origin -- the app just
+ * lives at the root instead of under /api/v1.2. Deriving the app link from
+ * the API base URL an administrator has already set means "open OpenSign to
+ * build a template" works for the hosted service, the EU region, and a
+ * self-hosted instance alike, with nothing new to configure.
+ */
+export function deriveOpenSignAppUrl(apiBaseUrl: string | null): string | null {
+  if (!apiBaseUrl) return null;
+  const trimmed = apiBaseUrl.trim().replace(/\/+$/, "");
+  if (!trimmed) return null;
+  return trimmed.replace(/\/api\/v1(\.\d+)?$/i, "");
+}
+
 export function academicYearOptions(from = new Date()): string[] {
   const startYear = from.getMonth() >= 7 ? from.getFullYear() : from.getFullYear() - 1;
   return [0, 1, 2].map((offset) => `${startYear + offset}-${startYear + offset + 1}`);
@@ -42,6 +56,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
   const [families, setFamilies] = useState<FamilyRow[]>([]);
   const [rows, setRows] = useState<FamilyRequirement[]>([]);
   const [documents, setDocuments] = useState<{ id: string; title: string }[]>([]);
+  const [openSignAppUrl, setOpenSignAppUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
   const [editing, setEditing] = useState<{ requirement: Requirement; family: FamilyRow; row: FamilyRequirement | null } | null>(null);
@@ -59,14 +74,16 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
 
     if (!activeYear) { setRequirements([]); setRows([]); setLoading(false); return; }
 
-    const [{ data: reqRows }, { data: familyRows }, { data: docRows }] = await Promise.all([
+    const [{ data: reqRows }, { data: familyRows }, { data: docRows }, { data: openSignRow }] = await Promise.all([
       supabase.from("requirements").select("id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,opensign_template_id,amount_per_family,amount_per_child,payment_url,due_on")
         .eq("school_year_id", activeYear).order("sort_order").order("title"),
       supabase.from("families").select("id,display_name,children(id,active),family_members(user_id,profiles(email,display_name,status))").order("display_name"),
       // Candidates to attach to a document requirement -- anything with a file.
       supabase.from("documents").select("id,title,storage_path").not("storage_path", "is", null).order("created_at", { ascending: false }),
+      supabase.from("integration_settings").select("api_base_url").eq("id", "opensign").maybeSingle(),
     ]);
     setDocuments((docRows ?? []).map((d) => ({ id: d.id, title: d.title })));
+    setOpenSignAppUrl(deriveOpenSignAppUrl(openSignRow?.api_base_url ?? null));
 
     const reqs = (reqRows ?? []) as Requirement[];
     setRequirements(reqs);
@@ -356,6 +373,9 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
               <div className="row-actions">
                 {opened < families.length && <button onClick={() => openToAllFamilies(req)}>Open to all families</button>}
                 {req.kind === "dues" && opened > 0 && <button onClick={() => recalculateDues(req)}>Recalculate balances</button>}
+                {req.kind === "document" && openSignAppUrl &&
+                  <a className="compliance-cta ghost" href={openSignAppUrl} target="_blank" rel="noopener noreferrer">Set up template in OpenSign ↗</a>}
+                {req.kind === "document" && <AttachTemplate requirement={req} onSaved={load} onStatus={setStatus} />}
                 {req.kind === "document" && <PublicSignLink requirement={req} onSaved={load} onStatus={setStatus} />}
                 {req.kind === "document" && <AttachDocument requirement={req} documents={documents} onSaved={load} onStatus={setStatus} />}
                 {req.kind === "document" && (req.opensign_template_id || req.document_id) &&
@@ -440,6 +460,50 @@ function PublicSignLink({ requirement, onSaved, onStatus }: {
     />
     <button onClick={save}>Save</button>
     <button className="ghost" onClick={() => { setValue(requirement.public_sign_url ?? ""); setEditing(false); }}>Cancel</button>
+  </span>;
+}
+
+/**
+ * Where a template built by hand in OpenSign comes back into the portal.
+ *
+ * OpenSign's own app has no API for handing back the id of a template just
+ * created there, so this is a paste, not a picker -- the id shows in the
+ * template's OpenSign URL (.../template/<id>) or its Templates list.
+ */
+function AttachTemplate({ requirement, onSaved, onStatus }: {
+  requirement: Requirement;
+  onSaved: () => void;
+  onStatus: (message: string) => void;
+}) {
+  const [value, setValue] = useState(requirement.opensign_template_id ?? "");
+  const [editing, setEditing] = useState(false);
+
+  async function save() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const trimmed = value.trim();
+    const { error } = await supabase.from("requirements").update({ opensign_template_id: trimmed || null }).eq("id", requirement.id);
+    if (error) { onStatus(error.message); return; }
+    setEditing(false);
+    onStatus(trimmed ? `Template attached to "${requirement.title}".` : `Template removed from "${requirement.title}".`);
+    onSaved();
+  }
+
+  if (!editing) {
+    return <button onClick={() => setEditing(true)}>
+      {requirement.opensign_template_id ? "Edit template ID" : "Attach template ID"}
+    </button>;
+  }
+
+  return <span className="inline-edit">
+    <input
+      aria-label={`OpenSign template ID for ${requirement.title}`}
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+      placeholder="Template ID from OpenSign"
+    />
+    <button onClick={save}>Save</button>
+    <button className="ghost" onClick={() => { setValue(requirement.opensign_template_id ?? ""); setEditing(false); }}>Cancel</button>
   </span>;
 }
 
