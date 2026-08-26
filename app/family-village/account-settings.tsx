@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
-import { PersonalSubscribeLink } from "./subscribe-link";
+import SubscribeLink from "./subscribe-link";
 import Avatar from "./avatar";
 import AvatarCropper from "./avatar-cropper";
 
@@ -18,19 +18,51 @@ export default function AccountSettings({ email, onSignOut, onProfileUpdated }: 
   </div>;
 }
 
-/** Everything on the family/teaching calendars this account can see, as a feed any calendar app can subscribe to. */
+/**
+ * Everything on the family/teaching calendars this account can see, as a
+ * feed any calendar app can subscribe to. The regenerate control lives only
+ * here, not on the inline subscribe links elsewhere in the app -- a leaked
+ * link is invalidated by getting a new one, and that's a deliberate account
+ * action, not something to have crowding a "here's your calendar" widget.
+ */
 function CalendarSection() {
-  const [userId, setUserId] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    getSupabaseBrowserClient()?.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    async function load() {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return;
+      const { data } = await supabase.from("profiles").select("calendar_token").eq("id", user.user.id).single();
+      setToken(data?.calendar_token ?? null);
+    }
+    load();
   }, []);
 
-  if (!userId) return null;
+  async function regenerate() {
+    if (!confirm("Get a new link? The old one will stop working.")) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true); setMessage("");
+    const { data, error } = await supabase.rpc("regenerate_calendar_token");
+    setBusy(false);
+    if (error) { setMessage(error.message); return; }
+    setToken(data as string);
+    setMessage("New link ready.");
+  }
+
+  if (!token) return null;
   return <div className="settings-block">
     <p className="card-kicker">Calendar</p>
     <p className="portal-empty">A live feed of your classes and events, for your phone or computer&rsquo;s calendar app.</p>
-    <PersonalSubscribeLink userId={userId} />
+    <SubscribeLink query={`scope=personal&token=${token}`} label="Subscribe to your calendar" />
+    <div className="row-actions">
+      <button type="button" className="ghost" onClick={regenerate} disabled={busy}>{busy ? "Working…" : "Get a new link"}</button>
+    </div>
+    <p className="admin-form-status" role="status">{message}</p>
   </div>;
 }
 

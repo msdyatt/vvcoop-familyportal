@@ -32,6 +32,15 @@ export function calendarSubscribeUrl(query: string) {
   return calendarFeedUrl(query).replace(/^https?:\/\//, "webcal://");
 }
 
+/**
+ * Opens Google Calendar's own "Add by URL" flow with the feed pre-filled,
+ * so subscribing there is one click too instead of a copy-paste into
+ * Settings -> Add calendar -> From URL.
+ */
+export function googleCalendarAddUrl(query: string) {
+  return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeedUrl(query))}`;
+}
+
 export function getSupabaseBrowserClient() {
   if (!isSupabaseConfigured()) return null;
   if (!client) {

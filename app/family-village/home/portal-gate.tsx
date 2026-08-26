@@ -11,7 +11,7 @@ import RichText, { stripRichText } from "../../../lib/rich-text";
 import MfaChallengeScreen from "../mfa-challenge";
 import { ComplianceBanner, CompliancePanel, ComplianceItem } from "../compliance-panel";
 import PostAttachments, { PostThumbnail, usePostAttachments } from "../post-attachments";
-import { FamilyRequirement, Requirement } from "../../../lib/compliance";
+import { FamilyRequirement, Requirement, SchoolYear } from "../../../lib/compliance";
 import { PersonalSubscribeLink } from "../subscribe-link";
 
 type PortalState = "loading" | "signed-out" | "mfa-challenge" | "pending" | "active" | "error";
@@ -220,9 +220,16 @@ export default function PortalGate() {
           excluded because they already appear above, against their requirement. */}
       <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other documents</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>
       <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">Family records</p><h2>Paperwork &amp; dues</h2>
-        <CompliancePanel items={portal?.compliance ?? []} />
+        {portal && <FamilyCompliance familyId={portal.familyId} />}
       </section>
     </div>
+
+    <footer className="portal-footer">
+      <a href="mailto:veritasvillagecoop@gmail.com?subject=Feedback%20on%20Family%20Village">Feedback</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms &amp; Conditions</a>
+    </footer>
+
     {openChildId && <ChildDetail childId={openChildId} onClose={() => setOpenChildId(null)} />}
     {openPost && <DetailModal title={openPost.title} onClose={() => setOpenPostId(null)}>
       <p className="portal-empty compliance-note">{openPost.published_at ? new Date(openPost.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""} · {openPost.audience}</p>
@@ -240,6 +247,65 @@ export default function PortalGate() {
       {documentUrl ? <a href={documentUrl} target="_blank" rel="noreferrer" className="email-button" style={{ textDecoration: "none" }}>Open document ↗</a> : <p className="portal-empty">No file is attached to this record yet.</p>}
     </DetailModal>}
   </main>;
+}
+
+/**
+ * Paperwork & dues, with a year picker -- the rest of the dashboard is
+ * always "this year," but a family may reasonably want to look back at a
+ * past year's dues receipt or signed form. Self-contained (fetches its own
+ * years and requirements) rather than folded into the big page-load effect,
+ * since switching years shouldn't refetch everything else on the page.
+ */
+function FamilyCompliance({ familyId }: { familyId: string }) {
+  const [years, setYears] = useState<SchoolYear[]>([]);
+  const [yearId, setYearId] = useState("");
+  const [items, setItems] = useState<ComplianceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadYears() {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      const { data } = await supabase.from("school_years").select("id,label,starts_on,ends_on,is_current").order("starts_on", { ascending: false });
+      if (cancelled) return;
+      const rows = (data ?? []) as SchoolYear[];
+      setYears(rows);
+      setYearId((current) => current || rows.find((year) => year.is_current)?.id || rows[0]?.id || "");
+    }
+    loadYears();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!yearId) return;
+    let cancelled = false;
+    async function loadCompliance() {
+      setLoading(true);
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      const { data } = await supabase
+        .from("family_requirements")
+        .select("id,requirement_id,family_id,status,signed_document_id,signed_at,signing_url,provider_document_id,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,amount_per_family,amount_per_child,payment_url,due_on)")
+        .eq("family_id", familyId)
+        .eq("requirements.active", true)
+        .eq("requirements.school_year_id", yearId);
+      if (cancelled) return;
+      setItems(toComplianceItems(data));
+      setLoading(false);
+    }
+    loadCompliance();
+    return () => { cancelled = true; };
+  }, [yearId, familyId]);
+
+  return <>
+    {years.length > 1 && <label className="compliance-year-picker"><span className="field-caption">School year</span>
+      <select value={yearId} onChange={(event) => setYearId(event.target.value)}>
+        {years.map((year) => <option key={year.id} value={year.id}>{year.label}{year.is_current ? " (current)" : ""}</option>)}
+      </select>
+    </label>}
+    {loading ? <p className="portal-empty">Loading…</p> : <CompliancePanel items={items} />}
+  </>;
 }
 
 function AddChildForm({ familyId, onAdded }: { familyId: string; onAdded: () => void }) {

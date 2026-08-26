@@ -1,44 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { calendarFeedUrl, calendarSubscribeUrl, getSupabaseBrowserClient } from "../../lib/supabase";
+import { calendarSubscribeUrl, getSupabaseBrowserClient, googleCalendarAddUrl } from "../../lib/supabase";
 
 /**
- * A calendar feed's subscribe action -- one click via webcal:// for Apple
- * Calendar/Outlook (see calendarSubscribeUrl for why that's the link that
- * actually opens a live subscription rather than a one-time download), plus
- * a copy button for the plain https:// form Google Calendar's "Other
- * calendars -> From URL" import wants instead.
+ * A calendar feed's two subscribe actions, styled identically since they're
+ * equally the point rather than one being a fallback: webcal:// opens Apple
+ * Calendar/Outlook's own "Subscribe" prompt directly (see
+ * calendarSubscribeUrl for why that -- not a plain https:// link -- is what
+ * keeps refreshing instead of downloading a one-time file); Google's own
+ * "Add by URL" flow opens the same way via its cid= deep link, one click
+ * instead of a copy-paste into Settings -> Add calendar -> From URL.
  */
 export default function SubscribeLink({ query, label = "Subscribe to this calendar" }: { query: string; label?: string }) {
-  const [status, setStatus] = useState("");
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(calendarFeedUrl(query));
-      setStatus("Link copied.");
-    } catch {
-      setStatus("Could not copy automatically.");
-    }
-  }
-
   return <span className="subscribe-link">
     <a className="compliance-cta ghost" href={calendarSubscribeUrl(query)}>{label} ↗</a>
-    <button type="button" className="ghost" onClick={copy}>Copy link for Google Calendar</button>
-    {status && <small role="status">{status}</small>}
+    <a className="compliance-cta ghost" href={googleCalendarAddUrl(query)} target="_blank" rel="noreferrer">Add to Google Calendar ↗</a>
   </span>;
 }
 
 /**
  * The signed-in person's own personal feed (see calendar-feed's
- * ?scope=personal), looked up by user id, with a "Get a new link" control --
- * a leaked link is invalidated by regenerating rather than by anyone having
- * to notice and revoke it.
+ * ?scope=personal), looked up by user id. Regenerating the link (a leaked
+ * link is invalidated by getting a new one, rather than anyone having to
+ * notice and revoke it) lives in Account Settings only, not here -- this is
+ * meant to sit inline wherever "here's your calendar" is useful, and a
+ * destructive-ish control didn't belong crowding that.
  */
 export function PersonalSubscribeLink({ userId }: { userId: string }) {
   const [token, setToken] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -52,22 +42,6 @@ export function PersonalSubscribeLink({ userId }: { userId: string }) {
     return () => { cancelled = true; };
   }, [userId]);
 
-  async function regenerate() {
-    if (!confirm("Get a new link? The old one will stop working.")) return;
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setBusy(true); setMessage("");
-    const { data, error } = await supabase.rpc("regenerate_calendar_token");
-    setBusy(false);
-    if (error) { setMessage(error.message); return; }
-    setToken(data as string);
-    setMessage("New link ready.");
-  }
-
   if (!token) return null;
-  return <span className="subscribe-link">
-    <SubscribeLink query={`scope=personal&token=${token}`} label="Subscribe to your calendar" />
-    <button type="button" className="ghost" onClick={regenerate} disabled={busy}>{busy ? "Working…" : "Get a new link"}</button>
-    {message && <small role="status">{message}</small>}
-  </span>;
+  return <SubscribeLink query={`scope=personal&token=${token}`} label="Subscribe to your calendar" />;
 }
