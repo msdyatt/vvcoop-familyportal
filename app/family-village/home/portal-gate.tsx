@@ -12,6 +12,7 @@ import MfaChallengeScreen from "../mfa-challenge";
 import { ComplianceBanner, CompliancePanel, ComplianceItem } from "../compliance-panel";
 import PostAttachments, { PostThumbnail, usePostAttachments } from "../post-attachments";
 import { FamilyRequirement, Requirement } from "../../../lib/compliance";
+import { PersonalSubscribeLink } from "../subscribe-link";
 
 type PortalState = "loading" | "signed-out" | "mfa-challenge" | "pending" | "active" | "error";
 type Profile = { display_name: string | null; email: string; status: "pending" | "active" | "suspended" };
@@ -55,12 +56,14 @@ export default function PortalGate() {
   const [openDocumentId, setOpenDocumentId] = useState<string | null>(null);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
+  const [userId, setUserId] = useState<string | null>(null);
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) { setState("signed-out"); return; }
+    setUserId(data.user.id);
     const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal.data && aal.data.nextLevel === "aal2" && aal.data.nextLevel !== aal.data.currentLevel) { setState("mfa-challenge"); return; }
     const result = await supabase.from("profiles").select("display_name,email,status").eq("id", data.user.id).single();
@@ -191,7 +194,9 @@ export default function PortalGate() {
       <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
       </section>
-      <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric", timeZone: event.all_day ? "UTC" : undefined})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}</section>
+      <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric", timeZone: event.all_day ? "UTC" : undefined})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}
+        {userId && <div className="calendar-subscribe-row"><PersonalSubscribeLink userId={userId} /></div>}
+      </section>
       <section className="portal-module"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
       {/* Class dates, per class, with anything needing prep called out. This
           replaces the old assignments list -- homework is now a flag on a date

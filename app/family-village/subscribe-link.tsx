@@ -30,12 +30,15 @@ export default function SubscribeLink({ query, label = "Subscribe to this calend
 }
 
 /**
- * The signed-in person's own personal feed (see calendar-feed's ?scope=personal),
- * looked up by user id -- read-only here; account-settings.tsx has the
- * regenerate-a-new-link control for that.
+ * The signed-in person's own personal feed (see calendar-feed's
+ * ?scope=personal), looked up by user id, with a "Get a new link" control --
+ * a leaked link is invalidated by regenerating rather than by anyone having
+ * to notice and revoke it.
  */
 export function PersonalSubscribeLink({ userId }: { userId: string }) {
   const [token, setToken] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +52,22 @@ export function PersonalSubscribeLink({ userId }: { userId: string }) {
     return () => { cancelled = true; };
   }, [userId]);
 
+  async function regenerate() {
+    if (!confirm("Get a new calendar link? The old one will stop working, so update it anywhere you've subscribed.")) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true); setMessage("");
+    const { data, error } = await supabase.rpc("regenerate_calendar_token");
+    setBusy(false);
+    if (error) { setMessage(error.message); return; }
+    setToken(data as string);
+    setMessage("New link ready.");
+  }
+
   if (!token) return null;
-  return <SubscribeLink query={`scope=personal&token=${token}`} label="Subscribe to your calendar" />;
+  return <span className="subscribe-link">
+    <SubscribeLink query={`scope=personal&token=${token}`} label="Subscribe to your calendar" />
+    <button type="button" className="ghost" onClick={regenerate} disabled={busy}>{busy ? "Working…" : "Get a new link"}</button>
+    {message && <small role="status">{message}</small>}
+  </span>;
 }

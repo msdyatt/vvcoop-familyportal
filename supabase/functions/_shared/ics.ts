@@ -97,14 +97,24 @@ function buildEvent(event: IcsEvent, stamp: string): string[] {
   return lines;
 }
 
-/** Renders a full VCALENDAR document, ready to serve as text/calendar. */
-export function buildIcs(events: IcsEvent[]): string {
+/**
+ * Renders a full VCALENDAR document, ready to serve as text/calendar.
+ *
+ * X-WR-CALNAME (and X-WR-CALDESC) are non-standard but universally
+ * respected by Apple Calendar, Google Calendar, and Outlook -- it's what
+ * names the calendar in the subscriber's own sidebar. Without it, a
+ * subscribed feed shows up labeled with the raw feed URL or "Untitled",
+ * indistinguishable from any other calendar someone has subscribed to.
+ */
+export function buildIcs(events: IcsEvent[], calendar: { name: string; description?: string }): string {
   const stamp = formatDateTime(new Date().toISOString());
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Veritas Village//Family Portal//EN",
     "CALSCALE:GREGORIAN",
+    `X-WR-CALNAME:${escapeText(calendar.name)}`,
+    ...(calendar.description ? [`X-WR-CALDESC:${escapeText(calendar.description)}`] : []),
     ...events.flatMap((event) => buildEvent(event, stamp)),
     "END:VCALENDAR",
   ];

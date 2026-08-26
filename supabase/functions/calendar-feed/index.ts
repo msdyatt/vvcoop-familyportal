@@ -139,7 +139,7 @@ async function handle(req: Request): Promise<Response> {
 
   if (scope === "public") {
     const { data } = await admin.from("events").select(EVENT_SELECT).eq("audience", "public").order("starts_at");
-    return text(buildIcs(eventsToIcs((data ?? []) as EventRow[])));
+    return text(buildIcs(eventsToIcs((data ?? []) as EventRow[]), { name: "Veritas Village" }));
   }
 
   if (scope === "class") {
@@ -153,14 +153,15 @@ async function handle(req: Request): Promise<Response> {
       admin.from("events").select(EVENT_SELECT).eq("class_id", classId).eq("audience", "class").order("starts_at"),
     ]);
     const events = eventsToIcs((eventRows ?? []) as EventRow[]);
-    return text(buildIcs(meeting ? [meeting, ...events] : events));
+    return text(buildIcs(meeting ? [meeting, ...events] : events, { name: `Veritas Village – ${klass.title}` }));
   }
 
   if (scope === "personal") {
     const token = url.searchParams.get("token");
     if (!token) return text("Missing token.", 400, "text/plain");
-    const { data: profile } = await admin.from("profiles").select("id").eq("calendar_token", token).maybeSingle();
+    const { data: profile } = await admin.from("profiles").select("id,display_name,email").eq("calendar_token", token).maybeSingle();
     if (!profile) return text("That calendar link is no longer valid.", 404, "text/plain");
+    const personalName = profile.display_name || profile.email || "My";
 
     const [{ data: roleRows }, { data: teachingRows }, { data: memberRows }] = await Promise.all([
       admin.from("user_roles").select("role").eq("user_id", profile.id),
@@ -200,7 +201,10 @@ async function handle(req: Request): Promise<Response> {
       return meeting ? [meeting, ...events] : events;
     }));
 
-    return text(buildIcs([...classEventLists.flat(), ...eventsToIcs((generalEventRows ?? []) as EventRow[])]));
+    return text(buildIcs(
+      [...classEventLists.flat(), ...eventsToIcs((generalEventRows ?? []) as EventRow[])],
+      { name: `${personalName} – Veritas Village` },
+    ));
   }
 
   return text("Unknown calendar scope.", 400, "text/plain");

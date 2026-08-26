@@ -38,6 +38,7 @@ export default function AvatarCropper({ file, busy, onCancel, onSave }: {
   // zoom/pan silently carries over and can be saved against a photo the user
   // never actually adjusted.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset zoom/pan/dimensions synchronously so a new file never renders with the previous photo's adjustments
     setZoom(1); setHorizontal(0); setVertical(0); setDimensions(null); setMessage("");
     let cancelled = false;
     createImageBitmap(file).then((bitmap) => {

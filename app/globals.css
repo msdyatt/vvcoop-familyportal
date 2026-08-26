@@ -1032,102 +1032,8 @@ footer {
   margin:0;
 }
 
-.month-calendar {
-  display:grid;
-  grid-template-columns:repeat(7,minmax(95px,1fr));
-  min-width:760px;
-  border-top:1px solid rgba(var(--navy-rgb),.14);
-  border-left:1px solid rgba(var(--navy-rgb),.14);
-}
-
 .teacher-calendar {
   overflow-x:auto;
-}
-
-.month-calendar> b {
-  padding:8px;
-  color:var(--sage-text);
-  font-size:10px;
-  text-transform:uppercase;
-  border-right:1px solid rgba(var(--navy-rgb),.14);
-  border-bottom:1px solid rgba(var(--navy-rgb),.14);
-}
-
-.month-calendar>div {
-  min-height:108px;
-  padding:7px;
-  background:var(--surface);
-  border-right:1px solid rgba(var(--navy-rgb),.14);
-  border-bottom:1px solid rgba(var(--navy-rgb),.14);
-}
-
-.month-calendar>div.outside {
-  background:var(--surface-sunken);
-  opacity:.6;
-}
-
-.month-calendar>div.today time {
-  display:grid;
-  place-items:center;
-  width:25px;
-  height:25px;
-  background:var(--terracotta-text);
-  color:var(--cream);
-  border-radius:50%;
-}
-
-.calendar-day-head {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-}
-
-.calendar-add {
-  padding:1px 7px;
-  font-size:13px;
-  line-height:1.4;
-}
-
-.calendar-day-view {
-  grid-template-columns:1fr;
-  min-width:0;
-}
-
-.calendar-day-view>div {
-  min-height:220px;
-}
-
-.calendar-week-cell {
-  min-height:160px;
-}
-
-.calendar-event-chip {
-  display:grid;
-  gap:1px;
-  width:100%;
-  margin-top:5px;
-  padding:5px 6px;
-  background:var(--panel);
-  color:var(--navy);
-  font:inherit;
-  font-size:10px;
-  line-height:1.25;
-  text-align:left;
-  border:0;
-  cursor:pointer;
-}
-
-.calendar-event-chip:hover:not(:disabled) {
-  background:var(--surface-sunken);
-}
-
-.calendar-event-chip:disabled {
-  cursor:default;
-  opacity:.75;
-}
-
-.calendar-event-chip small {
-  color:var(--sage-text);
 }
 
 .calendar-list-view {
@@ -1471,16 +1377,6 @@ footer {
     align-items:start;
     flex-direction:column;
   }
-  .month-calendar {
-    min-width:520px;
-  }
-  .month-calendar>div {
-    min-height:80px;
-    padding:5px;
-  }
-  .calendar-week-cell {
-    min-height:120px;
-  }
   .calendar-list-item {
     flex-direction:column;
     align-items:start;
@@ -1489,26 +1385,37 @@ footer {
 }
 
 @media print {
-  body.printing-report * {
+  /* Hides everything EXCEPT the print target, everything inside it, and its
+     own ancestor chain -- not "hide everything, then revert the target,"
+     which the first version of this did. Reverting display:none back with
+     display:revert restores each element's UA-default display (div -> block,
+     table -> table, ...), not the SITE's own display (flex, grid) -- so a
+     flex header or a grid meta block inside the target collapsed to a plain
+     block the moment it got reverted, silently breaking the very layout this
+     was supposed to preserve. Excluding the target's subtree from the hide
+     rule instead means its styles are simply never touched. */
+  body.printing-report *:not(.print-target):not(.print-target *):not(.print-ancestor) {
     display:none !important;
   }
-  /* The target's ancestor chain up to <body> stays in the flow (so the
-     target itself still renders at all) but contributes no content of its
-     own; the target and everything inside it reverts to each element's own
-     native display so table/list layout inside it still works. */
+  /* Ancestors exist only so the target isn't an orphaned, unrendered node --
+     their own design (a two-column admin layout, a modal's fixed backdrop
+     and max-height) has to go, or the target ends up squeezed into whatever
+     column/box width or scroll area that design happened to leave for it. */
   body.printing-report .print-ancestor {
-    display:revert !important;
-  }
-  body.printing-report .print-target,
-  body.printing-report .print-target * {
-    display:revert !important;
-  }
-  body.printing-report .print-target {
+    display:block !important;
     position:static !important;
     width:auto !important;
+    max-width:none !important;
+    height:auto !important;
     margin:0 !important;
     padding:0 !important;
     border:0 !important;
+    background:none !important;
+    overflow:visible !important;
+  }
+  body.printing-report .print-target {
+    width:auto !important;
+    margin:0 !important;
   }
   .no-print {
     display:none !important;
