@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import { edgeFunctionUrl, getSupabaseBrowserClient } from "../../../lib/supabase";
+import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
 import { SchoolYear, formatDate } from "../../../lib/compliance";
 import { ClassBlock, Room, WEEKDAYS, formatBlock, formatBlockTime, formatWeekday } from "../../../lib/schedule";
 import { printElement } from "../../../lib/dom";
@@ -30,7 +31,7 @@ function fullName(displayName: string | null, surname: string | null, email: str
   return first || email;
 }
 
-export default function ClassesTab() {
+export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [teacherOptions, setTeacherOptions] = useState<TeacherOption[]>([]);
   const [childOptions, setChildOptions] = useState<ChildOption[]>([]);
@@ -272,6 +273,7 @@ export default function ClassesTab() {
         terms={terms}
         clash={clashes.get(row.id) ?? null}
         teacherOptions={teacherOptions} childOptions={childOptions}
+        actorUserId={actorUserId}
         onSave={saveClass} onAssignTeacher={assignTeacher} onRemoveTeacher={removeTeacher}
         onEnrollChild={enrollChild} onSetEnrollmentStatus={setEnrollmentStatus} />)}
       {!visible.length && <p className="portal-empty">No classes for that year yet.</p>}
@@ -658,9 +660,9 @@ function RoomRow({ room, onSave, onToggle }: { room: Room; onSave: (room: Room) 
   </div>;
 }
 
-function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, childOptions, onSave, onAssignTeacher, onRemoveTeacher, onEnrollChild, onSetEnrollmentStatus }: {
+function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, childOptions, actorUserId, onSave, onAssignTeacher, onRemoveTeacher, onEnrollChild, onSetEnrollmentStatus }: {
   row: ClassRow; years: SchoolYear[]; blocks: ClassBlock[]; rooms: Room[]; terms: AcademicTerm[]; clash: string | null;
-  teacherOptions: TeacherOption[]; childOptions: ChildOption[];
+  teacherOptions: TeacherOption[]; childOptions: ChildOption[]; actorUserId: string;
   onSave: (row: ClassRow) => void;
   onAssignTeacher: (classId: string, userId: string, role: string) => void;
   onRemoveTeacher: (classId: string, userId: string) => void;
@@ -793,7 +795,7 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
     </div>
 
     <div className="record-section">
-      <div className="editable-head"><p className="card-kicker">Roster</p><button onClick={() => setRosterOpen(true)}>Printable roster</button></div>
+      <div className="editable-head"><p className="card-kicker">Roster</p><div className="row-actions"><a className="compliance-cta ghost" href={`${edgeFunctionUrl("calendar-feed")}?scope=class&id=${row.id}`} target="_blank" rel="noreferrer">Subscribe to this class&rsquo;s calendar ↗</a><button onClick={() => setRosterOpen(true)}>Printable roster</button></div></div>
       {active.map((entry) => <div className="child-line" key={entry.child_id}>
         <b>{entry.children?.first_name} {entry.children?.last_name}</b>
         <span>enrolled</span>
@@ -811,11 +813,102 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
         <button disabled={!childPick} onClick={() => { onEnrollChild(row.id, childPick); setChildPick(""); }}>Enroll</button>
       </div>
     </div>
+    <ClassCurriculum classId={row.id} classTitle={row.title} actorUserId={actorUserId} />
   </CollapsibleRecord>
   {rosterOpen && <DetailModal title={`${row.title} roster`} onClose={() => setRosterOpen(false)}>
     <RosterReport row={row} block={block} room={room} teacherName={teacherName} />
   </DetailModal>}
   </>;
+}
+
+type ClassFile = { id: string; title: string; kind: string; storage_path: string; created_at: string };
+
+/**
+ * Curriculum and handouts for one class, attached from the admin side.
+ *
+ * Mirrors ResourcesSection in teacher/workspace.tsx -- same documents table,
+ * same private bucket. RLS already keeps a "curriculum" file hidden from
+ * enrolled families and visible only to that class's teaching team
+ * (documents_read's `kind <> 'curriculum'` clause) and already lets any
+ * admin write any class's documents, so this is the upload/list UI the
+ * teacher side has always had, added here too -- an admin who has the file
+ * doesn't have to wait on a teacher account to get it into the class.
+ */
+function ClassCurriculum({ classId, classTitle, actorUserId }: { classId: string; classTitle: string; actorUserId: string }) {
+  const [files, setFiles] = useState<ClassFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState("");
+  const [kind, setKind] = useState("curriculum");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+
+  async function load() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { data } = await supabase.from("documents").select("id,title,kind,storage_path,created_at").eq("class_id", classId).order("created_at", { ascending: false });
+    setFiles((data ?? []) as ClassFile[]);
+    setLoading(false);
+  }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- refetch when the expanded class changes; load() is a fresh closure each render
+  useEffect(() => { load(); }, [classId]);
+
+  async function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !file || !title.trim()) return;
+    setBusy(true); setStatus("");
+    const uploaded = await uploadPrivateFile(supabase, "handouts", file);
+    if ("error" in uploaded) { setStatus(uploaded.error); setBusy(false); return; }
+    const { error } = await supabase.from("documents").insert({
+      class_id: classId, kind, title: title.trim(), storage_path: uploaded.path, uploaded_by_user_id: actorUserId,
+    });
+    setBusy(false);
+    if (error) { setStatus(error.message); return; }
+    setTitle(""); setFile(null); setKind("curriculum"); setStatus("File posted.");
+    await load();
+  }
+
+  async function download(path: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const url = await getSignedFileUrl(supabase, path);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async function remove(item: ClassFile) {
+    if (!confirm(`Remove "${item.title}"?`)) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("documents").delete().eq("id", item.id);
+    if (error) { setStatus(error.message); return; }
+    await load();
+  }
+
+  if (loading) return null;
+
+  return <div className="record-section">
+    <p className="card-kicker">Curriculum &amp; handouts</p>
+    <form onSubmit={upload} className="portal-form">
+      <label><span className="field-caption">Title</span>
+        <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${classTitle} scope and sequence`} disabled={busy} />
+      </label>
+      <label><span className="field-caption">File type</span><select value={kind} onChange={(event) => setKind(event.target.value)} disabled={busy}><option value="curriculum">Curriculum / teacher resource</option><option value="handout">Family handout</option></select></label>
+      <label className="file-drop"><span className="field-caption">File</span>
+        <input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} />
+      </label>
+      <button disabled={busy}>{busy ? "Uploading…" : "Upload class file"}</button>
+    </form>
+    <p className="admin-form-status" role="status">{status}</p>
+    <div className="portal-stack portal-stack-tight">
+      {files.map((item) => <div key={item.id} className="teacher-class">
+        <div><b>{item.title}</b><span>{item.kind === "curriculum" ? "Curriculum -- teacher/assistant only" : "Handout"} · {new Date(item.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</span></div>
+        <div className="row-actions"><button onClick={() => download(item.storage_path)}>Open</button><button className="danger" onClick={() => remove(item)}>Remove</button></div>
+      </div>)}
+      {!files.length && <p className="portal-empty">No files attached to {classTitle} yet.</p>}
+    </div>
+  </div>;
 }
 
 function RosterReport({ row, block, room, teacherName }: {

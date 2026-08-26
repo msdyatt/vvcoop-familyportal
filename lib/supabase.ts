@@ -8,6 +8,11 @@ export function isSupabaseConfigured() {
   return Boolean(projectUrl && publishableKey);
 }
 
+/** Public HTTPS URL for a deployed edge function -- e.g. the calendar feed, which a calendar app polls directly rather than through the supabase-js client. */
+export function edgeFunctionUrl(name: string) {
+  return `${projectUrl}/functions/v1/${name}`;
+}
+
 export function getSupabaseBrowserClient() {
   if (!isSupabaseConfigured()) return null;
   if (!client) {

@@ -61,7 +61,7 @@ export default function AdminWorkspace() {
     </>}
 
     {tab === "families" && <FamiliesTab actorUserId={userId} />}
-    {tab === "classes" && <ClassesTab />}
+    {tab === "classes" && <ClassesTab actorUserId={userId} />}
     {tab === "compliance" && <ComplianceTab actorUserId={userId} />}
     {tab === "news" && <NewsTab actorUserId={userId} />}
     {tab === "reports" && <ReportsTab />}

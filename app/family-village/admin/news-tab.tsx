@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import { edgeFunctionUrl, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { uploadPrivateFile } from "../../../lib/storage";
 import { sanitizeRichText, stripRichText } from "../../../lib/rich-text";
 import { PostThumbnail, usePostAttachments } from "../post-attachments";
@@ -9,7 +9,7 @@ import RichTextEditor from "../rich-text-editor";
 
 type Post = { id: string; title: string; body: string; audience: string; class_id: string | null; published_at: string | null };
 type ClassOption = { id: string; title: string };
-type CalendarEvent = { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; audience: string };
+type CalendarEvent = { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; audience: string; all_day: boolean };
 
 export default function NewsTab({ actorUserId }: { actorUserId: string }) {
   const [view, setView] = useState<"news" | "calendar">("news");
@@ -29,7 +29,7 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
     const [{ data, error }, { data: classRows }, { data: eventRows }] = await Promise.all([
       supabase.from("posts").select("id,title,body,audience,class_id,published_at").order("created_at", { ascending: false }).limit(40),
       supabase.from("classes").select("id,title").order("title"),
-      supabase.from("events").select("id,title,description,starts_at,ends_at,location,audience").is("class_id", null).order("starts_at", { ascending: false }).limit(60),
+      supabase.from("events").select("id,title,description,starts_at,ends_at,location,audience,all_day").is("class_id", null).order("starts_at", { ascending: false }).limit(60),
     ]);
     if (error) return;
     setPosts((data ?? []) as Post[]);
@@ -97,7 +97,7 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
     {view === "news" ? <>
       <form className="news-composer" onSubmit={publish}>
         <input required placeholder="Headline" value={title} onChange={(event) => setTitle(event.target.value)} disabled={busy} />
-        <RichTextEditor value={body} onChange={setBody} disabled={busy} />
+        <RichTextEditor key={editingId ?? "new"} value={body} onChange={setBody} disabled={busy} />
         <div className="composer-row">
           <select value={audience} onChange={(event) => setAudience(event.target.value)} disabled={busy}><option value="families">Every family</option><option value="teachers">Teaching team only</option><option value="class">One class</option><option value="public">Front page</option></select>
           {audience === "class" && <select value={classId} onChange={(event) => setClassId(event.target.value)} disabled={busy}><option value="">Choose a class…</option>{classes.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select>}
@@ -114,6 +114,8 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
 
 function CalendarPublisher({ events, onSaved, onStatus, status }: { events: CalendarEvent[]; onSaved: () => void; onStatus: (message: string) => void; status: string }) {
   const [title, setTitle] = useState(""); const [description, setDescription] = useState(""); const [location, setLocation] = useState("");
+  // Most co-op events are a date on the calendar, not a specific meeting time -- all-day is the default, with a toggle for the few that need one.
+  const [allDay, setAllDay] = useState(true);
   const [startsAt, setStartsAt] = useState(""); const [endsAt, setEndsAt] = useState(""); const [audience, setAudience] = useState("families"); const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -124,27 +126,40 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
     return local.toISOString().slice(0, 16);
   }
 
+  function inputDate(value: string | null) {
+    return value ? value.slice(0, 10) : "";
+  }
+
   async function createEvent(event: FormEvent) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !title.trim() || !startsAt) return;
     if (endsAt && endsAt < startsAt) { onStatus("An event cannot end before it starts."); return; }
     setBusy(true);
-    const payload = { title: title.trim(), description: description.trim() || null, location: location.trim() || null, starts_at: new Date(startsAt).toISOString(), ends_at: endsAt ? new Date(endsAt).toISOString() : null, audience, class_id: null };
+    const payload = {
+      title: title.trim(), description: description.trim() || null, location: location.trim() || null,
+      starts_at: allDay ? `${startsAt}T00:00:00.000Z` : new Date(startsAt).toISOString(),
+      ends_at: endsAt ? (allDay ? `${endsAt}T00:00:00.000Z` : new Date(endsAt).toISOString()) : null,
+      all_day: allDay, audience, class_id: null,
+    };
     const { error } = editingId
       ? await supabase.from("events").update(payload).eq("id", editingId)
       : await supabase.from("events").insert(payload);
     setBusy(false);
     if (error) { onStatus(error.message); return; }
-    onStatus(editingId ? `Updated ${title.trim()}.` : `Added ${title.trim()} to the Village calendar.`); setTitle(""); setDescription(""); setLocation(""); setStartsAt(""); setEndsAt(""); setAudience("families"); setEditingId(null); onSaved();
+    onStatus(editingId ? `Updated ${title.trim()}.` : `Added ${title.trim()} to the Village calendar.`); setTitle(""); setDescription(""); setLocation(""); setStartsAt(""); setEndsAt(""); setAllDay(true); setAudience("families"); setEditingId(null); onSaved();
   }
 
   function editEvent(row: CalendarEvent) {
-    setEditingId(row.id); setTitle(row.title); setDescription(row.description ?? ""); setLocation(row.location ?? ""); setStartsAt(inputDateTime(row.starts_at)); setEndsAt(inputDateTime(row.ends_at)); setAudience(row.audience); onStatus(`Editing “${row.title}”.`);
+    setEditingId(row.id); setTitle(row.title); setDescription(row.description ?? ""); setLocation(row.location ?? "");
+    setAllDay(row.all_day);
+    setStartsAt(row.all_day ? inputDate(row.starts_at) : inputDateTime(row.starts_at));
+    setEndsAt(row.all_day ? inputDate(row.ends_at) : inputDateTime(row.ends_at));
+    setAudience(row.audience); onStatus(`Editing “${row.title}”.`);
   }
 
   function cancelEdit() {
-    setEditingId(null); setTitle(""); setDescription(""); setLocation(""); setStartsAt(""); setEndsAt(""); setAudience("families"); onStatus("");
+    setEditingId(null); setTitle(""); setDescription(""); setLocation(""); setStartsAt(""); setEndsAt(""); setAllDay(true); setAudience("families"); onStatus("");
   }
 
   async function removeEvent(row: CalendarEvent) {
@@ -155,10 +170,34 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
     onStatus(`Deleted ${row.title}.`); onSaved();
   }
 
-  return <><form className="news-composer event-composer" onSubmit={createEvent}>
+  // Switching form kinds rather than converting between them -- a datetime-local
+  // and a date value aren't safely convertible without picking a timezone to
+  // guess with, so this just asks for the date/time again instead of guessing.
+  function toggleAllDay(next: boolean) {
+    setAllDay(next);
+    setStartsAt("");
+    setEndsAt("");
+  }
+
+  return <><p className="composer-hint">Anyone can subscribe to the co-op-wide calendar in their own calendar app: <a href={`${edgeFunctionUrl("calendar-feed")}?scope=public`} target="_blank" rel="noreferrer">Subscribe to this calendar ↗</a></p>
+  <form className="news-composer event-composer" onSubmit={createEvent}>
     <input required placeholder="Event title" value={title} onChange={(event) => setTitle(event.target.value)} disabled={busy} />
     <textarea placeholder="Details families should know" value={description} onChange={(event) => setDescription(event.target.value)} disabled={busy} />
-    <div className="composer-row"><label><span className="field-caption">Starts</span><input required type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} disabled={busy} /></label><label><span className="field-caption">Ends <i>optional</i></span><input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} disabled={busy} /></label><label><span className="field-caption">Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={busy} /></label><label><span className="field-caption">Audience</span><select value={audience} onChange={(event) => setAudience(event.target.value)} disabled={busy}><option value="families">Every family</option><option value="teachers">Teaching team</option><option value="public">Public audience</option></select></label></div>
+    <label className="checkbox-field"><input type="checkbox" checked={allDay} onChange={(event) => toggleAllDay(event.target.checked)} disabled={busy} /> All day (no specific meeting time)</label>
+    <div className="composer-row">
+      <label><span className="field-caption">Starts</span>
+        {allDay
+          ? <input required type="date" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} disabled={busy} />
+          : <input required type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} disabled={busy} />}
+      </label>
+      <label><span className="field-caption">Ends <i>optional</i></span>
+        {allDay
+          ? <input type="date" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} disabled={busy} />
+          : <input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} disabled={busy} />}
+      </label>
+      <label><span className="field-caption">Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={busy} /></label>
+      <label><span className="field-caption">Audience</span><select value={audience} onChange={(event) => setAudience(event.target.value)} disabled={busy}><option value="families">Every family</option><option value="teachers">Teaching team</option><option value="public">Public audience</option></select></label>
+    </div>
     <div className="row-actions"><button disabled={busy}>{busy ? "Saving…" : editingId ? "Save event" : "Add calendar event"}</button>{editingId && <button type="button" className="ghost" onClick={cancelEdit} disabled={busy}>Cancel edit</button>}</div><p className="admin-form-status" role="status">{status}</p>
-  </form><div className="news-list calendar-admin-list">{events.map((row) => <article className="news-item" key={row.id}><time>{new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</time><div><b>{row.title}</b><span>{new Date(row.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}{row.location ? ` · ${row.location}` : ""} · {row.audience}</span></div><div className="row-actions"><button onClick={() => editEvent(row)}>Edit</button><button className="danger" onClick={() => removeEvent(row)}>Delete</button></div></article>)}{!events.length && <p className="portal-empty">No co-op-wide events have been added yet.</p>}</div></>;
+  </form><div className="news-list calendar-admin-list">{events.map((row) => <article className="news-item" key={row.id}><time>{new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: row.all_day ? "UTC" : undefined })}</time><div><b>{row.title}</b><span>{row.all_day ? "All day" : new Date(row.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}{row.location ? ` · ${row.location}` : ""} · {row.audience}</span></div><div className="row-actions"><button onClick={() => editEvent(row)}>Edit</button><button className="danger" onClick={() => removeEvent(row)}>Delete</button></div></article>)}{!events.length && <p className="portal-empty">No co-op-wide events have been added yet.</p>}</div></>;
 }

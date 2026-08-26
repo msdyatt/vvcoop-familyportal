@@ -1,9 +1,19 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import filterXSS from "xss";
+import { getSupabaseBrowserClient } from "./supabase";
+import { getSignedFileUrls } from "./storage";
 
 const ALLOW_LIST = {
   p: [], br: [], strong: [], em: [], u: [],
   h2: [], h3: [], h4: [], ul: [], ol: [], li: [], blockquote: [],
   a: ["href"],
+  // Deliberately no "src" here -- an inline image is a reference to a file in
+  // the private bucket (data-path), never a raw URL. A pasted <img src="...">
+  // has its src stripped by filterXSS below and only data-path/alt survive,
+  // which is also what keeps this safe against a javascript: src.
+  img: ["data-path", "alt"],
 };
 
 function escapeText(value: string) {
@@ -54,6 +64,44 @@ export function stripRichText(value: string) {
     .trim();
 }
 
+function inlineImagePaths(html: string): string[] {
+  const paths = new Set<string>();
+  const pattern = /data-path="([^"]*)"/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html))) if (match[1]) paths.add(match[1]);
+  return [...paths];
+}
+
+/**
+ * Turns every `data-path="..."` on an <img> into a live `src`.
+ *
+ * The private bucket means an embedded image can only ever be a path
+ * reference, never a baked-in URL (a signed URL expires; the file's location
+ * doesn't). Shared between RichText's render and the editor's own preview so
+ * both resolve the same way.
+ */
+export async function resolveInlineImages(html: string): Promise<string> {
+  const paths = inlineImagePaths(html);
+  if (!paths.length) return html;
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return html;
+  const urls = await getSignedFileUrls(supabase, paths);
+  let resolved = html;
+  urls.forEach((url, path) => {
+    resolved = resolved.split(`data-path="${path}"`).join(`data-path="${path}" src="${url}"`);
+  });
+  return resolved;
+}
+
 export default function RichText({ html, className = "rich-text" }: { html: string; className?: string }) {
-  return <div className={className} dangerouslySetInnerHTML={{ __html: sanitizeRichText(html) }} />;
+  const clean = sanitizeRichText(html);
+  const [display, setDisplay] = useState(clean);
+
+  useEffect(() => {
+    let cancelled = false;
+    resolveInlineImages(clean).then((resolved) => { if (!cancelled) setDisplay(resolved); });
+    return () => { cancelled = true; };
+  }, [clean]);
+
+  return <div className={className} dangerouslySetInnerHTML={{ __html: display }} />;
 }

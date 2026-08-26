@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "../../lib/supabase";
+import { edgeFunctionUrl, getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
 import Avatar from "./avatar";
 import AvatarCropper from "./avatar-cropper";
@@ -12,6 +12,7 @@ export default function AccountSettings({ email, onSignOut, onProfileUpdated }: 
     <PasswordSection email={email} />
     <PasskeySection />
     <TwoFactorSection />
+    <CalendarSection />
     <DangerZone onSignOut={onSignOut} />
   </div>;
 }
@@ -194,6 +195,67 @@ function PasskeySection() {
       <div className="row-actions"><button className="danger" onClick={() => removePasskey(key.id)} disabled={busy}>Remove</button></div>
     </div>)}
     <button onClick={addPasskey} disabled={busy} style={{ marginTop: passkeys.length ? 14 : 0 }}>{busy ? "Working…" : "Add a passkey"}</button>
+    <p className="admin-form-status" role="status">{message}</p>
+  </div>;
+}
+
+/**
+ * A personal subscribable calendar -- everything this person is entitled to
+ * see (their own children's class schedules and assignments, or the classes
+ * they teach, plus every co-op event they can see) in whatever calendar app
+ * they already use. The link carries its own access token rather than a
+ * login, since a calendar app polling it can't do an interactive sign-in --
+ * see supabase/functions/calendar-feed.
+ */
+function CalendarSection() {
+  const [token, setToken] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) return;
+    const { data } = await supabase.from("profiles").select("calendar_token").eq("id", user.user.id).single();
+    setToken(data?.calendar_token ?? null);
+  }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
+  useEffect(() => { load(); }, []);
+
+  async function regenerate() {
+    if (token && !confirm("Get a new calendar link? The old one will stop working, so update it anywhere you've subscribed.")) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true); setMessage("");
+    const { data, error } = await supabase.rpc("regenerate_calendar_token");
+    setBusy(false);
+    if (error) { setMessage(error.message); return; }
+    setToken(data as string);
+    setMessage("New link ready.");
+  }
+
+  async function copy(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setMessage("Link copied.");
+    } catch {
+      setMessage("Could not copy automatically -- select and copy the link above.");
+    }
+  }
+
+  if (token === null) return null;
+  const link = `${edgeFunctionUrl("calendar-feed")}?scope=personal&token=${token}`;
+
+  return <div className="settings-block">
+    <p className="card-kicker">Calendar</p>
+    <p className="portal-empty">Subscribe in your phone or computer&rsquo;s calendar app to see your schedule alongside everything else.</p>
+    <p className="admin-form-status" style={{ wordBreak: "break-all" }}><a href={link} target="_blank" rel="noreferrer">{link}</a></p>
+    <div className="row-actions">
+      <button type="button" onClick={() => copy(link)} disabled={busy}>Copy link</button>
+      <button type="button" className="ghost" onClick={regenerate} disabled={busy}>{busy ? "Working…" : "Get a new link"}</button>
+    </div>
     <p className="admin-form-status" role="status">{message}</p>
   </div>;
 }

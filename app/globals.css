@@ -944,18 +944,11 @@ footer {
   background:rgba(var(--navy-rgb),.18);
 }
 
-.rich-editor textarea {
+.rich-editor-surface {
   min-height:230px;
   padding:16px;
   background:var(--surface);
-  border:0;
-  resize:vertical;
-}
-
-.rich-editor-preview {
-  min-height:230px;
-  padding:18px;
-  background:var(--surface);
+  outline:0;
 }
 
 .rich-text {
@@ -987,6 +980,25 @@ footer {
 .rich-text a {
   color:var(--terracotta-text);
   font-weight:700;
+}
+
+.rich-text img {
+  max-width:100%;
+  height:auto;
+  border-radius:2px;
+}
+
+.event-composer .checkbox-field {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  color:var(--navy);
+  font:400 14px var(--sans);
+}
+
+.event-composer .checkbox-field input[type=checkbox] {
+  width:17px;
+  height:17px;
 }
 
 .event-composer .composer-row label {
@@ -1052,6 +1064,22 @@ footer {
 .month-calendar>div.outside {
   background:var(--surface-sunken);
   opacity:.6;
+}
+
+.month-calendar>div.clickable {
+  cursor:pointer;
+}
+
+.month-calendar>div.clickable:hover {
+  background:var(--surface-sunken);
+}
+
+.month-calendar>div>span.clickable {
+  cursor:pointer;
+}
+
+.month-calendar>div>span.clickable:hover {
+  background:var(--surface-sunken);
 }
 
 .month-calendar>div.today time {

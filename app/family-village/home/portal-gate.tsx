@@ -21,7 +21,7 @@ type PortalData = {
   enrollments: { child_id: string; class_id: string }[];
   classes: { id: string; title: string; description: string | null }[];
   posts: { id: string; title: string; body: string; published_at: string | null; audience: string }[];
-  events: { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; class_id: string | null; audience: string; requires_prework: boolean }[];
+  events: { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; class_id: string | null; audience: string; requires_prework: boolean; all_day: boolean }[];
   documents: { id: string; title: string; kind: string; signature_status: string | null; storage_path: string | null }[];
   compliance: ComplianceItem[];
   roles: string[];
@@ -87,7 +87,7 @@ export default function PortalGate() {
       // here: it permits a teacher to read `teachers` posts, so anyone who is
       // both a parent and a teacher saw them on their family dashboard.
       supabase.from("posts").select("id,title,body,published_at,audience").in("audience", ["public", "families"]).not("published_at", "is", null).order("published_at", { ascending: false }).limit(6),
-      supabase.from("events").select("id,title,description,starts_at,ends_at,location,class_id,audience,requires_prework").gte("starts_at", new Date().toISOString()).order("starts_at").limit(20),
+      supabase.from("events").select("id,title,description,starts_at,ends_at,location,class_id,audience,requires_prework,all_day").gte("starts_at", new Date().toISOString()).order("starts_at").limit(20),
       supabase.from("documents").select("id,title,kind,signature_status,storage_path").or(`family_id.in.(${safeFamilyIds.join(",")}),class_id.in.(${safeClassIds.join(",")})`).order("created_at", { ascending: false }).limit(8),
       supabase.from("user_roles").select("role").eq("user_id", data.user.id),
     ]);
@@ -191,7 +191,7 @@ export default function PortalGate() {
       <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
       </section>
-      <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}</section>
+      <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric", timeZone: event.all_day ? "UTC" : undefined})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}</section>
       <section className="portal-module"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
       {/* Class dates, per class, with anything needing prep called out. This
           replaces the old assignments list -- homework is now a flag on a date
@@ -225,7 +225,9 @@ export default function PortalGate() {
       <PostAttachments attachments={postAttachments[openPost.id] ?? []} />
     </DetailModal>}
     {openEvent && <DetailModal title={openEvent.title} onClose={() => setOpenEventId(null)}>
-      <p className="portal-empty" style={{ marginBottom: 8 }}>{new Date(openEvent.starts_at).toLocaleString("en-US",{ month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}{openEvent.ends_at ? ` – ${new Date(openEvent.ends_at).toLocaleTimeString("en-US",{ hour:"numeric", minute:"2-digit" })}` : ""}{openEvent.location ? ` · ${openEvent.location}` : ""}</p>
+      <p className="portal-empty" style={{ marginBottom: 8 }}>{openEvent.all_day
+        ? new Date(openEvent.starts_at).toLocaleDateString("en-US",{ month:"short", day:"numeric", year:"numeric", timeZone:"UTC" })
+        : `${new Date(openEvent.starts_at).toLocaleString("en-US",{ month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}${openEvent.ends_at ? ` – ${new Date(openEvent.ends_at).toLocaleTimeString("en-US",{ hour:"numeric", minute:"2-digit" })}` : ""}`}{openEvent.location ? ` · ${openEvent.location}` : ""}</p>
       {openEvent.description && <p style={{ whiteSpace: "pre-wrap" }}>{openEvent.description}</p>}
     </DetailModal>}
     {openDocument_ && <DetailModal title={openDocument_.title} onClose={() => { setOpenDocumentId(null); setDocumentUrl(null); }}>

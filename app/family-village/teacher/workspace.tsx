@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import { edgeFunctionUrl, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrl, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
 import Avatar from "../avatar";
 import AppHeader from "../app-header";
+import DetailModal from "../detail-modal";
 import NewsSection from "./news-section";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../../lib/schedule";
 
@@ -155,7 +156,7 @@ export default function TeacherWorkspace() {
       <div className="workspace-main">
         <NewsSection classes={classes} />
 
-        <MonthCalendar events={classEvents} classes={classes} />
+        <MonthCalendar events={classEvents} classes={classes} roleByClass={roleByClass} activeClassId={activeClassId} onSaved={reload} />
 
         {/* One class selection drives the whole page. Every section below is
             scoped to it, so the per-section class dropdowns are gone. */}
@@ -177,6 +178,7 @@ export default function TeacherWorkspace() {
 
           {activeClass && <div className="class-roster">
             <p className="card-kicker">Students in {activeClass.title}</p>
+            <p className="composer-hint"><a href={`${edgeFunctionUrl("calendar-feed")}?scope=class&id=${activeClass.id}`} target="_blank" rel="noreferrer">Subscribe to this class&rsquo;s calendar ↗</a></p>
             {/* Notes stay closed until a student is chosen -- one child's record
                 should not be on screen while another parent is at the desk. */}
             {classRoster.length
@@ -227,9 +229,26 @@ export default function TeacherWorkspace() {
   </main>;
 }
 
-function MonthCalendar({ events, classes }: { events: ClassEvent[]; classes: ClassRow[] }) {
+/**
+ * A lead teacher schedules curriculum by attaching dated, class-scoped events
+ * directly here -- "requires prework" is what makes a date an assignment
+ * families see a checkbox for (child-detail.tsx / portal-gate.tsx already
+ * read that flag). Nothing new to build there; this just gives a lead
+ * teacher a way to create/edit/delete their own class's events, which the
+ * RLS policy events_teacher_write already allows and this calendar simply
+ * didn't expose.
+ *
+ * Read-only for an assistant, and for any event on a class this teacher
+ * doesn't lead (a village-wide event, or a class they only assist with) --
+ * clicking those does nothing, matching what they're actually allowed to
+ * write.
+ */
+function MonthCalendar({ events, classes, roleByClass, activeClassId, onSaved }: {
+  events: ClassEvent[]; classes: ClassRow[]; roleByClass: Record<string, string>; activeClassId: string; onSaved: () => void;
+}) {
   const now = new Date();
   const [month, setMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [editing, setEditing] = useState<{ date: string; classId: string; event: ClassEvent | null } | null>(null);
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
   const gridStart = new Date(first);
   gridStart.setDate(first.getDate() - first.getDay());
@@ -237,16 +256,113 @@ function MonthCalendar({ events, classes }: { events: ClassEvent[]; classes: Cla
   const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   const eventsFor = (day: Date) => events.filter((event) => dateKey(new Date(event.starts_at)) === dateKey(day));
   const className = (id: string | null) => classes.find((klass) => klass.id === id)?.title;
+  const activeLead = roleByClass[activeClassId] === "lead";
+  const editingClass = editing ? classes.find((klass) => klass.id === editing.classId) : null;
+
+  function openDay(day: Date) {
+    if (!activeLead) return;
+    setEditing({ date: dateKey(day), classId: activeClassId, event: null });
+  }
+
+  function openEvent(event: ClassEvent, domEvent: React.SyntheticEvent) {
+    domEvent.stopPropagation();
+    if (!event.class_id || roleByClass[event.class_id] !== "lead") return;
+    setEditing({ date: dateKey(new Date(event.starts_at)), classId: event.class_id, event });
+  }
+
   return <section id="calendar" className="teacher-calendar">
     <div className="teacher-calendar-head"><div><p className="card-kicker">Calendar</p><h2>{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h2></div><div className="row-actions"><button className="ghost" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><button className="ghost" onClick={() => setMonth(new Date(now.getFullYear(), now.getMonth(), 1))}>Today</button><button className="ghost" aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div></div>
+    {activeLead && <p className="composer-hint">Click a day to schedule curriculum or an assignment for {classes.find((klass) => klass.id === activeClassId)?.title}.</p>}
     <div className="month-calendar" role="grid" aria-label={month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}>
       {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <b key={day} role="columnheader">{day}</b>)}
-      {days.map((day) => <div key={day.toISOString()} role="gridcell" className={`${day.getMonth() === month.getMonth() ? "" : "outside"}${dateKey(day) === dateKey(now) ? " today" : ""}`}>
+      {days.map((day) => <div
+        key={day.toISOString()} role="gridcell" tabIndex={0}
+        className={`${day.getMonth() === month.getMonth() ? "" : "outside"}${dateKey(day) === dateKey(now) ? " today" : ""}${activeLead ? " clickable" : ""}`}
+        onClick={() => openDay(day)}
+        onKeyDown={(domEvent) => { if (domEvent.key === "Enter" || domEvent.key === " ") { domEvent.preventDefault(); openDay(day); } }}
+      >
         <time dateTime={dateKey(day)}>{day.getDate()}</time>
-        {eventsFor(day).map((event) => <span key={event.id} title={[event.title, className(event.class_id), event.location].filter(Boolean).join(" · ")}><strong>{event.title}</strong>{className(event.class_id) && <small>{className(event.class_id)}</small>}</span>)}
+        {eventsFor(day).map((event) => <span
+          key={event.id}
+          role="button" tabIndex={0}
+          className={event.class_id && roleByClass[event.class_id] === "lead" ? "clickable" : ""}
+          title={[event.title, className(event.class_id), event.location].filter(Boolean).join(" · ")}
+          onClick={(domEvent) => openEvent(event, domEvent)}
+          onKeyDown={(domEvent) => { if (domEvent.key === "Enter" || domEvent.key === " ") { domEvent.preventDefault(); openEvent(event, domEvent); } }}
+        ><strong>{event.title}</strong>{className(event.class_id) && <small>{className(event.class_id)}</small>}</span>)}
       </div>)}
     </div>
+    {editing && editingClass && <EventEditor
+      classId={editing.classId} classTitle={editingClass.title} date={editing.date} event={editing.event}
+      onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onSaved(); }}
+    />}
   </section>;
+}
+
+function EventEditor({ classId, classTitle, date, event, onClose, onSaved }: {
+  classId: string; classTitle: string; date: string; event: ClassEvent | null; onClose: () => void; onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(event?.title ?? "");
+  const [description, setDescription] = useState(event?.description ?? "");
+  const [location, setLocation] = useState(event?.location ?? "");
+  const [requiresPrework, setRequiresPrework] = useState(event?.requires_prework ?? false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const displayDate = new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+
+  async function save(formEvent: FormEvent) {
+    formEvent.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !title.trim()) return;
+    setBusy(true); setStatus("");
+    const payload = {
+      title: title.trim(), description: description.trim() || null, location: location.trim() || null,
+      requires_prework: requiresPrework, audience: "class", class_id: classId,
+      // Class dates are date-only -- a teacher scheduling curriculum is
+      // marking a day, not booking a specific meeting time.
+      starts_at: `${date}T00:00:00.000Z`, ends_at: null, all_day: true,
+    };
+    const { error } = event
+      ? await supabase.from("events").update(payload).eq("id", event.id)
+      : await supabase.from("events").insert(payload);
+    setBusy(false);
+    if (error) { setStatus(error.message); return; }
+    onSaved();
+  }
+
+  async function remove() {
+    if (!event || !confirm(`Remove "${event.title}" from the calendar?`)) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true);
+    const { error } = await supabase.from("events").delete().eq("id", event.id);
+    setBusy(false);
+    if (error) { setStatus(error.message); return; }
+    onSaved();
+  }
+
+  return <DetailModal title={`${classTitle} · ${displayDate}`} onClose={onClose}>
+    <form onSubmit={save} className="portal-form">
+      <label><span className="field-caption">What&rsquo;s scheduled</span>
+        <input required value={title} onChange={(domEvent) => setTitle(domEvent.target.value)} placeholder="Chapter 4 reading" disabled={busy} />
+      </label>
+      <label className="checkbox-field">
+        <input type="checkbox" checked={requiresPrework} onChange={(domEvent) => setRequiresPrework(domEvent.target.checked)} disabled={busy} />
+        Students need to prepare before this (shows as an assignment families can check off)
+      </label>
+      <label><span className="field-caption">Notes <i>optional</i></span>
+        <textarea value={description} onChange={(domEvent) => setDescription(domEvent.target.value)} placeholder="What to bring, what to read, ..." disabled={busy} />
+      </label>
+      <label><span className="field-caption">Location <i>optional</i></span>
+        <input value={location} onChange={(domEvent) => setLocation(domEvent.target.value)} disabled={busy} />
+      </label>
+      <div className="row-actions">
+        <button disabled={busy}>{busy ? "Saving…" : event ? "Save changes" : "Add to calendar"}</button>
+        {event && <button type="button" className="danger" onClick={remove} disabled={busy}>Remove</button>}
+      </div>
+      <p className="admin-form-status" role="status">{status}</p>
+    </form>
+  </DetailModal>;
 }
 
 /** One student's notes, plus the form to add another. Only rendered on demand. */
