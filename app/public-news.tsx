@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../lib/supabase";
 import PostAttachments, { usePostAttachments } from "./family-village/post-attachments";
+import RichText from "../lib/rich-text";
 
 type PublicPost = { id: string; title: string; body: string; published_at: string | null };
 
@@ -11,7 +12,9 @@ type PublicPost = { id: string; title: string; body: string; published_at: strin
  *
  * Reads as an unauthenticated visitor, which the `posts_public_read` policy
  * allows for published `public` posts and nothing else. The section removes
- * itself when there is nothing to show rather than leaving an empty shelf.
+ * keeps a small invitation in place when there is nothing to show, so public
+ * news remains a real part of the home page instead of appearing only after a
+ * first post exists.
  */
 export default function PublicNews() {
   const [posts, setPosts] = useState<PublicPost[]>([]);
@@ -35,8 +38,6 @@ export default function PublicNews() {
     return () => { cancelled = true; };
   }, []);
 
-  if (!posts.length) return null;
-
   return <section id="news" className="public-news">
     <div className="public-news-heading">
       <p className="eyebrow">From the village</p>
@@ -50,9 +51,10 @@ export default function PublicNews() {
             : ""}
         </time>
         <h3>{post.title}</h3>
-        <p>{post.body}</p>
+        <RichText html={post.body} />
         <PostAttachments attachments={attachments[post.id] ?? []} />
       </article>)}
+      {!posts.length && <article className="public-news-empty"><p className="eyebrow">The next story starts here</p><h3>Community news is coming.</h3><p>Updates chosen for public sharing will gather here as the Village grows.</p></article>}
     </div>
   </section>;
 }

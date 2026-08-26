@@ -1,5 +1,18 @@
 # Veritas Village Family Portal — Project Handoff
 
+## 25 Aug 2026 feature pass — built and verified locally, not yet released
+
+The current working tree contains a coordinated public-site and portal update responding to Sam's 25 Aug feedback. It is intentionally **not described as live yet**: the two database migrations below have been applied to Supabase, but the Cloudflare site bundle and the updated `invite-family-admin` Edge Function still require an explicit production release.
+
+- Public/login: horizontal hero lockup, public news section, reduced Friday-specific copy, email/password-only sign-in, repaired home link, and removal of the login sidebar.
+- Shared UI: signed-in account photo with a gold detail, browser-based crop/zoom before upload, lighter motion cues, and permission-aware portal navigation without the old “Workspace” label.
+- Admin: persistent left navigation, combined **News & calendar** editor, safe formatted news, system-wide events, printable Reports, class/family readiness filters, grouped CSV payment matching, and editable schedule settings nested under Classes.
+- Scheduling: weekdays on time blocks, editable rooms, date-bounded academic terms, and many-to-many class-to-term assignment. Schema is recorded in `20260825050154_portal_schedule_terms.sql` and is already live.
+- Family/teacher: descriptive elective enrollment cards, per-child and bulk assignment completion, teacher month calendar, family handouts versus teacher-only curriculum files, and a file-backed print queue. The curriculum privacy tightening in `20260825051738_protect_teacher_curriculum_files.sql` is already live.
+- Verification: lint has zero errors (two existing `<img>` optimization warnings), the production build succeeds, focused rendered-page tests pass, the public home/login/preview fit a 390px viewport without overflow, and the formatted-news allow-list rejects scripts, event attributes, and unsafe links.
+
+Release boundary: `supabase/functions/invite-family-admin/index.ts` now points invitations to `family.veritasvillage.org`, but that function version has **not** been deployed. Deploying it can create real household invitations and send real mail, so do so only after Sam explicitly confirms the production release. The same confirmation should cover the Cloudflare deployment; keep the shared-password gate and verify both Worker secrets afterward.
+
 ## What this is
 A private family-portal web app for Veritas Village, a Central Texas homeschool co-op. It sits alongside the co-op's public marketing site in the same repo. Three private workspaces: **Family** (parents), **Teacher's Lounge** (teachers), **Admin** (co-op leadership).
 
@@ -62,8 +75,8 @@ NODE_ENV=development npx wrangler deploy --config dist/server/wrangler.json --na
   - `@import "tailwindcss/preflight"` is load-bearing — the stylesheet depends on its reset. Do not remove it. No Tailwind utilities are used.
 9. **Brand assets** live in `public/brand/`. Use the horizontal lockup in headers, stacked in the hero, the cream variant on dark fields, and the compact mark below 64px. Full-resolution masters are outside the repo in `~/Downloads/veritas-village-logo-assets/`.
 
-## Current state (as of this handoff)
-Everything below is live on `family.veritasvillage.org` right now — nothing is pending/uncommitted.
+## Production baseline before the 25 Aug local pass
+Everything below describes the previously deployed production baseline. The dated section at the top lists the newer local changes that still need release.
 
 **Family portal**: dashboard with children (click a child → classes/assignments/family-visible teacher notes with read-receipts), clickable News/Events/Documents (open a detail modal instead of a flat list), self-service add-a-child (button-triggered form) and display-name edit, Account & Security accessible from the header's account menu (password change, passkeys, TOTP 2FA, phone/emergency contact, self-service account deletion).
 
@@ -83,7 +96,7 @@ Dues amounts are captured when a requirement is opened, not derived on read, so 
 
 **Shared**: one `AppHeader` component (the real horizontal lockup top-left, portal title, workspace switcher, account menu top-right) across all three portals. It renders as a full-bleed band whose colour identifies the workspace: cream with a terracotta rule for Family, a sage tint for Teacher, reversed navy with the cream lockup for Admin.
 
-**Auth**: email/password, Google/Apple OAuth (buttons present but **not actually configured** — no OAuth app credentials set up in Supabase yet), and passkeys (WebAuthn, enabled and working). TOTP 2FA available. The login flow checks authenticator-assurance-level and shows a code-challenge screen if 2FA is on.
+**Auth in the previous production bundle**: email/password, unconfigured Google/Apple buttons, and passkeys. The current local pass removes the Google/Apple options from sign-in and removes passkey management from Account settings, while retaining TOTP 2FA and the authenticator-assurance-level challenge.
 
 ## Known gaps / good next steps (raised but not yet built)
 
@@ -120,14 +133,14 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 ```
 `400` = token good (it reached validation). `405` = token rejected.
 
-- **Google/Apple OAuth** aren't actually wired up — buttons exist but will error if clicked. Either configure real OAuth apps in the Supabase dashboard, or consider dropping them in favor of passkeys + email/password, which already work.
+- ~~**Google/Apple OAuth** buttons were visible but unconfigured.~~ **Closed locally 25 Aug:** the sign-in screen is email/password only. This is not live until the current site bundle is released.
 - **Dues/payments**: `docs/dues-processor-options.html` compares Stripe, Cheddar Up and Zeffy against the real dues structure. Recommendation is Stripe with ACH as the default method. No payments code exists yet; Sam still owes an actual family count and a board decision on absorbing vs passing on fees.
 - **A parent-only account does not exist yet.** Both current users are administrators, so the family-scoped RLS has been verified at the predicate level (`private.has_family_access` grants each user only their own family, checked both directions) but never exercised end to end by a non-admin. Worth confirming with a real parent account before the co-op relies on it.
 - **Print automation is designed but not built.** Decision made: a small agent on an always-on machine at Sam's house polling `print_requests` for `status = 'pending'`, printing via `lp`/CUPS, and setting `status = 'printed'`. Waiting on hardware. Email-to-print was rejected because it cannot report back whether anything printed — and HP retired ePrint's email service in 2023, Google Cloud Print in 2020, so it is mostly gone anyway. The agent will need its own edge function and secret; do not hand a service-role key to a home machine.
 - **Homeschool co-op features not yet built**, discussed as good candidates: attendance tracking, parent volunteer-hour tracking, field trip/event RSVP with headcount, per-class supply/curriculum lists, a lending library, carpool coordination, a "closed today" alert banner.
 - **Classes now have a real timetable.** `class_blocks` (label + `starts_at`/`ends_at`, per school year) is the single source of a class's meeting time — `classes.block_id` points at one, and `classes.meeting_time`/`block_label` are **dropped**. `rooms` is a managed list with `classes.room_id`. Both are managed from collapsible sections in Admin → Classes. Display goes through `lib/schedule.ts` (`describeSchedule`, `SCHEDULE_SELECT`) — do not format a block time with `toLocaleTimeString`, a bare `time` has no date and the browser timezone will shift it. **Neither table is seeded**: every class reads "No time block" until Sam defines the co-op day. A same-block-same-room double booking shows as a warning chip on the class card, deliberately not a constraint — a co-op does legitimately share a big room.
 - **Three table-level traps worth remembering** (all three bit this session): a new table with RLS and policies but **no `GRANT`** fails `42501` for everyone, because privileges are checked before RLS; a `SECURITY DEFINER` function with a null `proacl` is `EXECUTE` to `PUBLIC`, which PostgREST publishes at `/rest/v1/rpc/<name>` — the Supabase API is **not** behind the Cloudflare password gate; and **`GRANT ... TO authenticated` is not enough** — every admin-gated edge function bypasses RLS with a service-role client, and this project's default privileges for tables owned by `postgres` (every table created by a migration) never included `service_role`. It silently worked in the browser (as `authenticated`) and silently failed in every server-side call (as `service_role`) for every single table, discovered only when OpenSign's admin check returned a genuine Postgres `permission denied for table profiles` for a database-confirmed active admin. Fixed for good in `20260824100000_restore_service_role_grants.sql`, which both back-grants every existing table and corrects the default privilege for future ones — **a new table only needs `GRANT ... TO authenticated` from here on**, `service_role` now comes free. Run `get_advisors(type: "security")` after adding any of the three.
-- **Admin "Publishing" card** doesn't yet cover calendar events (only news posts) — no admin UI exists to create/edit `events` rows yet, despite the family portal displaying them.
+- ~~**Admin "Publishing" card** did not cover calendar events.~~ **Closed locally 25 Aug:** it is now **News & calendar**, with create/edit/delete support for co-op-wide events. This is not live until the current site bundle is released.
 - **Integrations tab** is notes-only for every service *except OpenSign*, which is genuinely wired. Three edge functions are deployed: `opensign-send` (JWT + admin gated), `opensign-sync` (JWT + admin gated), and `opensign-webhook` (`verify_jwt=false`, fail-closed on a shared secret). The production base URL is set on the `opensign` row.
 
   **Sends go from templates, per family.** `POST /createdocument/:template_id` keeps the signature fields the co-op positioned by hand — the PDF-upload path guesses at them and drops a box on page 1, which is wrong for a ten-page handbook. `requirements.opensign_template_id` is backfilled (`NOWgrVuBcr` handbook, `EmfQUgwGOC` liability waiver). Public `publicsign?templateid=…` links must **not** be used for anything tracked: they carry no link back to a household, which is why Sam's own signature never registered.

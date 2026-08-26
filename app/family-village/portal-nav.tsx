@@ -30,7 +30,7 @@ export default function PortalNav({ current, roles }: { current: PortalKey; role
   return (
     <div className="portal-nav" ref={rootRef}>
       <button type="button" className="portal-nav-trigger" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        {LABELS[current]} workspace <span aria-hidden>▾</span>
+        {LABELS[current]} <span aria-hidden>▾</span>
       </button>
       {open && (
         <div className="portal-nav-menu" role="menu">

@@ -15,9 +15,9 @@ type Assignment = { class_id: string; assignment_role: string; classes: ClassRow
 type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string; avatar_path: string | null };
 type NoteRead = { name: string; read_at: string };
 type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string; author_name: string; reads: NoteRead[] };
-type Handout = { id: string; title: string; storage_path: string; class_id: string | null; created_at: string };
+type Handout = { id: string; title: string; kind: string; storage_path: string; class_id: string | null; created_at: string };
 type PrintRequest = { id: string; title: string; quantity: number; status: string; storage_path: string; created_at: string; class_id: string | null };
-type ClassEvent = { id: string; class_id: string | null; title: string; description: string | null; starts_at: string; location: string | null; requires_prework: boolean };
+type ClassEvent = { id: string; class_id: string | null; title: string; description: string | null; starts_at: string; location: string | null; requires_prework: boolean; audience: string };
 
 async function signOutToEntry() {
   await getSupabaseBrowserClient()?.auth.signOut();
@@ -73,12 +73,13 @@ export default function TeacherWorkspace() {
     const classIds = myClasses.map((row) => row.id);
     if (!classIds.length) return;
 
-    const [{ data: enrollments }, { data: noteRows }, { data: handoutRows }, { data: printRows }, { data: eventRows }] = await Promise.all([
+    const [{ data: enrollments }, { data: noteRows }, { data: handoutRows }, { data: printRows }, { data: eventRows }, { data: villageEventRows }] = await Promise.all([
       supabase.from("enrollments").select("child_id,class_id,children(id,first_name,last_name,avatar_path)").in("class_id", classIds).eq("status", "active"),
       supabase.from("teacher_notes").select("id,body,visibility,created_at,child_id,class_id,author_user_id").in("class_id", classIds).order("created_at", { ascending: false }).limit(60),
-      supabase.from("documents").select("id,title,storage_path,class_id,created_at").in("class_id", classIds).order("created_at", { ascending: false }),
+      supabase.from("documents").select("id,title,kind,storage_path,class_id,created_at").in("class_id", classIds).order("created_at", { ascending: false }),
       supabase.from("print_requests").select("id,title,quantity,status,storage_path,created_at,class_id").eq("requested_by_user_id", uid).is("cleared_at", null).order("created_at", { ascending: false }),
-      supabase.from("events").select("id,class_id,title,description,starts_at,location,requires_prework").in("class_id", classIds).order("starts_at", { ascending: true }),
+      supabase.from("events").select("id,class_id,title,description,starts_at,location,requires_prework,audience").in("class_id", classIds).order("starts_at", { ascending: true }),
+      supabase.from("events").select("id,class_id,title,description,starts_at,location,requires_prework,audience").is("class_id", null).order("starts_at", { ascending: true }),
     ]);
     const rosterRows = ((enrollments ?? []) as unknown as { children: { id: string; first_name: string; last_name: string | null; avatar_path: string | null }; class_id: string }[])
       .map((row) => ({ ...row.children, class_id: row.class_id }));
@@ -110,7 +111,7 @@ export default function TeacherWorkspace() {
 
     setHandouts((handoutRows ?? []) as Handout[]);
     setPrintQueue((printRows ?? []) as PrintRequest[]);
-    setClassEvents((eventRows ?? []) as ClassEvent[]);
+    setClassEvents([...(eventRows ?? []), ...(villageEventRows ?? [])] as ClassEvent[]);
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch once access resolves
@@ -144,14 +145,17 @@ export default function TeacherWorkspace() {
     {classes.length > 0 && <section className="workspace-grid">
       <article className="workspace-nav">
         <a className="active" href="#news">Teaching team news</a>
+        <a href="#calendar">Calendar</a>
         <a href="#classes">Classes</a>
         <a href="#planning">Class dates</a>
-        <a href="#resources">Handouts</a>
+        <a href="#resources">Class files</a>
         <a href="#lounge">Print queue</a>
       </article>
 
       <div className="workspace-main">
         <NewsSection classes={classes} />
+
+        <MonthCalendar events={classEvents} classes={classes} />
 
         {/* One class selection drives the whole page. Every section below is
             scoped to it, so the per-section class dropdowns are gone. */}
@@ -221,6 +225,28 @@ export default function TeacherWorkspace() {
       </div>
     </section>}
   </main>;
+}
+
+function MonthCalendar({ events, classes }: { events: ClassEvent[]; classes: ClassRow[] }) {
+  const now = new Date();
+  const [month, setMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const gridStart = new Date(first);
+  gridStart.setDate(first.getDate() - first.getDay());
+  const days = Array.from({ length: 42 }, (_, index) => { const day = new Date(gridStart); day.setDate(gridStart.getDate() + index); return day; });
+  const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const eventsFor = (day: Date) => events.filter((event) => dateKey(new Date(event.starts_at)) === dateKey(day));
+  const className = (id: string | null) => classes.find((klass) => klass.id === id)?.title;
+  return <section id="calendar" className="teacher-calendar">
+    <div className="teacher-calendar-head"><div><p className="card-kicker">Calendar</p><h2>{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h2></div><div className="row-actions"><button className="ghost" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><button className="ghost" onClick={() => setMonth(new Date(now.getFullYear(), now.getMonth(), 1))}>Today</button><button className="ghost" aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div></div>
+    <div className="month-calendar" role="grid" aria-label={month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}>
+      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <b key={day} role="columnheader">{day}</b>)}
+      {days.map((day) => <div key={day.toISOString()} role="gridcell" className={`${day.getMonth() === month.getMonth() ? "" : "outside"}${dateKey(day) === dateKey(now) ? " today" : ""}`}>
+        <time dateTime={dateKey(day)}>{day.getDate()}</time>
+        {eventsFor(day).map((event) => <span key={event.id} title={[event.title, className(event.class_id), event.location].filter(Boolean).join(" · ")}><strong>{event.title}</strong>{className(event.class_id) && <small>{className(event.class_id)}</small>}</span>)}
+      </div>)}
+    </div>
+  </section>;
 }
 
 /** One student's notes, plus the form to add another. Only rendered on demand. */
@@ -383,6 +409,7 @@ function ResourcesSection({ klass, isLead, userId, handouts, onSaved }: {
   klass: ClassRow; isLead: boolean; userId: string; handouts: Handout[]; onSaved: () => void;
 }) {
   const [title, setTitle] = useState("");
+  const [kind, setKind] = useState("handout");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -395,11 +422,11 @@ function ResourcesSection({ klass, isLead, userId, handouts, onSaved }: {
     const uploaded = await uploadPrivateFile(supabase, "handouts", file);
     if ("error" in uploaded) { setStatus(uploaded.error); setBusy(false); return; }
     const { error } = await supabase.from("documents").insert({
-      class_id: klass.id, kind: "handout", title: title.trim(), storage_path: uploaded.path, uploaded_by_user_id: userId,
+      class_id: klass.id, kind, title: title.trim(), storage_path: uploaded.path, uploaded_by_user_id: userId,
     });
     setBusy(false);
     if (error) { setStatus(error.message); return; }
-    setTitle(""); setFile(null); setStatus("Handout posted.");
+    setTitle(""); setFile(null); setKind("handout"); setStatus("File posted.");
     onSaved();
   }
 
@@ -410,26 +437,27 @@ function ResourcesSection({ klass, isLead, userId, handouts, onSaved }: {
   }
 
   return <section id="resources">
-    <p className="card-kicker">Handouts</p>
-    <h2>Files for {klass.title}.</h2>
+    <p className="card-kicker">Class files</p>
+    <h2>Handouts &amp; curriculum for {klass.title}.</h2>
 
     {isLead ? <form onSubmit={submit} className="portal-form">
       <label><span className="field-caption">Title</span>
         <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Week 4 spelling list" disabled={busy} />
       </label>
+      <label><span className="field-caption">File type</span><select value={kind} onChange={(event) => setKind(event.target.value)} disabled={busy}><option value="handout">Family handout</option><option value="curriculum">Curriculum / teacher resource</option></select></label>
       <label className="file-drop"><span className="field-caption">File</span>
         <input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} />
       </label>
-      <button disabled={busy}>{busy ? "Uploading…" : "Post handout"}</button>
+      <button disabled={busy}>{busy ? "Uploading…" : "Upload class file"}</button>
       <p className="admin-form-status" role="status">{status}</p>
-    </form> : <p className="portal-empty">The lead teacher for {klass.title} posts handouts.</p>}
+    </form> : <p className="portal-empty">The lead teacher for {klass.title} manages class files.</p>}
 
     <div className="portal-stack portal-stack-tight">
       {handouts.map((handout) => <div key={handout.id} className="teacher-class">
-        <div><b>{handout.title}</b><span>{formatDay(handout.created_at)}</span></div>
+        <div><b>{handout.title}</b><span>{handout.kind === "curriculum" ? "Curriculum" : "Handout"} · {formatDay(handout.created_at)}</span></div>
         <button onClick={() => download(handout.storage_path)}>Open</button>
       </div>)}
-      {!handouts.length && <p className="portal-empty">No handouts posted for {klass.title} yet.</p>}
+      {!handouts.length && <p className="portal-empty">No class files posted for {klass.title} yet.</p>}
     </div>
   </section>;
 }
@@ -472,7 +500,7 @@ function PrintSection({ klass, isLead, userId, queue, classes, onSaved }: {
 
     {isLead ? <form onSubmit={submit} className="portal-form">
       <label><span className="field-caption">What is it?</span>
-        <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Friday worksheet packet" disabled={busy} />
+        <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Class worksheet packet" disabled={busy} />
       </label>
       <label><span className="field-caption">Copies needed</span>
         <input required type="number" min={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} disabled={busy} />
@@ -501,7 +529,7 @@ function PrintSection({ klass, isLead, userId, queue, classes, onSaved }: {
         <span className={`status-pill ${item.status}`}>{item.status}</span>
       </div>)}
       {!queue.length && <p className="portal-empty">Nothing in your print queue.</p>}
-      <p className="print-queue-note">The queue empties early on Sunday morning, after co-op day.</p>
+      <p className="print-queue-note">Completed jobs leave the queue during the weekly print-room reset.</p>
     </div>
   </section>;
 }

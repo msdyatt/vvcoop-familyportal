@@ -1,19 +1,23 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
-import { SchoolYear } from "../../../lib/compliance";
-import { ClassBlock, Room, formatBlock, formatBlockTime } from "../../../lib/schedule";
+import { SchoolYear, formatDate } from "../../../lib/compliance";
+import { ClassBlock, Room, WEEKDAYS, formatBlock, formatBlockTime, formatWeekday } from "../../../lib/schedule";
+import { printElement } from "../../../lib/dom";
 import { CollapsibleRecord, EditableSection, Field, GradePicker, formatGrades } from "./admin-ui";
 import EnrollmentPeriods from "./enrollment-periods";
+import DetailModal from "../detail-modal";
 
 type TeacherAssignment = { user_id: string; assignment_role: string; profiles: { display_name: string | null; email: string } | null };
-type Enrollment = { child_id: string; status: string; children: { first_name: string; last_name: string | null } | null };
+type Enrollment = { child_id: string; status: string; children: { first_name: string; last_name: string | null; age_band: string | null; families: { last_name: string | null; display_name: string } | null } | null };
+type AcademicTerm = { id: string; school_year_id: string; label: string; starts_on: string; ends_on: string; sort_order: number };
+type ClassTerm = { class_id: string; term_id: string };
 type ClassRow = {
   id: string; title: string; description: string | null; term: string | null;
   grades: string[]; block_id: string | null; room_id: string | null;
   active: boolean; is_elective: boolean; school_year_id: string | null;
-  teacher_assignments: TeacherAssignment[]; enrollments: Enrollment[];
+  teacher_assignments: TeacherAssignment[]; enrollments: Enrollment[]; term_ids: string[];
 };
 type TeacherOption = { user_id: string; name: string; email: string };
 type ChildOption = { id: string; first_name: string; last_name: string | null; families: { last_name: string | null; display_name: string } | null };
@@ -33,7 +37,10 @@ export default function ClassesTab() {
   const [years, setYears] = useState<SchoolYear[]>([]);
   const [blocks, setBlocks] = useState<ClassBlock[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [yearFilter, setYearFilter] = useState("current");
+  const [classFilter, setClassFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [adding, setAdding] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,15 +49,17 @@ export default function ClassesTab() {
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const [{ data }, { data: teachers }, { data: children }, { data: yearRows }, { data: blockRows }, { data: roomRows }] = await Promise.all([
-      supabase.from("classes").select("id,title,description,term,grades,block_id,room_id,active,is_elective,school_year_id,teacher_assignments(user_id,assignment_role,profiles(display_name,email)),enrollments(child_id,status,children(first_name,last_name))").order("title"),
+    const [{ data }, { data: teachers }, { data: children }, { data: yearRows }, { data: blockRows }, { data: roomRows }, { data: termRows }, { data: classTermRows }] = await Promise.all([
+      supabase.from("classes").select("id,title,description,term,grades,block_id,room_id,active,is_elective,school_year_id,teacher_assignments(user_id,assignment_role,profiles(display_name,email)),enrollments(child_id,status,children(first_name,last_name,age_band,families(last_name,display_name)))").order("title"),
       // The surname lives on the household, not the profile, so it is joined in
       // rather than showing a bare first name on every roster.
       supabase.from("user_roles").select("user_id,profiles(display_name,email)").eq("role", "teacher"),
       supabase.from("children").select("id,first_name,last_name,families(last_name,display_name)").eq("active", true).order("first_name"),
       supabase.from("school_years").select("id,label,starts_on,ends_on,is_current").order("label", { ascending: false }),
-      supabase.from("class_blocks").select("id,label,starts_at,ends_at,sort_order,school_year_id").order("sort_order").order("starts_at"),
+      supabase.from("class_blocks").select("id,label,starts_at,ends_at,sort_order,school_year_id,day_of_week").order("day_of_week").order("sort_order").order("starts_at"),
       supabase.from("rooms").select("id,name,note,active,sort_order").order("sort_order").order("name"),
+      supabase.from("academic_terms").select("id,school_year_id,label,starts_on,ends_on,sort_order").order("sort_order").order("starts_on"),
+      supabase.from("class_terms").select("class_id,term_id"),
     ]);
 
     const teacherRows = (teachers ?? []) as unknown as { user_id: string; profiles: { display_name: string | null; email: string } | null }[];
@@ -60,7 +69,11 @@ export default function ClassesTab() {
     const surnames = new Map(((memberRows ?? []) as unknown as { user_id: string; families: { last_name: string | null } | null }[])
       .map((row) => [row.user_id, row.families?.last_name ?? null]));
 
-    setClasses((data ?? []) as unknown as ClassRow[]);
+    const termLinks = (classTermRows ?? []) as ClassTerm[];
+    setClasses(((data ?? []) as unknown as Omit<ClassRow, "term_ids">[]).map((row) => ({
+      ...row,
+      term_ids: termLinks.filter((link) => link.class_id === row.id).map((link) => link.term_id),
+    })));
     setTeacherOptions(teacherRows.map((row) => ({
       user_id: row.user_id,
       email: row.profiles?.email ?? "",
@@ -70,6 +83,7 @@ export default function ClassesTab() {
     setYears((yearRows ?? []) as SchoolYear[]);
     setBlocks((blockRows ?? []) as ClassBlock[]);
     setRooms((roomRows ?? []) as Room[]);
+    setTerms((termRows ?? []) as AcademicTerm[]);
     setLoading(false);
   }
 
@@ -78,11 +92,24 @@ export default function ClassesTab() {
 
   const currentYear = years.find((year) => year.is_current) ?? null;
 
-  const visible = useMemo(() => {
+  const yearClasses = useMemo(() => {
     if (yearFilter === "all") return classes;
     const wanted = yearFilter === "current" ? currentYear?.id ?? null : yearFilter;
     return classes.filter((row) => row.school_year_id === wanted);
   }, [classes, yearFilter, currentYear]);
+
+  const visible = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return yearClasses.filter((row) => {
+      if (query && !`${row.title} ${row.description ?? ""}`.toLowerCase().includes(query)) return false;
+      const activeEnrollmentCount = row.enrollments.filter((entry) => entry.status === "active").length;
+      if (classFilter === "needs-teachers" && row.teacher_assignments.length >= 2) return false;
+      if (classFilter === "empty" && activeEnrollmentCount > 0) return false;
+      if (classFilter === "elective" && !row.is_elective) return false;
+      if (classFilter === "standard" && row.is_elective) return false;
+      return true;
+    });
+  }, [yearClasses, classFilter, search]);
 
   /**
    * Two active classes in one room at one time.
@@ -90,7 +117,7 @@ export default function ClassesTab() {
    * Not a database constraint: a co-op legitimately shares a big room between a
    * combined class and a quiet table, and refusing the save would be wrong. A
    * warning on the card is enough -- the point is that nobody discovers it on a
-   * Friday morning.
+   * a co-op morning.
    */
   const clashes = useMemo(() => {
     const bySlot = new Map<string, ClassRow[]>();
@@ -108,6 +135,14 @@ export default function ClassesTab() {
     }
     return found;
   }, [visible]);
+
+  const classCounts = useMemo(() => ({
+    all: yearClasses.length,
+    "needs-teachers": yearClasses.filter((row) => row.teacher_assignments.length < 2).length,
+    empty: yearClasses.filter((row) => !row.enrollments.some((entry) => entry.status === "active")).length,
+    elective: yearClasses.filter((row) => row.is_elective).length,
+    standard: yearClasses.filter((row) => !row.is_elective).length,
+  }), [yearClasses]);
 
   async function addClass(event: FormEvent) {
     event.preventDefault();
@@ -130,6 +165,21 @@ export default function ClassesTab() {
       is_elective: row.is_elective, school_year_id: row.school_year_id,
     }).eq("id", row.id);
     if (error) { setStatus(error.message); return; }
+
+    const wanted = row.term_ids;
+    const { data: existingRows, error: existingError } = await supabase.from("class_terms").select("term_id").eq("class_id", row.id);
+    if (existingError) { setStatus(`The class details saved, but its terms could not be checked: ${existingError.message}`); return; }
+    const existing = new Set((existingRows ?? []).map((item) => item.term_id));
+    const add = wanted.filter((termId) => !existing.has(termId));
+    const remove = [...existing].filter((termId) => !wanted.includes(termId));
+    if (add.length) {
+      const added = await supabase.from("class_terms").insert(add.map((termId) => ({ class_id: row.id, term_id: termId })));
+      if (added.error) { setStatus(`The class details saved, but its new terms did not: ${added.error.message}`); return; }
+    }
+    if (remove.length) {
+      const removed = await supabase.from("class_terms").delete().eq("class_id", row.id).in("term_id", remove);
+      if (removed.error) { setStatus(`The class details saved, but its old terms were not removed: ${removed.error.message}`); return; }
+    }
     setStatus(`Saved ${row.title}.`);
     await load();
   }
@@ -183,7 +233,7 @@ export default function ClassesTab() {
         ? <button className="make-current" onClick={() => setAdding(true)}>Add a class</button>
         : <form className="inline-edit" onSubmit={addClass}>
             {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the field only exists after the user pressed Add, so focusing it follows their intent rather than hijacking it */}
-              <input autoFocus value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder="Friday Science" />
+              <input autoFocus value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder="Foundations Science" />
             <button>Add</button>
             <button type="button" className="ghost" onClick={() => { setAdding(false); setNewTitle(""); }}>Cancel</button>
           </form>}
@@ -192,22 +242,51 @@ export default function ClassesTab() {
 
     <p className="admin-form-status" role="status">{status || "Open a class to see its roster and teachers. Nothing is editable until you choose to edit it."}</p>
 
-    <SchoolYears years={years} onSaved={load} onStatus={setStatus} />
+    <div className="summary-filter-cards" aria-label="Class summaries">
+      {([
+        ["all", "All classes"],
+        ["needs-teachers", "Need two teachers"],
+        ["empty", "No students"],
+        ["elective", "Electives"],
+        ["standard", "Standard"],
+      ] as const).map(([key, label]) => <button key={key} className={classFilter === key ? "active" : ""} onClick={() => setClassFilter(key)}>
+        <b>{classCounts[key]}</b><span>{label}</span>
+      </button>)}
+    </div>
 
-    <TimeBlocks blocks={blocks} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
-
-    <Rooms rooms={rooms} onSaved={load} onStatus={setStatus} />
-
-    <EnrollmentPeriods years={years} currentYearId={currentYear?.id ?? null} onStatus={setStatus} />
+    <div className="list-filters">
+      <label><span className="field-caption">Find a class</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title or description" /></label>
+      <label><span className="field-caption">Show</span>
+        <select value={classFilter} onChange={(event) => setClassFilter(event.target.value)}>
+          <option value="all">All classes</option>
+          <option value="needs-teachers">Fewer than two teachers</option>
+          <option value="empty">No students enrolled</option>
+          <option value="elective">Electives</option>
+          <option value="standard">Standard classes</option>
+        </select>
+      </label>
+    </div>
 
     <div className="classes-list">
       {visible.map((row) => <ClassCard key={row.id} row={row} years={years} blocks={blocks} rooms={rooms}
+        terms={terms}
         clash={clashes.get(row.id) ?? null}
         teacherOptions={teacherOptions} childOptions={childOptions}
         onSave={saveClass} onAssignTeacher={assignTeacher} onRemoveTeacher={removeTeacher}
         onEnrollChild={enrollChild} onSetEnrollmentStatus={setEnrollmentStatus} />)}
       {!visible.length && <p className="portal-empty">No classes for that year yet.</p>}
     </div>
+
+    <details className="schedule-settings">
+      <summary><span>Schedule &amp; enrollment settings</span><small>School years, terms, meeting times, rooms, and enrollment windows</small></summary>
+      <div className="schedule-settings-body">
+        <SchoolYears years={years} onSaved={load} onStatus={setStatus} />
+        <AcademicTerms terms={terms} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
+        <TimeBlocks blocks={blocks} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
+        <Rooms rooms={rooms} onSaved={load} onStatus={setStatus} />
+        <EnrollmentPeriods years={years} currentYearId={currentYear?.id ?? null} onStatus={setStatus} />
+      </div>
+    </details>
   </section>;
 }
 
@@ -268,6 +347,105 @@ function SchoolYears({ years, onSaved, onStatus }: { years: SchoolYear[]; onSave
   </div>;
 }
 
+/** Date-bounded quarters, semesters, or custom pieces of a school year. */
+function AcademicTerms({ terms, years, currentYearId, onSaved, onStatus }: {
+  terms: AcademicTerm[]; years: SchoolYear[]; currentYearId: string | null;
+  onSaved: () => void; onStatus: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState("");
+  const [startsOn, setStartsOn] = useState("");
+  const [endsOn, setEndsOn] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function addTerm(event: FormEvent) {
+    event.preventDefault();
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !currentYearId || !label.trim()) return;
+    if (endsOn < startsOn) { onStatus("A term has to end on or after it starts."); return; }
+    setBusy(true);
+    const { error } = await supabase.from("academic_terms").insert({
+      school_year_id: currentYearId,
+      label: label.trim(),
+      starts_on: startsOn,
+      ends_on: endsOn,
+      sort_order: terms.filter((term) => term.school_year_id === currentYearId).length,
+    });
+    setBusy(false);
+    if (error) { onStatus(error.message); return; }
+    onStatus(`Added ${label.trim()}.`);
+    setLabel(""); setStartsOn(""); setEndsOn("");
+    onSaved();
+  }
+
+  async function saveTerm(term: AcademicTerm) {
+    if (term.ends_on < term.starts_on) { onStatus("A term has to end on or after it starts."); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("academic_terms").update({
+      label: term.label.trim(), starts_on: term.starts_on, ends_on: term.ends_on,
+    }).eq("id", term.id);
+    if (error) { onStatus(error.message); return; }
+    onStatus(`Saved ${term.label}.`);
+    onSaved();
+  }
+
+  async function removeTerm(term: AcademicTerm) {
+    if (!confirm(`Delete "${term.label}"? Classes will no longer be assigned to it.`)) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("academic_terms").delete().eq("id", term.id);
+    if (error) { onStatus(error.message); return; }
+    onStatus(`Deleted ${term.label}.`);
+    onSaved();
+  }
+
+  return <div className="record-section school-years">
+    <button className="record-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <span className="record-caret" aria-hidden>{open ? "▾" : "▸"}</span>
+      <span className="record-summary"><b>School-year terms</b></span>
+      <span className="record-meta">{terms.length ? `${terms.length} term${terms.length === 1 ? "" : "s"}` : "none set"}</span>
+    </button>
+    {open && <div className="record-body">
+      <p className="field-note">Create semesters, quarters, or custom date ranges. A class may belong to one or several terms.</p>
+      {terms.map((term) => <AcademicTermRow key={term.id} term={term} yearLabel={years.find((year) => year.id === term.school_year_id)?.label ?? "School year"} onSave={saveTerm} onDelete={removeTerm} />)}
+      {!terms.length && <p className="portal-empty">No terms yet.</p>}
+      <form onSubmit={addTerm} className="portal-form">
+        <label><span className="field-caption">Name</span><input required value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Fall semester" disabled={busy || !currentYearId} /></label>
+        <label><span className="field-caption">Starts</span><input required type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} disabled={busy || !currentYearId} /></label>
+        <label><span className="field-caption">Ends</span><input required type="date" value={endsOn} onChange={(event) => setEndsOn(event.target.value)} disabled={busy || !currentYearId} /></label>
+        <div className="row-actions"><button disabled={busy || !currentYearId}>{busy ? "Adding…" : "Add term"}</button></div>
+        {!currentYearId && <p className="field-note">Choose a current school year first.</p>}
+      </form>
+    </div>}
+  </div>;
+}
+
+function AcademicTermRow({ term, yearLabel, onSave, onDelete }: {
+  term: AcademicTerm; yearLabel: string;
+  onSave: (term: AcademicTerm) => void; onDelete: (term: AcademicTerm) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [local, setLocal] = useState(term);
+  // Local only ever copies the prop when editing starts or is cancelled, not
+  // on every render of the parent's data -- a useEffect keyed on `term` fired
+  // whenever any OTHER term/block/room in the same panel saved (the parent's
+  // load() refetches all three lists as new object references), silently
+  // wiping an in-progress, unsaved edit in this row back to its last-saved
+  // text.
+  function startEditing() { setLocal(term); setEditing(true); }
+  return <div className="child-line term-row">
+    {editing ? <>
+      <input aria-label="Term name" value={local.label} onChange={(event) => setLocal({ ...local, label: event.target.value })} />
+      <input aria-label="Term start" type="date" value={local.starts_on} onChange={(event) => setLocal({ ...local, starts_on: event.target.value })} />
+      <input aria-label="Term end" type="date" value={local.ends_on} onChange={(event) => setLocal({ ...local, ends_on: event.target.value })} />
+    </> : <><b>{term.label}</b><span>{formatDate(term.starts_on)}–{formatDate(term.ends_on)} · {yearLabel}</span></>}
+    <div className="row-actions">
+      {editing ? <><button onClick={() => { onSave(local); setEditing(false); }}>Save</button><button onClick={() => { setLocal(term); setEditing(false); }}>Cancel</button></> : <><button onClick={startEditing}>Edit</button><button className="danger" onClick={() => onDelete(term)}>Delete</button></>}
+    </div>
+  </div>;
+}
+
 /**
  * The co-op day, defined once.
  *
@@ -276,8 +454,8 @@ function SchoolYears({ years, onSaved, onStatus }: { years: SchoolYear[]; onSave
  * it moves together, which is the behaviour anyone would expect and the old
  * free-text field could not give.
  *
- * Blocks are time-of-day only. If the co-op ever meets on more than one weekday,
- * a day-of-week column here is the change to make.
+ * Each block also carries its weekday, so the same school year can support more
+ * than one co-op day without encoding a day name into a free-text label.
  */
 function TimeBlocks({ blocks, years, currentYearId, onSaved, onStatus }: {
   blocks: ClassBlock[]; years: SchoolYear[]; currentYearId: string | null;
@@ -287,6 +465,7 @@ function TimeBlocks({ blocks, years, currentYearId, onSaved, onStatus }: {
   const [label, setLabel] = useState("");
   const [startsAt, setStartsAt] = useState("09:00");
   const [endsAt, setEndsAt] = useState("10:00");
+  const [dayOfWeek, setDayOfWeek] = useState(5);
   const [busy, setBusy] = useState(false);
 
   async function addBlock(event: FormEvent) {
@@ -297,12 +476,26 @@ function TimeBlocks({ blocks, years, currentYearId, onSaved, onStatus }: {
     setBusy(true);
     const { error } = await supabase.from("class_blocks").insert({
       label: label.trim(), starts_at: startsAt, ends_at: endsAt,
-      school_year_id: currentYearId, sort_order: blocks.length,
+      day_of_week: dayOfWeek, school_year_id: currentYearId,
+      sort_order: blocks.filter((block) => block.day_of_week === dayOfWeek).length,
     });
     setBusy(false);
     if (error) { onStatus(error.message); return; }
     onStatus(`Added the ${label.trim()} block.`);
     setLabel("");
+    onSaved();
+  }
+
+  async function saveBlock(block: ClassBlock) {
+    if (block.ends_at <= block.starts_at) { onStatus("A block has to end after it starts."); return; }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("class_blocks").update({
+      label: block.label.trim(), day_of_week: block.day_of_week,
+      starts_at: block.starts_at, ends_at: block.ends_at,
+    }).eq("id", block.id);
+    if (error) { onStatus(error.message); return; }
+    onStatus(`Saved the ${block.label} block.`);
     onSaved();
   }
 
@@ -329,16 +522,15 @@ function TimeBlocks({ blocks, years, currentYearId, onSaved, onStatus }: {
         A class takes its meeting time from the block it sits in. Two classes in the same block run at the same
         time, so a child can only be enrolled in one of them.
       </p>
-      {blocks.map((block) => <div className="child-line" key={block.id}>
-        <b>{block.label}</b>
-        <span>{formatBlockTime(block)}{block.school_year_id ? ` · ${years.find((year) => year.id === block.school_year_id)?.label ?? ""}` : " · every year"}</span>
-        <div className="row-actions">
-          <button className="danger" onClick={() => removeBlock(block)}>Delete</button>
-        </div>
-      </div>)}
+      {blocks.map((block) => <TimeBlockRow key={block.id} block={block} yearLabel={block.school_year_id ? years.find((year) => year.id === block.school_year_id)?.label ?? "" : "Every year"} onSave={saveBlock} onDelete={removeBlock} />)}
       {!blocks.length && <p className="portal-empty">No time blocks yet. Add one before scheduling classes.</p>}
 
       <form onSubmit={addBlock} className="portal-form">
+        <label><span className="field-caption">Day</span>
+          <select value={dayOfWeek} onChange={(event) => setDayOfWeek(Number(event.target.value))} disabled={busy}>
+            {WEEKDAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}
+          </select>
+        </label>
         <label><span className="field-caption">Name</span>
           <input required value={label} onChange={(event) => setLabel(event.target.value)} placeholder="First period" disabled={busy} />
         </label>
@@ -351,6 +543,31 @@ function TimeBlocks({ blocks, years, currentYearId, onSaved, onStatus }: {
         <div className="row-actions"><button disabled={busy}>{busy ? "Adding…" : "Add block"}</button></div>
       </form>
     </div>}
+  </div>;
+}
+
+function TimeBlockRow({ block, yearLabel, onSave, onDelete }: {
+  block: ClassBlock; yearLabel: string;
+  onSave: (block: ClassBlock) => void; onDelete: (block: ClassBlock) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [local, setLocal] = useState(block);
+  // See AcademicTermRow -- local only copies the prop on entering/cancelling
+  // edit, never on every parent reload, so an unrelated save elsewhere in the
+  // same panel can't silently wipe an in-progress edit here.
+  function startEditing() { setLocal(block); setEditing(true); }
+  return <div className="child-line term-row">
+    {editing ? <>
+      <select aria-label="Meeting day" value={local.day_of_week} onChange={(event) => setLocal({ ...local, day_of_week: Number(event.target.value) })}>
+        {WEEKDAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}
+      </select>
+      <input aria-label="Block name" value={local.label} onChange={(event) => setLocal({ ...local, label: event.target.value })} />
+      <input aria-label="Block start" type="time" value={local.starts_at.slice(0, 5)} onChange={(event) => setLocal({ ...local, starts_at: event.target.value })} />
+      <input aria-label="Block end" type="time" value={local.ends_at.slice(0, 5)} onChange={(event) => setLocal({ ...local, ends_at: event.target.value })} />
+    </> : <><b>{formatWeekday(block.day_of_week)} · {block.label}</b><span>{formatBlockTime(block)} · {yearLabel}</span></>}
+    <div className="row-actions">
+      {editing ? <><button onClick={() => { onSave(local); setEditing(false); }}>Save</button><button onClick={() => { setLocal(block); setEditing(false); }}>Cancel</button></> : <><button onClick={startEditing}>Edit</button><button className="danger" onClick={() => onDelete(block)}>Delete</button></>}
+    </div>
   </div>;
 }
 
@@ -390,6 +607,15 @@ function Rooms({ rooms, onSaved, onStatus }: { rooms: Room[]; onSaved: () => voi
     onSaved();
   }
 
+  async function saveRoom(room: Room) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !room.name.trim()) return;
+    const { error } = await supabase.from("rooms").update({ name: room.name.trim(), note: room.note?.trim() || null }).eq("id", room.id);
+    if (error) { onStatus(error.message.includes("duplicate") ? `There is already a room called "${room.name.trim()}".` : error.message); return; }
+    onStatus(`Saved ${room.name.trim()}.`);
+    onSaved();
+  }
+
   const live = rooms.filter((room) => room.active).length;
 
   return <div className="record-section school-years">
@@ -402,13 +628,7 @@ function Rooms({ rooms, onSaved, onStatus }: { rooms: Room[]; onSaved: () => voi
       <p className="field-note">
         Retiring a room keeps it on the classes that already use it but takes it out of the picker.
       </p>
-      {rooms.map((room) => <div className="child-line" key={room.id}>
-        <b>{room.name}</b>
-        <span>{room.active ? "In use" : "Retired"}</span>
-        <div className="row-actions">
-          <button onClick={() => toggleActive(room)}>{room.active ? "Retire" : "Bring back"}</button>
-        </div>
-      </div>)}
+      {rooms.map((room) => <RoomRow key={room.id} room={room} onSave={saveRoom} onToggle={toggleActive} />)}
       {!rooms.length && <p className="portal-empty">No rooms yet.</p>}
 
       <form onSubmit={addRoom} className="portal-form">
@@ -421,8 +641,25 @@ function Rooms({ rooms, onSaved, onStatus }: { rooms: Room[]; onSaved: () => voi
   </div>;
 }
 
-function ClassCard({ row, years, blocks, rooms, clash, teacherOptions, childOptions, onSave, onAssignTeacher, onRemoveTeacher, onEnrollChild, onSetEnrollmentStatus }: {
-  row: ClassRow; years: SchoolYear[]; blocks: ClassBlock[]; rooms: Room[]; clash: string | null;
+function RoomRow({ room, onSave, onToggle }: { room: Room; onSave: (room: Room) => void; onToggle: (room: Room) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [local, setLocal] = useState(room);
+  // See AcademicTermRow -- local only copies the prop on entering/cancelling
+  // edit, never on every parent reload.
+  function startEditing() { setLocal(room); setEditing(true); }
+  return <div className="child-line term-row">
+    {editing ? <>
+      <input aria-label="Room name" value={local.name} onChange={(event) => setLocal({ ...local, name: event.target.value })} />
+      <input aria-label="Room note" value={local.note ?? ""} onChange={(event) => setLocal({ ...local, note: event.target.value })} placeholder="Optional note" />
+    </> : <><b>{room.name}</b><span>{room.note ? `${room.note} · ` : ""}{room.active ? "In use" : "Retired"}</span></>}
+    <div className="row-actions">
+      {editing ? <><button onClick={() => { onSave(local); setEditing(false); }}>Save</button><button onClick={() => { setLocal(room); setEditing(false); }}>Cancel</button></> : <><button onClick={startEditing}>Edit</button><button onClick={() => onToggle(room)}>{room.active ? "Retire" : "Bring back"}</button></>}
+    </div>
+  </div>;
+}
+
+function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, childOptions, onSave, onAssignTeacher, onRemoveTeacher, onEnrollChild, onSetEnrollmentStatus }: {
+  row: ClassRow; years: SchoolYear[]; blocks: ClassBlock[]; rooms: Room[]; terms: AcademicTerm[]; clash: string | null;
   teacherOptions: TeacherOption[]; childOptions: ChildOption[];
   onSave: (row: ClassRow) => void;
   onAssignTeacher: (classId: string, userId: string, role: string) => void;
@@ -434,6 +671,7 @@ function ClassCard({ row, years, blocks, rooms, clash, teacherOptions, childOpti
   const [teacherPick, setTeacherPick] = useState("");
   const [teacherRole, setTeacherRole] = useState("lead");
   const [childPick, setChildPick] = useState("");
+  const [rosterOpen, setRosterOpen] = useState(false);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- resync local edit buffer when parent data reloads
   useEffect(() => { setLocal(row); }, [row]);
@@ -441,17 +679,21 @@ function ClassCard({ row, years, blocks, rooms, clash, teacherOptions, childOpti
   const active = row.enrollments.filter((entry) => entry.status === "active");
   const block = blocks.find((option) => option.id === row.block_id) ?? null;
   const room = rooms.find((option) => option.id === row.room_id) ?? null;
+  const classTerms = terms.filter((term) => row.term_ids.includes(term.id));
+  const availableTerms = terms.filter((term) => !local.school_year_id || term.school_year_id === local.school_year_id);
+  const availableBlocks = blocks.filter((option) => !option.school_year_id || !local.school_year_id || option.school_year_id === local.school_year_id);
   const teacherName = (assignment: TeacherAssignment) =>
     teacherOptions.find((option) => option.user_id === assignment.user_id)?.name
       ?? assignment.profiles?.display_name
       ?? assignment.profiles?.email
       ?? "Unnamed";
 
-  return <CollapsibleRecord
+  return <><CollapsibleRecord
     summary={<b>{row.title}</b>}
     meta={[
       block ? formatBlock(block) : "No time block",
       room?.name,
+      classTerms.map((term) => term.label).join(", ") || null,
       formatGrades(row.grades),
       `${active.length} enrolled`,
       row.is_elective ? "elective" : null,
@@ -472,7 +714,7 @@ function ClassCard({ row, years, blocks, rooms, clash, teacherOptions, childOpti
         <Field label="Meets" value={formatBlock(block) || "No time block"} editing={editing}>
           <select value={local.block_id ?? ""} onChange={(event) => setLocal({ ...local, block_id: event.target.value || null })}>
             <option value="">No time block</option>
-            {blocks.map((option) => <option key={option.id} value={option.id}>{formatBlock(option)}</option>)}
+            {availableBlocks.map((option) => <option key={option.id} value={option.id}>{formatBlock(option)}</option>)}
           </select>
         </Field>
         <Field label="Room" value={room?.name ?? "No room"} editing={editing}>
@@ -486,10 +728,31 @@ function ClassCard({ row, years, blocks, rooms, clash, teacherOptions, childOpti
           <GradePicker selected={local.grades ?? []} onChange={(grades) => setLocal({ ...local, grades })} />
         </Field>
         <Field label="School year" value={years.find((year) => year.id === row.school_year_id)?.label ?? "Unassigned"} editing={editing}>
-          <select value={local.school_year_id ?? ""} onChange={(event) => setLocal({ ...local, school_year_id: event.target.value || null })}>
+          <select value={local.school_year_id ?? ""} onChange={(event) => {
+            const schoolYearId = event.target.value || null;
+            const keepBlock = blocks.find((option) => option.id === local.block_id);
+            setLocal({
+              ...local,
+              school_year_id: schoolYearId,
+              term_ids: local.term_ids.filter((termId) => terms.some((term) => term.id === termId && (!schoolYearId || term.school_year_id === schoolYearId))),
+              block_id: keepBlock && keepBlock.school_year_id && schoolYearId && keepBlock.school_year_id !== schoolYearId ? null : local.block_id,
+            });
+          }}>
             <option value="">Unassigned</option>
             {years.map((year) => <option key={year.id} value={year.id}>{year.label}</option>)}
           </select>
+        </Field>
+        <Field label="Terms" value={classTerms.map((term) => term.label).join(", ") || "All year / not assigned"} editing={editing}>
+          <div className="term-picker">
+            {availableTerms.map((term) => <label key={term.id}>
+              <input type="checkbox" checked={local.term_ids.includes(term.id)} onChange={(event) => setLocal({
+                ...local,
+                term_ids: event.target.checked ? [...local.term_ids, term.id] : local.term_ids.filter((id) => id !== term.id),
+              })} />
+              <span>{term.label}<small>{formatDate(term.starts_on)}–{formatDate(term.ends_on)}</small></span>
+            </label>)}
+            {!availableTerms.length && <span className="field-note">Create school-year terms in Schedule &amp; enrollment settings first.</span>}
+          </div>
         </Field>
         <Field label="Description" value={row.description} editing={editing}>
           <input value={local.description ?? ""} onChange={(event) => setLocal({ ...local, description: event.target.value })} />
@@ -530,7 +793,7 @@ function ClassCard({ row, years, blocks, rooms, clash, teacherOptions, childOpti
     </div>
 
     <div className="record-section">
-      <p className="card-kicker">Roster</p>
+      <div className="editable-head"><p className="card-kicker">Roster</p><button onClick={() => setRosterOpen(true)}>Printable roster</button></div>
       {active.map((entry) => <div className="child-line" key={entry.child_id}>
         <b>{entry.children?.first_name} {entry.children?.last_name}</b>
         <span>enrolled</span>
@@ -548,5 +811,31 @@ function ClassCard({ row, years, blocks, rooms, clash, teacherOptions, childOpti
         <button disabled={!childPick} onClick={() => { onEnrollChild(row.id, childPick); setChildPick(""); }}>Enroll</button>
       </div>
     </div>
-  </CollapsibleRecord>;
+  </CollapsibleRecord>
+  {rosterOpen && <DetailModal title={`${row.title} roster`} onClose={() => setRosterOpen(false)}>
+    <RosterReport row={row} block={block} room={room} teacherName={teacherName} />
+  </DetailModal>}
+  </>;
+}
+
+function RosterReport({ row, block, room, teacherName }: {
+  row: ClassRow; block: ClassBlock | null; room: Room | null;
+  teacherName: (assignment: TeacherAssignment) => string;
+}) {
+  const reportRef = useRef<HTMLElement>(null);
+  const active = row.enrollments.filter((entry) => entry.status === "active")
+    .sort((a, b) => `${a.children?.last_name ?? ""}${a.children?.first_name ?? ""}`.localeCompare(`${b.children?.last_name ?? ""}${b.children?.first_name ?? ""}`));
+
+  return <div className="roster-report-shell">
+    <div className="roster-report-actions no-print"><p>{active.length} enrolled student{active.length === 1 ? "" : "s"}</p><button onClick={() => printElement(reportRef.current)}>Print roster</button></div>
+    <section ref={reportRef} className="roster-print-sheet">
+      <div className="roster-print-head"><div><p>VERITAS VILLAGE</p><h2>{row.title}</h2></div><span>{block ? formatBlock(block) : "Time to be announced"}<br/>{room?.name ?? "Room to be announced"}</span></div>
+      <dl className="roster-print-meta"><div><dt>Teaching team</dt><dd>{row.teacher_assignments.length ? row.teacher_assignments.map((assignment) => `${teacherName(assignment)} (${assignment.assignment_role})`).join(", ") : "Not assigned"}</dd></div><div><dt>Grades</dt><dd>{formatGrades(row.grades)}</dd></div></dl>
+      <table>
+        <thead><tr><th>#</th><th>Student</th><th>Grade</th><th>Household</th><th>Attendance / notes</th></tr></thead>
+        <tbody>{active.map((entry, index) => <tr key={entry.child_id}><td>{index + 1}</td><td>{entry.children?.first_name} {entry.children?.last_name}</td><td>{entry.children?.age_band ?? "—"}</td><td>{entry.children?.families?.last_name ?? entry.children?.families?.display_name ?? "—"}</td><td /></tr>)}</tbody>
+      </table>
+      {!active.length && <p className="portal-empty">No students are currently enrolled.</p>}
+    </section>
+  </div>;
 }

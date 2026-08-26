@@ -17,7 +17,7 @@ export default function FamilyVillagePreview() {
       <div className="preview-banner"><b>This is a privacy-safe preview.</b> Real names, notes, photographs, and paperwork will appear only after secure sign-in and administrative approval.</div>
 
       <section id="home" className="dashboard-grid">
-        <article className="dashboard-card welcome-card"><p className="card-kicker">This week</p><h2>Ready for Friday.</h2><p>Your family’s next co-op day, current classes, open assignments, and reminders will gather here.</p><div className="friday-row"><time>9:45</time><span>Arrival + setup</span><time>10:00</time><span>History begins</span></div></article>
+        <article className="dashboard-card welcome-card"><p className="card-kicker">This week</p><h2>Ready for co-op.</h2><p>Your family’s next gathering, current classes, open assignments, and reminders will gather here.</p><div className="friday-row"><time>9:45</time><span>Arrival + setup</span><time>10:00</time><span>History begins</span></div></article>
         <article className="dashboard-card action-card"><p className="card-kicker">Family checklist</p><h2>Nothing needs attention.</h2><p>Forms, unread notes, supply reminders, and upcoming deadlines will appear here.</p><span className="empty-pill">All caught up</span></article>
       </section>
 

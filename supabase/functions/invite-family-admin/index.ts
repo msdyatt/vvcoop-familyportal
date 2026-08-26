@@ -30,7 +30,7 @@ export default {
     const adminName = body?.adminName?.trim();
     if (!email || !/^\S+@\S+\.\S+$/.test(email) || !familyName || !adminName) return json({ error: "Name, family name, and a valid email are required." }, 400);
 
-    const redirectTo = "https://veritas-village-coop.msdyatt.chatgpt.site/family-village/accept-invite";
+    const redirectTo = "https://family.veritasvillage.org/family-village/accept-invite";
     const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, { redirectTo, data: { display_name: adminName, family_name: familyName, invited_by: user.id, note: body?.note?.trim() || "" } });
     if (inviteError || !invited.user) return json({ error: inviteError?.message ?? "The invitation could not be sent." }, 400);
 

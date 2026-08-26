@@ -54,6 +54,15 @@ export type SchoolYear = {
   is_current: boolean;
 };
 
+/**
+ * A household's currently-active adults -- excludes members an administrator
+ * has removed, so a former member's status doesn't keep counting toward
+ * teaching credit or the displayed adult count after they're gone.
+ */
+export function activeAdults<T extends { profiles: { status: string } | null }>(members: T[]): T[] {
+  return members.filter((member) => member.profiles?.status !== "removed");
+}
+
 /** `waived` counts as settled -- an administrator has decided it doesn't apply. */
 export function isSettled(status: ComplianceStatus) {
   return status === "complete" || status === "waived";

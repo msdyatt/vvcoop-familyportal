@@ -11,9 +11,10 @@ import IntegrationsTab from "./integrations-tab";
 import ActivityTab from "./activity-tab";
 import ComplianceTab from "./compliance-tab";
 import AdminDashboard from "./dashboard";
+import ReportsTab from "./reports-tab";
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-type Tab = "dashboard" | "invitations" | "families" | "classes" | "compliance" | "news" | "activity" | "integrations";
+type Tab = "dashboard" | "invitations" | "families" | "classes" | "compliance" | "news" | "reports" | "activity" | "integrations";
 
 async function signOutToEntry() {
   await getSupabaseBrowserClient()?.auth.signOut();
@@ -35,16 +36,22 @@ export default function AdminWorkspace() {
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private administrator workspace</p><h1>Administrator access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
-    <nav className="admin-tabs">
+    <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
+      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="compliance">Compliance</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="integrations">Integrations</option>
+    </select></label>
+    <div className="admin-workspace-layout">
+    <nav className="admin-tabs" aria-label="Administration sections">
       <button className={tab === "dashboard" ? "active" : ""} onClick={() => setTab("dashboard")}>Dashboard</button>
       <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}>Invitations</button>
       <button className={tab === "families" ? "active" : ""} onClick={() => setTab("families")}>Families</button>
       <button className={tab === "classes" ? "active" : ""} onClick={() => setTab("classes")}>Classes</button>
       <button className={tab === "compliance" ? "active" : ""} onClick={() => setTab("compliance")}>Compliance</button>
-      <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>Village news</button>
+      <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News &amp; calendar</button>
+      <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
       <button className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}>Activity</button>
       <button className={tab === "integrations" ? "active" : ""} onClick={() => setTab("integrations")}>Integrations</button>
     </nav>
+    <div className="admin-workspace-main">
 
     {tab === "dashboard" && <AdminDashboard onNavigate={setTab} />}
 
@@ -57,7 +64,10 @@ export default function AdminWorkspace() {
     {tab === "classes" && <ClassesTab />}
     {tab === "compliance" && <ComplianceTab actorUserId={userId} />}
     {tab === "news" && <NewsTab actorUserId={userId} />}
+    {tab === "reports" && <ReportsTab />}
     {tab === "activity" && <ActivityTab />}
     {tab === "integrations" && <IntegrationsTab actorUserId={userId} />}
+    </div>
+    </div>
   </main>;
 }

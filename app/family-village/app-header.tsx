@@ -7,12 +7,15 @@ import { useOutsideClick } from "../../lib/use-outside-click";
 import PortalNav from "./portal-nav";
 import DetailModal from "./detail-modal";
 import AccountSettings from "./account-settings";
+import Avatar from "./avatar";
+import { getSignedFileUrl } from "../../lib/storage";
 
 type PortalKey = "home" | "admin" | "teacher";
 
 export default function AppHeader({ current, roles, title, subtitle }: { current: PortalKey; roles: string[]; title: string; subtitle?: string }) {
   const [email, setEmail] = useState("");
   const [initial, setInitial] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -22,11 +25,12 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
     if (!supabase) return;
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
-    const { data: profile } = await supabase.from("profiles").select("display_name,email").eq("id", data.user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("display_name,email,avatar_path").eq("id", data.user.id).single();
     const resolvedEmail = profile?.email || data.user.email || "";
     const name = profile?.display_name || resolvedEmail;
     setEmail(resolvedEmail);
     setInitial(name.slice(0, 1).toUpperCase());
+    setAvatarUrl(profile?.avatar_path ? await getSignedFileUrl(supabase, profile.avatar_path) : null);
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
@@ -58,7 +62,10 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
       <div className="app-header-actions">
         <PortalNav current={current} roles={roles} />
         <div className="account-menu" ref={menuRef}>
-          <button type="button" className="account-avatar" onClick={() => setMenuOpen((value) => !value)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label="Account menu">{initial || "…"}</button>
+          <button type="button" className="account-avatar-button" onClick={() => setMenuOpen((value) => !value)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label="Account menu">
+            <Avatar url={avatarUrl} label={initial || "…"} size="sm" />
+            <span className="account-avatar-detail" aria-hidden="true" />
+          </button>
           {menuOpen && <div className="account-dropdown" role="menu">
             <button role="menuitem" onClick={() => { setAccountOpen(true); setMenuOpen(false); }}>Account &amp; security</button>
             <button role="menuitem" onClick={signOut}>Sign out</button>
@@ -67,7 +74,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
       </div>
     </header>
     {accountOpen && <DetailModal title="Account & security" onClose={() => setAccountOpen(false)}>
-      <AccountSettings email={email} onSignOut={signOut} />
+      <AccountSettings email={email} onSignOut={signOut} onProfileUpdated={loadProfile} />
     </DetailModal>}
   </>;
 }

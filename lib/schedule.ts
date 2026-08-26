@@ -2,7 +2,7 @@
  * How a class says when and where it meets.
  *
  * The time used to be free text on each class, which meant it could say "9",
- * "Fridays 11:00" or nothing at all, and two classes in the same slot had no way
+ * "Friday 11:00" or nothing at all, and two classes in the same slot had no way
  * to know they were in the same slot. Time now comes from a block -- a named
  * period of the co-op day, defined once with a real start and end -- so every
  * class in a block reports the same time by construction, and a clash is
@@ -17,6 +17,8 @@ export type ClassBlock = {
   ends_at: string;
   sort_order: number;
   school_year_id: string | null;
+  /** Postgres day number: Sunday 0 through Saturday 6. */
+  day_of_week: number;
 };
 
 export type Room = {
@@ -29,7 +31,7 @@ export type Room = {
 
 /** What a class embeds when it needs to show its schedule. */
 export type ClassSchedule = {
-  class_blocks: Pick<ClassBlock, "label" | "starts_at" | "ends_at"> | null;
+  class_blocks: Pick<ClassBlock, "label" | "starts_at" | "ends_at" | "day_of_week"> | null;
   rooms: Pick<Room, "name"> | null;
 };
 
@@ -62,11 +64,18 @@ export function formatBlockTime(block: Pick<ClassBlock, "starts_at" | "ends_at">
   return startSuffix === endSuffix ? `${startClock} – ${end}` : `${start} – ${end}`;
 }
 
-/** "Block A · 9:00 – 10:15 AM" for a picker or a heading. */
-export function formatBlock(block: Pick<ClassBlock, "label" | "starts_at" | "ends_at"> | null | undefined) {
+export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
+export function formatWeekday(day: number | null | undefined) {
+  return typeof day === "number" && day >= 0 && day < WEEKDAYS.length ? WEEKDAYS[day] : "Day not set";
+}
+
+/** "Friday · Block A · 9:00 – 10:15 AM" for a picker or heading. */
+export function formatBlock(block: Pick<ClassBlock, "label" | "starts_at" | "ends_at" | "day_of_week"> | null | undefined) {
   if (!block) return "";
   const time = formatBlockTime(block);
-  return time ? `${block.label} · ${time}` : block.label;
+  const label = [formatWeekday(block.day_of_week), block.label].filter(Boolean).join(" · ");
+  return time ? `${label} · ${time}` : label;
 }
 
 /**
@@ -81,4 +90,4 @@ export function describeSchedule(row: Partial<ClassSchedule>, fallback = "Schedu
 }
 
 /** The columns every schedule-aware select needs. Kept here so they cannot drift. */
-export const SCHEDULE_SELECT = "class_blocks(label,starts_at,ends_at),rooms(name)";
+export const SCHEDULE_SELECT = "class_blocks(label,starts_at,ends_at,day_of_week),rooms(name)";

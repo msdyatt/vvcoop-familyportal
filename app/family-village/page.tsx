@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import SignInPanel from "./sign-in-panel";
 
 export const metadata = {
@@ -9,7 +8,7 @@ export const metadata = {
 
 export default function FamilyVillageSignIn() {
   return <main className="portal-entry">
-    <Link className="portal-back" href="/">← Return to Veritas Village</Link>
+    <a className="portal-back" href="https://veritasvillage.org/">← Back to homepage</a>
     <section className="portal-entry-card">
       <div className="portal-entry-brand"><Image src="/brand/lockup-horizontal-navy.png" alt="Veritas Village" width={900} height={310} priority /></div>
       <p className="eyebrow">Invitation-only family portal</p>
@@ -18,10 +17,5 @@ export default function FamilyVillageSignIn() {
       <SignInPanel />
       <a className="preview-link" href="/family-village/preview">Preview the family experience →</a>
     </section>
-    <aside className="portal-entry-aside">
-      <p className="eyebrow">A private place for</p>
-      <ol><li><b>Families</b><span>Children, classes, assignments, notes, forms, and photos.</span></li><li><b>Teachers</b><span>Class rosters, resources, assignments, and family-visible notes.</span></li><li><b>Administrators</b><span>Invitations, roles, enrollment, publishing, and document records.</span></li></ol>
-      <p className="privacy-promise">No family receives access until an administrator connects the account to the correct household and children.</p>
-    </aside>
   </main>;
 }

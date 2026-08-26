@@ -112,22 +112,21 @@ export default function DuesImport({ families, rows, requirements, actorUserId, 
     const headers = table[0].map((header) => header.trim());
     const lower = headers.map((header) => header.toLowerCase());
     const nameCol = findColumn(lower, NAME_KEYS);
+    const emailCol = findColumn(lower, EMAIL_KEYS);
     const amountCol = findColumn(lower, AMOUNT_KEYS);
 
-    if (nameCol === -1 || amountCol === -1) {
+    if ((nameCol === -1 && emailCol === -1) || amountCol === -1) {
       setProblem(
-        `Could not find a family column and an amount column. Found: ${headers.join(", ") || "nothing"}. ` +
-        `Expected one of ${NAME_KEYS.join(" / ")} and one of ${AMOUNT_KEYS.join(" / ")}.`,
+        `Could not find a payer name or email column and an amount column. Found: ${headers.join(", ") || "nothing"}. ` +
+        `Expected a name or email column and one of ${AMOUNT_KEYS.join(" / ")}.`,
       );
       return;
     }
 
     const refCol = findColumn(lower, REF_KEYS);
     const dateCol = findColumn(lower, DATE_KEYS);
-    const emailCol = findColumn(lower, EMAIL_KEYS);
-
     setParsed(table.slice(1).map((cells, index) => {
-      const rawName = (cells[nameCol] ?? "").trim();
+      const rawName = nameCol >= 0 ? (cells[nameCol] ?? "").trim() : "";
       const rawEmail = emailCol >= 0 ? (cells[emailCol] ?? "").trim() : "";
       const familyId = matchFamily(rawEmail, rawName, families);
       const amount = money(cells[amountCol] ?? "");
@@ -147,35 +146,46 @@ export default function DuesImport({ families, rows, requirements, actorUserId, 
   async function apply() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !parsed || !requirementId) return;
-    const usable = parsed.filter((row) => row.familyId && row.amount > 0);
+    const usable = parsed.filter((row): row is ParsedRow & { familyId: string } => !!row.familyId && row.amount > 0);
     if (!usable.length) { onStatus("Nothing in that file could be matched to a household."); return; }
+    const grouped = new Map<string, typeof usable>();
+    usable.forEach((row) => grouped.set(row.familyId, [...(grouped.get(row.familyId) ?? []), row]));
     setBusy(true);
 
-    let applied = 0;
-    for (const row of usable) {
-      const existing = rows.find((entry) => entry.requirement_id === requirementId && entry.family_id === row.familyId);
+    const results = await Promise.all([...grouped].map(([familyId, payments]) => {
+      const existing = rows.find((entry) => entry.requirement_id === requirementId && entry.family_id === familyId);
+      const paidOn = payments.map((row) => row.paidOn).find((value) => value && !Number.isNaN(new Date(value).getTime()));
       const payload = {
         status: "complete",
-        amount_paid: row.amount,
-        paid_at: row.paidOn ? new Date(row.paidOn).toISOString() : new Date().toISOString(),
+        amount_paid: payments.reduce((total, row) => total + row.amount, 0),
+        paid_at: paidOn ? new Date(paidOn).toISOString() : new Date().toISOString(),
         payment_method: "Crowded",
-        payment_reference: row.reference,
+        payment_reference: payments.map((row) => row.reference).filter(Boolean).join(", ") || null,
         updated_by: actorUserId,
       };
-      const result = existing
-        ? await supabase.from("family_requirements").update(payload).eq("id", existing.id)
-        : await supabase.from("family_requirements").insert({ requirement_id: requirementId, family_id: row.familyId, ...payload });
-      if (!result.error) applied += 1;
-    }
+      return existing
+        ? supabase.from("family_requirements").update(payload).eq("id", existing.id)
+        : supabase.from("family_requirements").insert({ requirement_id: requirementId, family_id: familyId, ...payload });
+    }));
+    const applied = results.filter((result) => !result.error).length;
 
     setBusy(false);
     setParsed(null);
-    onStatus(`Recorded ${applied} payment${applied === 1 ? "" : "s"} from the file.`);
+    onStatus(`Recorded payments for ${applied} famil${applied === 1 ? "y" : "ies"} from the file.`);
     await onSaved();
   }
 
   const matched = parsed?.filter((row) => row.familyId && row.amount > 0).length ?? 0;
+  const matchedFamilies = new Set(parsed?.filter((row) => row.familyId && row.amount > 0).map((row) => row.familyId) ?? []).size;
   const skipped = (parsed?.length ?? 0) - matched;
+
+  function matchRow(line: number, familyId: string) {
+    setParsed((rows) => rows?.map((row) => row.line === line ? {
+      ...row,
+      familyId: familyId || null,
+      note: !familyId ? "No matching household" : row.amount <= 0 ? "Amount is zero" : "",
+    } : row) ?? null);
+  }
 
   return <div className="record-section school-years">
     <button className="record-head" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -218,8 +228,11 @@ export default function DuesImport({ families, rows, requirements, actorUserId, 
             <tbody>
               {parsed.map((row) => <tr key={row.line} className={row.note ? "import-skip" : ""}>
                 <td className="num">{row.line}</td>
-                <td>{row.rawName || <em>blank</em>}{row.rawEmail ? <small className="field-note">{row.rawEmail}</small> : null}</td>
-                <td>{row.familyId ? families.find((family) => family.id === row.familyId)?.name : <em>unmatched</em>}</td>
+                <td><span className="import-payer"><b>{row.rawName || "No payer name"}</b>{row.rawEmail ? <small>{row.rawEmail}</small> : null}</span></td>
+                <td><select aria-label={`Household for line ${row.line}`} value={row.familyId ?? ""} onChange={(event) => matchRow(row.line, event.target.value)}>
+                  <option value="">Unmatched</option>
+                  {families.map((family) => <option key={family.id} value={family.id}>{family.name}</option>)}
+                </select></td>
                 <td className="num">{formatMoney(row.amount)}</td>
                 <td>{row.note || "Will be recorded"}</td>
               </tr>)}
@@ -228,7 +241,7 @@ export default function DuesImport({ families, rows, requirements, actorUserId, 
         </div>
         <div className="row-actions">
           <button disabled={busy || !requirementId || !matched} onClick={apply}>
-            {busy ? "Recording…" : `Record ${matched} payment${matched === 1 ? "" : "s"}`}
+            {busy ? "Recording…" : `Record payments for ${matchedFamilies} famil${matchedFamilies === 1 ? "y" : "ies"}`}
           </button>
           <button className="ghost" disabled={busy} onClick={() => setParsed(null)}>Discard</button>
         </div>

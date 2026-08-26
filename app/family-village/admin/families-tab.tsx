@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
 import { CollapsibleRecord, EditableSection, Field, GRADES } from "./admin-ui";
 import FamilyDocuments from "./family-documents";
-import { FamilyRequirement, Requirement, isSettled, statusLabel, statusTone } from "../../../lib/compliance";
+import { FamilyRequirement, Requirement, activeAdults, isSettled, statusLabel, statusTone } from "../../../lib/compliance";
 
 type Child = {
   id: string; first_name: string; last_name: string | null; last_initial: string | null;
   age_band: string | null; birthdate: string | null; age_band_override: boolean;
   active: boolean; last_name_override: boolean; avatar_path: string | null;
+  enrollments: { class_id: string; status: string }[];
 };
 type Member = { user_id: string; relationship: string | null; profiles: { email: string; display_name: string | null; status: string; phone: string | null } | null };
 type Family = { id: string; display_name: string; last_name: string | null; children: Child[]; family_members: Member[] };
 type ComplianceRow = FamilyRequirement & { requirements: Requirement | null };
+type ScheduleClass = { id: string; block_id: string | null; grades: string[]; is_elective: boolean; active: boolean };
+type TeacherLink = { user_id: string; class_id: string };
 
 const ASSIGNABLE_ROLES = ["teacher", "admin"];
 
@@ -25,17 +28,26 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   const [roleMap, setRoleMap] = useState<Record<string, string[]>>({});
   const [compliance, setCompliance] = useState<ComplianceRow[]>([]);
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
+  const [scheduleClasses, setScheduleClasses] = useState<ScheduleClass[]>([]);
+  const [teacherLinks, setTeacherLinks] = useState<TeacherLink[]>([]);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { data, error } = await supabase
-      .from("families")
-      .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,birthdate,age_band_override,active,last_name_override,avatar_path),family_members(user_id,relationship,profiles(email,display_name,status,phone))")
-      .order("display_name");
+    const [{ data, error }, { data: classRows }, { data: teachingRows }] = await Promise.all([
+      supabase.from("families")
+        .select("id,display_name,last_name,children(id,first_name,last_name,last_initial,age_band,birthdate,age_band_override,active,last_name_override,avatar_path,enrollments(class_id,status)),family_members(user_id,relationship,profiles(email,display_name,status,phone))")
+        .order("display_name"),
+      supabase.from("classes").select("id,block_id,grades,is_elective,active,school_years!inner(is_current)").eq("active", true).eq("school_years.is_current", true),
+      supabase.from("teacher_assignments").select("user_id,class_id,classes!inner(school_years!inner(is_current))").eq("classes.school_years.is_current", true),
+    ]);
     if (!error) setFamilies((data ?? []) as unknown as Family[]);
+    setScheduleClasses((classRows ?? []) as unknown as ScheduleClass[]);
+    setTeacherLinks((teachingRows ?? []) as TeacherLink[]);
 
     const userIds = [...new Set(((data ?? []) as unknown as Family[]).flatMap((family) => family.family_members?.map((member) => member.user_id) ?? []))];
     if (userIds.length) {
@@ -63,6 +75,53 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { load(); }, []);
+
+  function metrics(family: Family) {
+    const rows = compliance.filter((row) => row.family_id === family.id && row.requirements);
+    const unpaid = rows.filter((row) => row.requirements?.kind === "dues" && !isSettled(row.status)).length;
+    const unsigned = rows.filter((row) => row.requirements?.kind === "document" && !isSettled(row.status)).length;
+    const adultIds = new Set(activeAdults(family.family_members).map((member) => member.user_id));
+    const taughtClasses = new Set(teacherLinks.filter((link) => adultIds.has(link.user_id)).map((link) => link.class_id)).size;
+    const activeChildren = family.children.filter((child) => child.active);
+    const missingEnrollment = activeChildren.some((child) => {
+      const eligibleBlocks = new Set(scheduleClasses.filter((klass) => klass.block_id && !klass.is_elective && (!klass.grades.length || !child.age_band || klass.grades.includes(child.age_band))).map((klass) => klass.block_id!));
+      const enrolledBlocks = new Set(child.enrollments.filter((entry) => entry.status === "active").map((entry) => scheduleClasses.find((klass) => klass.id === entry.class_id)?.block_id).filter((id): id is string => !!id));
+      return [...eligibleBlocks].some((blockId) => !enrolledBlocks.has(blockId));
+    });
+    return { unpaid, unsigned, taughtClasses, missingEnrollment, noChildren: activeChildren.length === 0 };
+  }
+
+  // Computed once per families/compliance/teacherLinks/scheduleClasses change
+  // and looked up everywhere else -- metrics() re-scans the family's
+  // compliance rows and enrollments, so calling it again per filter and per
+  // rendered card multiplied that scan several times over on every render.
+  const metricsByFamily = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof metrics>>();
+    families.forEach((family) => map.set(family.id, metrics(family)));
+    return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- metrics is a pure projection over these state collections
+  }, [families, compliance, teacherLinks, scheduleClasses]);
+
+  const summary = useMemo(() => ({
+    unpaid: families.filter((family) => metricsByFamily.get(family.id)!.unpaid > 0).length,
+    unsigned: families.filter((family) => metricsByFamily.get(family.id)!.unsigned > 0).length,
+    missing: families.filter((family) => metricsByFamily.get(family.id)!.missingEnrollment).length,
+  }), [families, metricsByFamily]);
+
+  const visibleFamilies = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return families.filter((family) => {
+      const info = metricsByFamily.get(family.id)!;
+      if (query && !`${family.last_name ?? ""} ${family.display_name} ${family.family_members.map((member) => `${member.profiles?.display_name ?? ""} ${member.profiles?.email ?? ""}`).join(" ")}`.toLowerCase().includes(query)) return false;
+      if (filter === "unpaid" && info.unpaid === 0) return false;
+      if (filter === "unsigned" && info.unsigned === 0) return false;
+      if (filter === "teaching" && info.taughtClasses === 0) return false;
+      if (filter === "non-teaching" && info.taughtClasses > 0) return false;
+      if (filter === "missing" && !info.missingEnrollment) return false;
+      if (filter === "no-kids" && !info.noChildren) return false;
+      return true;
+    });
+  }, [families, metricsByFamily, filter, search]);
 
   async function log(action: string, subjectType: string, subjectId: string, detail: Record<string, unknown>) {
     const supabase = getSupabaseBrowserClient();
@@ -126,9 +185,7 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
    */
   async function removeUser(familyId: string, userId: string, displayName: string) {
     const family = families.find((row) => row.id === familyId);
-    const remaining = (family?.family_members ?? []).filter(
-      (member) => member.user_id !== userId && member.profiles?.status !== "removed",
-    );
+    const remaining = activeAdults(family?.family_members ?? []).filter((member) => member.user_id !== userId);
     const who = displayName || "this person";
 
     if (remaining.length > 0) {
@@ -195,16 +252,31 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
 
   return <section className="family-manage">
     <p className="admin-form-status" role="status">{status || `${families.length} household${families.length === 1 ? "" : "s"}. Open one to see its details; nothing is editable until you choose to edit it.`}</p>
+    <div className="summary-filter-cards" aria-label="Household summaries">
+      <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}><b>{families.length}</b><span>All families</span></button>
+      <button className={filter === "unpaid" ? "active" : ""} onClick={() => setFilter("unpaid")}><b>{summary.unpaid}</b><span>Unpaid dues</span></button>
+      <button className={filter === "unsigned" ? "active" : ""} onClick={() => setFilter("unsigned")}><b>{summary.unsigned}</b><span>Unsigned forms</span></button>
+      <button className={filter === "missing" ? "active" : ""} onClick={() => setFilter("missing")}><b>{summary.missing}</b><span>Need enrollment</span></button>
+    </div>
+    <div className="list-filters">
+      <label><span className="field-caption">Find a family</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name or email" /></label>
+      <label><span className="field-caption">Show</span><select value={filter} onChange={(event) => setFilter(event.target.value)}>
+        <option value="all">All families</option><option value="unpaid">Unpaid dues</option><option value="unsigned">Unsigned paperwork</option><option value="teaching">Teaching families</option><option value="non-teaching">Non-teaching families</option><option value="missing">Children missing a time slot</option><option value="no-kids">No children assigned</option>
+      </select></label>
+      <p className="compliance-summary">{visibleFamilies.length} shown</p>
+    </div>
     <div className="family-manage-list">
-      {families.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
+      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
+      {!visibleFamilies.length && <p className="portal-empty">No households match those filters.</p>}
     </div>
   </section>;
 }
 
-function FamilyCard({ family, roleMap, compliance, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onUploadAvatar, onRemoveUser, onGrantRole, onRevokeRole }: {
+function FamilyCard({ family, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onUploadAvatar, onRemoveUser, onGrantRole, onRevokeRole }: {
   family: Family;
   roleMap: Record<string, string[]>;
   compliance: ComplianceRow[];
+  metrics: { unpaid: number; unsigned: number; taughtClasses: number; missingEnrollment: boolean; noChildren: boolean };
   avatarUrls: Map<string, string>;
   onSaveFamily: (f: Family) => void;
   onSaveChild: (c: Child) => void;
@@ -227,20 +299,24 @@ function FamilyCard({ family, roleMap, compliance, avatarUrls, onSaveFamily, onS
     setChildren((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   }
 
-  const adults = (family.family_members ?? []).filter((member) => member.profiles?.status !== "removed");
+  const adults = activeAdults(family.family_members ?? []);
   const activeChildren = children.filter((child) => child.active);
   const outstanding = compliance.filter((row) => row.requirements && !isSettled(row.status)).length;
   const name = family.last_name || family.display_name;
 
   return <CollapsibleRecord
     summary={<b>{name}</b>}
-    meta={`${adults.length} adult${adults.length === 1 ? "" : "s"} · ${activeChildren.length} child${activeChildren.length === 1 ? "" : "ren"}`}
+    meta={`${adults.length} adult${adults.length === 1 ? "" : "s"} · ${activeChildren.length} child${activeChildren.length === 1 ? "" : "ren"} · teaches ${metrics.taughtClasses} class${metrics.taughtClasses === 1 ? "" : "es"}`}
     chips={compliance.length > 0
       ? <span className={`status-pill ${outstanding ? "outstanding" : "complete"}`}>
           {outstanding ? `${outstanding} outstanding` : "Up to date"}
         </span>
       : null}
   >
+    {(metrics.unpaid > 0 || metrics.unsigned > 0) && adults[0]?.profiles?.email && <div className="family-reminder-bar">
+      <span>{metrics.unpaid ? `${metrics.unpaid} unpaid` : ""}{metrics.unpaid && metrics.unsigned ? " · " : ""}{metrics.unsigned ? `${metrics.unsigned} unsigned` : ""}</span>
+      <a href={`mailto:${encodeURIComponent(adults[0].profiles!.email)}?subject=${encodeURIComponent("A reminder from Veritas Village")}&body=${encodeURIComponent(`Hello ${adults[0].profiles?.display_name || "there"},\n\nA quick reminder that your Family Village account has ${[metrics.unpaid ? `${metrics.unpaid} unpaid dues item${metrics.unpaid === 1 ? "" : "s"}` : "", metrics.unsigned ? `${metrics.unsigned} unsigned document${metrics.unsigned === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ")}. You can review these under Paperwork & dues in the portal.\n\nThank you,\nVeritas Village`)}`}>Draft reminder</a>
+    </div>}
     <EditableSection
       label="Household"
       onSave={() => onSaveFamily({ ...family, display_name: lastName, last_name: lastName })}

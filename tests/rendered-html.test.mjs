@@ -1,91 +1,76 @@
 import assert from "node:assert/strict";
-import { access, readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
-const templateRoot = new URL("../", import.meta.url);
-const previewRoot = new URL("../app/_sites-preview/", import.meta.url);
+const env = {
+  ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+  SITE_PASSWORD: "test-only-password",
+  SITE_AUTH_SECRET: "test-only-secret",
+};
+const ctx = { waitUntil() {}, passThroughOnException() {} };
 
-async function render() {
+async function worker() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
+  return (await import(workerUrl.href)).default;
 }
 
-test("server-renders the starter loading skeleton", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+async function request(path, init = {}) {
+  return (await worker()).fetch(new Request(`http://localhost${path}`, init), env, ctx);
+}
 
+async function accessCookie() {
+  const body = new URLSearchParams({ password: env.SITE_PASSWORD, return_to: "/" });
+  const response = await request("/site-access", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body,
+    redirect: "manual",
+  });
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get("location"), "/");
+  const cookie = response.headers.get("set-cookie")?.split(";", 1)[0];
+  assert.ok(cookie?.startsWith("vv_site_access="));
+  return cookie;
+}
+
+test("keeps the public site behind the shared-password gate", async () => {
+  const response = await request("/", { headers: { accept: "text/html" } });
+  assert.equal(response.status, 401);
   const html = await response.text();
-  assert.match(html, developmentPreviewMeta);
-  assert.match(html, /<title>Your site is taking shape<\/title>/i);
-  assert.match(html, /Building your site/);
-  assert.match(html, /Your site is taking shape/);
-  assert.match(
-    html,
-    /Your first version will appear here automatically when it’s ready\./,
-  );
-  assert.doesNotMatch(html, /Codex/);
-  assert.match(html, /react-loading-skeleton/);
-  assert.match(html, /role="status"/);
+  assert.match(html, /This site is password protected/);
+  assert.match(html, /action="\/site-access"/);
+  assert.doesNotMatch(html, /SITE_PASSWORD|SITE_AUTH_SECRET/);
 });
 
-test("keeps the loading skeleton scoped and disposable", async () => {
-  const [preview, css, page, layout, packageJson, files] = await Promise.all([
-    readFile(new URL("SkeletonPreview.tsx", previewRoot), "utf8"),
-    readFile(new URL("preview.css", previewRoot), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+test("server-renders the branded public home after gate access", async () => {
+  const response = await request("/", {
+    headers: { accept: "text/html", cookie: await accessCookie() },
+  });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Learning in truth/);
+  assert.match(html, /Lately at the co-op/);
+  assert.match(html, /lockup-horizontal-navy/);
+  assert.doesNotMatch(html, /Friday Co-op/i);
+});
+
+test("renders a focused email-and-password portal entry", async () => {
+  const response = await request("/family-village", { headers: { accept: "text/html" } });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Everything your family/);
+  assert.match(html, /Back to homepage/);
+  assert.match(html, /First time here\? Request an account/);
+  assert.doesNotMatch(html, />Google</);
+  assert.doesNotMatch(html, />Apple</);
+
+  const [invitationFunction, packageJson] = await Promise.all([
+    readFile(new URL("../supabase/functions/invite-family-admin/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readdir(previewRoot),
   ]);
-
-  assert.deepEqual(files.sort(), ["SkeletonPreview.tsx", "preview.css"]);
-  assert.match(preview, /from "react-loading-skeleton"/);
-  assert.match(preview, /baseColor="#eceae7"/);
-  assert.match(preview, /highlightColor="#f9f8f6"/);
-  assert.match(preview, /duration=\{2\.8\}/);
-  assert.match(preview, /sites-skeleton-search-placeholder/);
-  assert.match(packageJson, /"react-loading-skeleton": "3\.5\.0"/);
-
-  const shellIndex = preview.indexOf('className="sites-skeleton-shell"');
-  const statusIndex = preview.indexOf('className="sites-skeleton-status"');
-  assert.ok(shellIndex >= 0 && statusIndex > shellIndex);
-  assert.match(css, /position:\s*fixed/);
-  assert.match(css, /inset:\s*0/);
-  assert.match(css, /opacity:\s*0\.52/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.doesNotMatch(css, /#020617|canvas|pets|progress/i);
-  assert.doesNotMatch(
-    preview,
-    /loading-spinner|status-mark|status-progress|canvas|cookie|random/i,
-  );
-
-  assert.match(page, /export const metadata:\s*Metadata/);
-  assert.match(page, /"codex-preview": "development"/);
-  assert.match(page, /<SkeletonPreview \/>/);
-  assert.match(layout, /title:\s*"Starter Project"/);
-  assert.doesNotMatch(layout, /codex-preview|_sites-preview|themeColor|\bViewport\b/);
-  assert.doesNotMatch(css, /(^|\s)(html|body)\s*\{/m);
-
-  await assert.rejects(
-    access(new URL("public/_sites-preview", templateRoot)),
-  );
+  assert.match(invitationFunction, /https:\/\/family\.veritasvillage\.org\/family-village\/accept-invite/);
+  assert.doesNotMatch(invitationFunction, /chatgpt\.site/);
+  assert.match(packageJson, /"xss": "1\.0\.15"/);
+  assert.doesNotMatch(packageJson, /sanitize-html/);
 });

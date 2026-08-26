@@ -4,10 +4,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
 import Avatar from "./avatar";
+import AvatarCropper from "./avatar-cropper";
 
-export default function AccountSettings({ email, onSignOut }: { email: string; onSignOut: () => void }) {
+export default function AccountSettings({ email, onSignOut, onProfileUpdated }: { email: string; onSignOut: () => void; onProfileUpdated?: () => void }) {
   return <div className="account-settings">
-    <ContactSection />
+    <ContactSection onProfileUpdated={onProfileUpdated} />
     <PasswordSection email={email} />
     <PasskeySection />
     <TwoFactorSection />
@@ -21,7 +22,7 @@ export default function AccountSettings({ email, onSignOut }: { email: string; o
  * the week ahead; it belongs here with the rest of the account, and it saves in
  * the same round trip as the contact fields rather than needing its own form.
  */
-function ContactSection() {
+function ContactSection({ onProfileUpdated }: { onProfileUpdated?: () => void }) {
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
   const [emergencyName, setEmergencyName] = useState("");
@@ -29,6 +30,7 @@ function ContactSection() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarStatus, setAvatarStatus] = useState("");
+  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -57,7 +59,9 @@ function ContactSection() {
     setAvatarBusy(false);
     if (error) { setAvatarStatus(error.message); return; }
     setAvatarStatus("Photo updated.");
+    setPendingAvatar(null);
     await load();
+    onProfileUpdated?.();
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
@@ -79,6 +83,7 @@ function ContactSection() {
     setBusy(false);
     if (error) { setStatus(error.message); return; }
     setStatus("Saved.");
+    onProfileUpdated?.();
   }
 
   if (loading) return null;
@@ -89,11 +94,12 @@ function ContactSection() {
       <Avatar url={avatarUrl} label={displayName || "?"} size="lg" />
       <div>
         <label className="file-drop"><span className="field-caption">Photo</span>
-          <input type="file" accept="image/*" disabled={avatarBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadAvatar(file); }} />
+          <input type="file" accept="image/*" disabled={avatarBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) setPendingAvatar(file); event.currentTarget.value = ""; }} />
         </label>
         <p className="admin-form-status" role="status">{avatarStatus}</p>
       </div>
     </div>
+    {pendingAvatar && <AvatarCropper file={pendingAvatar} busy={avatarBusy} onCancel={() => setPendingAvatar(null)} onSave={uploadAvatar} />}
     <form onSubmit={submit} className="household-form">
       <label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="How your name appears in the Village" disabled={busy} /></label>
       <label>Phone number<input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="(555) 555-5555" disabled={busy} /></label>

@@ -14,7 +14,7 @@ type NoteInfo = { id: string; body: string; visibility: string; created_at: stri
 type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null; age_band_override: boolean; birthdate: string | null; avatar_path: string | null };
 
 type OpenPeriod = { id: string; title: string; closes_at: string; electives_only: boolean };
-type EligibleClass = { id: string; title: string; is_elective: boolean };
+type EligibleClass = { id: string; title: string; description: string | null; is_elective: boolean; schedule: string };
 
 export default function ChildDetail({ childId, onClose }: { childId: string; onClose: () => void }) {
   const [child, setChild] = useState<ChildRecord | null>(null);
@@ -116,8 +116,13 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     setOpenPeriod(period ?? null);
 
     if (period && childRow?.age_band) {
-      let classQuery = supabase.from("classes").select("id,title,is_elective")
-        .eq("active", true).contains("grades", [childRow.age_band]);
+      // A class with no term assigned is treated as year-round, matching the
+      // same convention private.classes_terms_overlap uses for the clash
+      // check -- otherwise every class that predates academic terms would
+      // vanish from the picker the moment terms were introduced.
+      let classQuery = supabase.from("classes")
+        .select(`id,title,description,is_elective,grades,${SCHEDULE_SELECT},class_terms(academic_terms(starts_on,ends_on))`)
+        .eq("active", true);
       if (period.electives_only) classQuery = classQuery.eq("is_elective", true);
 
       const [{ data: classRows2 }, { data: enrolledRows }] = await Promise.all([
@@ -125,7 +130,20 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         supabase.from("enrollments").select("class_id").eq("child_id", childId).eq("status", "active"),
       ]);
       const alreadyIn = new Set((enrolledRows ?? []).map((row) => row.class_id));
-      setEligibleClasses((classRows2 ?? []).filter((row) => !alreadyIn.has(row.id)));
+      const today = new Date().toISOString().slice(0, 10);
+      setEligibleClasses(((classRows2 ?? []) as unknown as ({
+        id: string; title: string; description: string | null; is_elective: boolean; grades: string[];
+        class_terms: { academic_terms: { starts_on: string; ends_on: string } | null }[];
+      } & ClassSchedule)[])
+        // An empty grades array means "any grade" (see admin-ui.tsx's
+        // formatGrades) -- a .contains() filter on the query can't express
+        // that (an empty array never "contains" anything), so the match
+        // happens here instead.
+        .filter((row) => !row.grades.length || row.grades.includes(childRow.age_band as string))
+        .filter((row) => !alreadyIn.has(row.id))
+        .filter((row) => !row.class_terms.length || row.class_terms.some((link) =>
+          link.academic_terms && link.academic_terms.starts_on <= today && today <= link.academic_terms.ends_on))
+        .map((row) => ({ id: row.id, title: row.title, description: row.description, is_elective: row.is_elective, schedule: describeSchedule(row) })));
     } else {
       setEligibleClasses([]);
     }
@@ -308,13 +326,12 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
             {openPeriod.electives_only ? " Choose electives for " : " Choose classes for "}{child?.first_name} — enrolling is immediate, no approval needed.
           </p>
           {eligibleClasses.length
-            ? <div className="row-actions">
-                <select value={classPick} onChange={(event) => setClassPick(event.target.value)}>
-                  <option value="">Choose a class…</option>
-                  {eligibleClasses.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
-                </select>
-                <button disabled={!classPick} onClick={enrollInClass}>Enroll</button>
-              </div>
+            ? <><div className="enrollment-class-options" role="radiogroup" aria-label={`Classes available to ${child?.first_name}`}>
+                {eligibleClasses.map((option) => <div key={option.id} className={classPick === option.id ? "selected" : ""}>
+                  <input id={`enroll-${option.id}`} type="radio" name={`class-${childId}`} value={option.id} checked={classPick === option.id} onChange={() => setClassPick(option.id)} />
+                  <label htmlFor={`enroll-${option.id}`}><b>{option.title}</b><small>{option.schedule}</small><p>{option.description || "No class description has been added yet."}</p></label>
+                </div>)}
+              </div><button className="enroll-confirm" disabled={!classPick} onClick={enrollInClass}>Enroll {child?.first_name}</button></>
             : <p className="portal-empty">No open classes match {child?.first_name}&rsquo;s grade right now.</p>}
           {enrollStatus && <p className="admin-form-status" role="status">{enrollStatus}</p>}
         </section>}
@@ -322,7 +339,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         <section>
           <p className="card-kicker">Teacher notes</p>
           {notes.length ? <ul className="child-detail-list note-list">{notes.map((row) => <li key={row.id}>
-            <span>{row.author_name} · {row.class_title} · {new Date(row.created_at).toLocaleDateString()} · {row.visibility}</span>
+            <span>{row.author_name} · {row.class_title} · {new Date(row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {row.visibility}</span>
             <p>{row.body}</p>
             <div className="note-actions">
               {row.read_by_me

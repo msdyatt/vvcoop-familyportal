@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import DetailModal from "../detail-modal";
 import PostAttachments, { PostThumbnail, usePostAttachments } from "../post-attachments";
+import RichText from "../../../lib/rich-text";
 
 type Post = {
   id: string; title: string; body: string; audience: string;
@@ -73,7 +74,7 @@ export default function NewsSection({ classes }: { classes: { id: string; title:
         {open.published_at ? new Date(open.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : ""}
         {open.audience === "class" ? ` · ${classTitle(open.class_id) ?? "a class"}` : open.audience === "teachers" ? " · teaching team" : ""}
       </p>
-      <p className="prose-body">{open.body}</p>
+      <RichText html={open.body} className="prose-body rich-text" />
       <PostAttachments attachments={attachments[open.id] ?? []} />
     </DetailModal>}
   </section>;

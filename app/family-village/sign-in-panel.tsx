@@ -19,6 +19,9 @@ export default function SignInPanel() {
     });
   }, []);
 
+  // Google/Apple sign-in was removed at Sam's request (username/password
+  // only). Passkeys were never part of that ask -- restored after being
+  // dropped along with the OAuth buttons in an earlier pass.
   async function passkey() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
@@ -26,14 +29,6 @@ export default function SignInPanel() {
     const { error } = await supabase.auth.signInWithPasskey();
     if (error) { setMessage(error.message || "We could not sign you in with a passkey. Try email instead."); setBusy(false); return; }
     window.location.assign("/family-village/home");
-  }
-
-  async function social(provider: "google" | "apple") {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/family-village/home` } });
-    if (error) { setMessage(error.message); setBusy(false); }
   }
 
   async function emailSignIn(event: FormEvent<HTMLFormElement>) {
@@ -55,14 +50,11 @@ export default function SignInPanel() {
 
   return <div className="signin-stack" aria-label="Family Village sign-in">
     <button type="button" className="passkey-button" disabled={!configured || busy} onClick={passkey}><span>🔐</span> Sign in with a passkey</button>
-    <div className="signin-divider"><span>or</span></div>
-    <button type="button" disabled={!configured || busy} onClick={() => social("google")}><span>G</span> Continue with Google</button>
-    <button type="button" disabled={!configured || busy} onClick={() => social("apple")}><span>●</span> Continue with Apple</button>
     <div className="signin-divider"><span>or use your invitation email</span></div>
     <form onSubmit={emailSignIn} className="email-signin">
       <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={!configured || busy}/></label>
       <label>Password<input type="password" minLength={8} autoComplete={mode === "request" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} disabled={!configured || busy}/></label>
-      <button type="submit" disabled={!configured || busy}><span>✉</span> {mode === "request" ? "Request family access" : "Sign in with email"}</button>
+      <button type="submit" disabled={!configured || busy}>{mode === "request" ? "Request family access" : "Sign in"}</button>
     </form>
     <button className="mode-switch" type="button" disabled={!configured || busy} onClick={() => { setMode(mode === "sign-in" ? "request" : "sign-in"); setMessage(""); }}>
       {mode === "sign-in" ? "First time here? Request an account" : "Already approved? Return to sign in"}

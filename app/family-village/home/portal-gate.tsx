@@ -7,6 +7,7 @@ import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
 import AppHeader from "../app-header";
+import RichText, { stripRichText } from "../../../lib/rich-text";
 import MfaChallengeScreen from "../mfa-challenge";
 import { ComplianceBanner, CompliancePanel, ComplianceItem } from "../compliance-panel";
 import PostAttachments, { PostThumbnail, usePostAttachments } from "../post-attachments";
@@ -17,6 +18,7 @@ type Profile = { display_name: string | null; email: string; status: "pending" |
 type PortalData = {
   familyId: string;
   children: { id: string; first_name: string; last_initial: string | null; avatar_path: string | null }[];
+  enrollments: { child_id: string; class_id: string }[];
   classes: { id: string; title: string; description: string | null }[];
   posts: { id: string; title: string; body: string; published_at: string | null; audience: string }[];
   events: { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; class_id: string | null; audience: string; requires_prework: boolean }[];
@@ -24,6 +26,7 @@ type PortalData = {
   compliance: ComplianceItem[];
   roles: string[];
   enrollmentPeriod: { title: string; closesAt: string } | null;
+  completions: { event_id: string; child_id: string }[];
 };
 
 /**
@@ -74,7 +77,7 @@ export default function PortalGate() {
     const childIds = (childrenResult.data ?? []).map((row) => row.id);
     const safeChildIds = childIds.length ? childIds : ["00000000-0000-0000-0000-000000000000"];
 
-    const enrollmentResult = await supabase.from("enrollments").select("class_id").in("child_id", safeChildIds).eq("status", "active");
+    const enrollmentResult = await supabase.from("enrollments").select("child_id,class_id").in("child_id", safeChildIds).eq("status", "active");
     const classIds = [...new Set((enrollmentResult.data ?? []).map((row) => row.class_id))];
     const safeClassIds = classIds.length ? classIds : ["00000000-0000-0000-0000-000000000000"];
 
@@ -102,16 +105,22 @@ export default function PortalGate() {
     const failed = [children, classes, posts, events, documents, roles].find((item) => item.error);
     if (failed?.error) { setState("error"); return; }
 
+    const preworkIds = (events.data ?? []).filter((event) => event.requires_prework).map((event) => event.id);
+    const { data: completionRows } = preworkIds.length
+      ? await supabase.from("event_completions").select("event_id,child_id").in("event_id", preworkIds).in("child_id", safeChildIds)
+      : { data: [] };
+
     const nowIso = new Date().toISOString();
     const { data: periodRows } = await supabase.from("enrollment_periods")
       .select("title,closes_at").eq("active", true).lte("opens_at", nowIso).gte("closes_at", nowIso).limit(1);
     const period = (periodRows ?? [])[0];
 
     setPortal({
-      familyId: safeFamilyIds[0] ?? "", children: children.data ?? [], classes: classes.data ?? [], posts: posts.data ?? [],
+      familyId: safeFamilyIds[0] ?? "", children: children.data ?? [], enrollments: enrollmentResult.data ?? [], classes: classes.data ?? [], posts: posts.data ?? [],
       events: events.data ?? [], documents: documents.data ?? [], compliance: toComplianceItems(compliance.data),
       roles: (roles.data ?? []).map((item) => item.role),
       enrollmentPeriod: period ? { title: period.title, closesAt: period.closes_at } : null,
+      completions: completionRows ?? [],
     } as PortalData);
     setState("active");
 
@@ -130,6 +139,15 @@ export default function PortalGate() {
     const supabase = getSupabaseBrowserClient(); if (!supabase) return;
     const url = await getSignedFileUrl(supabase, storagePath);
     setDocumentUrl(url);
+  }
+
+  async function setEventCompletion(eventId: string, childIds: string[], done: boolean) {
+    const supabase = getSupabaseBrowserClient(); if (!supabase || !childIds.length) return;
+    const { data } = await supabase.auth.getUser(); if (!data.user) return;
+    const result = done
+      ? await supabase.from("event_completions").upsert(childIds.map((childId) => ({ event_id: eventId, child_id: childId, completed_by: data.user!.id })), { onConflict: "event_id,child_id" })
+      : await supabase.from("event_completions").delete().eq("event_id", eventId).in("child_id", childIds);
+    if (!result.error) await load();
   }
 
   if (state === "loading") return <main className="portal-state"><p className="eyebrow">Family Village</p><h1>Gathering your village…</h1></main>;
@@ -173,25 +191,24 @@ export default function PortalGate() {
       <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
       </section>
-      <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}</section>
-      <section className="portal-module"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{post.body.length > 130 ? `${post.body.slice(0,130)}…` : post.body}</span></div></div></li>)}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
+      <section className="portal-module"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}</section>
+      <section className="portal-module"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
       {/* Class dates, per class, with anything needing prep called out. This
           replaces the old assignments list -- homework is now a flag on a date
           rather than a separate row, so a parent reads one list instead of two. */}
       <section className="portal-module"><p className="eyebrow">Learning</p><h2>In your children&rsquo;s classes</h2>{classDates.length
-        ? <ol className="portal-list clickable-list">{classDates.map(event => <li key={event.id}>
-            <div role="button" tabIndex={0}
-              onClick={() => setOpenEventId(event.id)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }}
-              style={{ display: "contents" }}>
-              <time>{new Date(event.starts_at).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</time>
-              <div>
-                <b>{event.title}</b>
-                <span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span>
-                {event.requires_prework && <span className="prep-flag">Assignment · see your child&rsquo;s page</span>}
-              </div>
-            </div>
-          </li>)}</ol>
+        ? <ol className="portal-list class-event-list">{classDates.map(event => {
+            const childIds = (portal?.enrollments ?? []).filter((entry) => entry.class_id === event.class_id).map((entry) => entry.child_id);
+            const completedIds = new Set((portal?.completions ?? []).filter((entry) => entry.event_id === event.id).map((entry) => entry.child_id));
+            const allDone = childIds.length > 0 && childIds.every((id) => completedIds.has(id));
+            return <li key={event.id}>
+              <button className="class-event-open" onClick={() => setOpenEventId(event.id)}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</time><span><b>{event.title}</b><small>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</small></span></button>
+              {event.requires_prework && <div className="event-completion-group">
+                {childIds.map((childId) => { const child = portal?.children.find((row) => row.id === childId); const done = completedIds.has(childId); return <label key={childId} className={done ? "done" : ""}><input type="checkbox" checked={done} onChange={() => setEventCompletion(event.id, [childId], !done)} />{child?.first_name ?? "Student"} {done ? "ready" : "assignment"}</label>; })}
+                {childIds.length > 1 && <button onClick={() => setEventCompletion(event.id, childIds, !allDone)}>{allDone ? "Clear all" : "Mark all ready"}</button>}
+              </div>}
+            </li>;
+          })}</ol>
         : empty(portal?.classes.length ? "Nothing scheduled in your children's classes yet." : "Classes will appear after enrollment is entered.")}</section>
       {/* Documents that aren't a requirement -- class handouts and anything an
           administrator has shared with this household. Signed copies are
@@ -203,12 +220,12 @@ export default function PortalGate() {
     </div>
     {openChildId && <ChildDetail childId={openChildId} onClose={() => setOpenChildId(null)} />}
     {openPost && <DetailModal title={openPost.title} onClose={() => setOpenPostId(null)}>
-      <p className="portal-empty compliance-note">{openPost.published_at ? new Date(openPost.published_at).toLocaleDateString() : ""} · {openPost.audience}</p>
-      <p className="prose-body">{openPost.body}</p>
+      <p className="portal-empty compliance-note">{openPost.published_at ? new Date(openPost.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""} · {openPost.audience}</p>
+      <RichText html={openPost.body} className="prose-body rich-text" />
       <PostAttachments attachments={postAttachments[openPost.id] ?? []} />
     </DetailModal>}
     {openEvent && <DetailModal title={openEvent.title} onClose={() => setOpenEventId(null)}>
-      <p className="portal-empty" style={{ marginBottom: 8 }}>{new Date(openEvent.starts_at).toLocaleString(undefined,{ month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}{openEvent.ends_at ? ` – ${new Date(openEvent.ends_at).toLocaleTimeString(undefined,{ hour:"numeric", minute:"2-digit" })}` : ""}{openEvent.location ? ` · ${openEvent.location}` : ""}</p>
+      <p className="portal-empty" style={{ marginBottom: 8 }}>{new Date(openEvent.starts_at).toLocaleString("en-US",{ month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}{openEvent.ends_at ? ` – ${new Date(openEvent.ends_at).toLocaleTimeString("en-US",{ hour:"numeric", minute:"2-digit" })}` : ""}{openEvent.location ? ` · ${openEvent.location}` : ""}</p>
       {openEvent.description && <p style={{ whiteSpace: "pre-wrap" }}>{openEvent.description}</p>}
     </DetailModal>}
     {openDocument_ && <DetailModal title={openDocument_.title} onClose={() => { setOpenDocumentId(null); setDocumentUrl(null); }}>
@@ -245,5 +262,3 @@ function AddChildForm({ familyId, onAdded }: { familyId: string; onAdded: () => 
     <p className="admin-form-status" role="status">{status}</p>
   </form>;
 }
-
-
