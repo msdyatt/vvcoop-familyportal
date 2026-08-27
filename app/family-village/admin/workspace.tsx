@@ -1,18 +1,25 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
 import AppHeader from "../app-header";
-import FamiliesTab from "./families-tab";
-import NewsTab from "./news-tab";
-import ClassesTab from "./classes-tab";
-import IntegrationsTab from "./integrations-tab";
-import ActivityTab from "./activity-tab";
-import ComplianceTab from "./compliance-tab";
 import AdminDashboard from "./dashboard";
-import ReportsTab from "./reports-tab";
+
+// Every tab used to be a static import, so an admin session downloaded all
+// eight tabs' code (and everything they pull in -- rich text, CSV export,
+// OpenSign/Resend integration wiring...) up front, before ever opening one.
+// AdminDashboard stays eager since it's what actually renders first; the
+// other seven only cost bytes once someone clicks their tab.
+const FamiliesTab = dynamic(() => import("./families-tab"));
+const NewsTab = dynamic(() => import("./news-tab"));
+const ClassesTab = dynamic(() => import("./classes-tab"));
+const IntegrationsTab = dynamic(() => import("./integrations-tab"));
+const ActivityTab = dynamic(() => import("./activity-tab"));
+const ComplianceTab = dynamic(() => import("./compliance-tab"));
+const ReportsTab = dynamic(() => import("./reports-tab"));
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
 type Tab = "dashboard" | "invitations" | "families" | "classes" | "compliance" | "news" | "reports" | "activity" | "integrations";
