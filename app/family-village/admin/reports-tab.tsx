@@ -5,7 +5,7 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { ClassSchedule, formatBlock, SCHEDULE_SELECT } from "../../../lib/schedule";
 import { ComplianceStatus, activeAdults, formatDate, formatMoney, isSettled } from "../../../lib/compliance";
 import { downloadCsv, toCsv } from "../../../lib/csv";
-import { PrintActions } from "./admin-ui";
+import { printElement } from "../../../lib/dom";
 
 type FamilyReport = {
   id: string; display_name: string; last_name: string | null;
@@ -139,7 +139,7 @@ export default function ReportsTab() {
 function PrintableReport({ title, children }: { title: string; children: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
   return <article className="printable-report" ref={ref}>
-    <header><div><p>VERITAS VILLAGE</p><h3>{title}</h3></div><PrintActions title={title} targetRef={ref} printLabel="Print report" /></header>
+    <header><div><p>VERITAS VILLAGE</p><h3>{title}</h3></div><button className="no-print" onClick={() => printElement(ref.current)}>Print report</button></header>
     {children}
   </article>;
 }

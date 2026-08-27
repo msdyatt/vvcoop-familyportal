@@ -1,10 +1,7 @@
 "use client";
 
-import { ReactNode, RefObject, useId, useState } from "react";
+import { ReactNode, useId, useState } from "react";
 import DetailModal from "../detail-modal";
-import { printElement } from "../../../lib/dom";
-import { queuePrintJob } from "../../../lib/print-jobs";
-import { getSupabaseBrowserClient } from "../../../lib/supabase";
 
 /**
  * Shared shape for the admin lists.
@@ -157,35 +154,4 @@ export function ConfirmDeleteModal({ title, description, confirmWord = "DELETE",
       </div>
     </div>
   </DetailModal>;
-}
-
-/**
- * The print controls every printable report/roster carries: the browser's own
- * print dialog (unchanged), plus a duplex-aware "Send to office printer"
- * action that queues a job for the future Raspberry Pi script instead of
- * printing locally. One shared component so the three report surfaces
- * (Reports tab, master roster, single-class roster) don't each reinvent the
- * duplex checkbox.
- */
-export function PrintActions({ title, targetRef, printLabel = "Print" }: { title: string; targetRef: RefObject<HTMLElement | null>; printLabel?: string }) {
-  const [duplex, setDuplex] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("");
-
-  async function sendToPrinter() {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setBusy(true);
-    setStatus("Queuing…");
-    const error = await queuePrintJob(supabase, { title, target: targetRef.current, duplex });
-    setBusy(false);
-    setStatus(error ?? "Queued for the office printer.");
-  }
-
-  return <span className="print-actions no-print">
-    <label className="print-duplex-toggle"><input type="checkbox" checked={duplex} onChange={(event) => setDuplex(event.target.checked)} /> Double-sided</label>
-    <button type="button" onClick={() => printElement(targetRef.current)}>{printLabel}</button>
-    <button type="button" className="ghost" disabled={busy} onClick={sendToPrinter}>{busy ? "Sending…" : "Send to office printer"}</button>
-    {status && <em className="print-actions-status">{status}</em>}
-  </span>;
 }

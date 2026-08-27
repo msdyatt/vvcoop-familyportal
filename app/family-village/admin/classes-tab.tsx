@@ -6,7 +6,8 @@ import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
 import SubscribeLink from "../subscribe-link";
 import { SchoolYear, formatDate } from "../../../lib/compliance";
 import { ClassBlock, Room, WEEKDAYS, formatBlock, formatBlockTime, formatWeekday } from "../../../lib/schedule";
-import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES, GradePicker, PrintActions, formatGrades } from "./admin-ui";
+import { printElement } from "../../../lib/dom";
+import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES, GradePicker, formatGrades } from "./admin-ui";
 import EnrollmentPeriods from "./enrollment-periods";
 import DetailModal from "../detail-modal";
 
@@ -995,7 +996,7 @@ function MasterRoster({ classes, blocks, rooms, terms, year }: {
   const pages = orderedTerms.length ? orderedTerms : [null];
 
   return <div className="roster-report-shell">
-    <div className="roster-report-actions no-print"><p>{classes.length} class{classes.length === 1 ? "" : "es"} across {orderedTerms.length || 1} page{orderedTerms.length === 1 ? "" : "s"}</p><PrintActions title={`${year.label} Class Roster`} targetRef={reportRef} printLabel="Print master roster" /></div>
+    <div className="roster-report-actions no-print"><p>{classes.length} class{classes.length === 1 ? "" : "es"} across {orderedTerms.length || 1} page{orderedTerms.length === 1 ? "" : "s"}</p><button onClick={() => printElement(reportRef.current)}>Print master roster</button></div>
     <section ref={reportRef} className="roster-print-sheet master-roster">
       {pages.map((term, pageIndex) => {
         const forTerm = classes.filter((row) => !term || !row.term_ids.length || row.term_ids.includes(term.id));
@@ -1043,7 +1044,7 @@ function RosterReport({ row, block, room, teacherName }: {
     .sort((a, b) => `${a.children?.last_name ?? ""}${a.children?.first_name ?? ""}`.localeCompare(`${b.children?.last_name ?? ""}${b.children?.first_name ?? ""}`));
 
   return <div className="roster-report-shell">
-    <div className="roster-report-actions no-print"><p>{active.length} enrolled student{active.length === 1 ? "" : "s"}</p><PrintActions title={`${row.title} roster`} targetRef={reportRef} printLabel="Print roster" /></div>
+    <div className="roster-report-actions no-print"><p>{active.length} enrolled student{active.length === 1 ? "" : "s"}</p><button onClick={() => printElement(reportRef.current)}>Print roster</button></div>
     <section ref={reportRef} className="roster-print-sheet">
       <div className="roster-print-head"><div><p>VERITAS VILLAGE</p><h2>{row.title}</h2></div><span>{block ? formatBlock(block) : "Time to be announced"}<br/>{room?.name ?? "Room to be announced"}</span></div>
       <dl className="roster-print-meta"><div><dt>Teaching team</dt><dd>{row.teacher_assignments.length ? row.teacher_assignments.map((assignment) => `${teacherName(assignment)} (${assignment.assignment_role})`).join(", ") : "Not assigned"}</dd></div><div><dt>Grades</dt><dd>{formatGrades(row.grades)}</dd></div></dl>

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrl, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
+import { queueFilePrintJob } from "../../../lib/print-jobs";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
 import Avatar from "../avatar";
@@ -444,8 +445,15 @@ function PrintSection({ classes, roleByClass, userId, queue, onSaved }: {
   const [quantity, setQuantity] = useState(1);
   const [file, setFile] = useState<File | null>(null);
   const [classId, setClassId] = useState(() => ledClasses[0]?.id ?? "");
+  const [duplex, setDuplex] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  // A separate busy/status pair from the manual queue above -- the two
+  // buttons submit to different places (print_requests vs. print_jobs) and
+  // can be triggered independently, so one shouldn't disable or overwrite
+  // the other's feedback.
+  const [officeBusy, setOfficeBusy] = useState(false);
+  const [officeStatus, setOfficeStatus] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -464,6 +472,24 @@ function PrintSection({ classes, roleByClass, userId, queue, onSaved }: {
     onSaved();
   }
 
+  // The office-printer queue (print_jobs) is a separate, automated path --
+  // eventually fulfilled by a Raspberry Pi script talking to the printer
+  // directly, rather than a person in the print queue above -- so it gets
+  // its own upload and its own row, not a flag on the same request.
+  async function sendToOfficePrinter() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !file || !title.trim()) { setOfficeStatus("Add a title and choose a file first."); return; }
+    setOfficeBusy(true); setOfficeStatus("");
+    const uploaded = await uploadPrivateFile(supabase, "print-requests", file);
+    if ("error" in uploaded) { setOfficeStatus(uploaded.error); setOfficeBusy(false); return; }
+    const error = await queueFilePrintJob(supabase, {
+      title: title.trim(), storagePath: uploaded.path, duplex, copies: quantity,
+    });
+    setOfficeBusy(false);
+    if (error) { setOfficeStatus(error); return; }
+    setOfficeStatus("Sent to the office printer.");
+  }
+
   const classTitle = (id: string | null) => classes.find((row) => row.id === id)?.title;
 
   return <section id="lounge">
@@ -472,22 +498,35 @@ function PrintSection({ classes, roleByClass, userId, queue, onSaved }: {
 
     {ledClasses.length ? <form onSubmit={submit} className="portal-form">
       <label><span className="field-caption">What is it?</span>
-        <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Class worksheet packet" disabled={busy} />
+        <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Class worksheet packet" disabled={busy || officeBusy} />
       </label>
       <label><span className="field-caption">Copies needed</span>
-        <input required type="number" min={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} disabled={busy} />
+        <input required type="number" min={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} disabled={busy || officeBusy} />
       </label>
       <label className="file-drop"><span className="field-caption">File to print</span>
-        <input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy} />
+        <input required type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} disabled={busy || officeBusy} />
       </label>
       <label><span className="field-caption">Which class</span>
-        <select value={classId} onChange={(event) => setClassId(event.target.value)} disabled={busy}>
+        <select value={classId} onChange={(event) => setClassId(event.target.value)} disabled={busy || officeBusy}>
           <option value="">Not class-specific</option>
           {ledClasses.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </select>
       </label>
-      <button disabled={busy}>{busy ? "Sending…" : `Send to print queue`}</button>
+      <button disabled={busy || officeBusy}>{busy ? "Sending…" : `Send to print queue`}</button>
       <p className="admin-form-status" role="status">{status}</p>
+
+      <div className="office-printer-option">
+        <p className="card-kicker">Office printer</p>
+        <p className="portal-empty">Send straight to the co-op&rsquo;s office printer instead of the manual queue above.</p>
+        <label className="checkbox-field">
+          <input type="checkbox" checked={duplex} onChange={(event) => setDuplex(event.target.checked)} disabled={officeBusy} />
+          <span>Print double-sided</span>
+        </label>
+        <button type="button" className="ghost" disabled={officeBusy || busy || !file || !title.trim()} onClick={sendToOfficePrinter}>
+          {officeBusy ? "Sending…" : "Send to office printer"}
+        </button>
+        <p className="admin-form-status" role="status">{officeStatus}</p>
+      </div>
     </form> : <p className="portal-empty">The lead teacher for a class sends its print requests.</p>}
 
     {/* The list is everything this teacher has queued, across every class --

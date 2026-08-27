@@ -5544,6 +5544,23 @@ footer nav a:hover {
   text-transform:none;
 }
 
+/* The office-printer option (PrintSection, teacher workspace) is a distinct
+   second path off the same form -- set apart with a divider and its own
+   kicker rather than blending into the manual-queue fields above it. */
+.office-printer-option {
+  grid-column:1 / -1;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:6px;
+  padding-top:16px;
+  border-top:1px solid rgba(var(--navy-rgb),.18);
+}
+.office-printer-option .checkbox-field {
+  align-self:start;
+  padding-bottom:0;
+}
+
 
 /* The prep flag also appears in the child detail list, which styles its spans
    the same way the portal list does -- so it needs the same weight there. */

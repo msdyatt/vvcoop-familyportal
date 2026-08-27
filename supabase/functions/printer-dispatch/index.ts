@@ -22,9 +22,17 @@ import { safeEqual } from "../_shared/crypto.ts";
  *                                                 before this one reports back
  *                                                 can't pick up and print the
  *                                                 same job twice) and returns
- *                                                 everything the printer needs:
- *                                                 the self-contained HTML body,
- *                                                 sides, and copies.
+ *                                                 everything the printer needs.
+ *                                                 A job carries exactly one of
+ *                                                 two content forms: a
+ *                                                 self-contained html_body (an
+ *                                                 admin report, rendered by
+ *                                                 this app) or a storage_path
+ *                                                 (a teacher's uploaded file,
+ *                                                 for the printer script to
+ *                                                 download and hand to CUPS
+ *                                                 directly) -- plus sides and
+ *                                                 copies either way.
  *   { mode: "report", id, status, error? }    -- marks one claimed job
  *                                                 "printed" or "failed" once
  *                                                 the printer has actually
@@ -56,11 +64,27 @@ async function handle(req: Request): Promise<Response> {
     const { data, error } = await adminClient.from("print_jobs")
       .update({ status: "sending" })
       .eq("status", "pending")
-      .select("id,title,html_body,duplex,orientation,sides,copies,printer_id,created_at")
+      .select("id,title,html_body,storage_path,duplex,orientation,sides,copies,printer_id,created_at")
       .order("created_at")
       .limit(20);
     if (error) return json({ error: error.message }, 500);
-    return json({ ok: true, jobs: data ?? [] });
+
+    // The Pi authenticates with the shared delivery secret above, not a
+    // Supabase session -- it has no way to read a private-bucket file on its
+    // own. For any job carrying storage_path (a teacher's upload) rather than
+    // an inline html_body (an admin report), hand back a short-lived signed
+    // URL instead, since that's the only credential this script gets.
+    const jobs = data ?? [];
+    const paths = jobs.map((job) => job.storage_path).filter((path): path is string => !!path);
+    const signed = paths.length
+      ? (await adminClient.storage.from("family-village-private").createSignedUrls(paths, 900)).data ?? []
+      : [];
+    const signedByPath = new Map(signed.filter((row) => row.signedUrl && !row.error && row.path).map((row) => [row.path as string, row.signedUrl]));
+    const withUrls = jobs.map((job) => ({
+      ...job,
+      file_url: job.storage_path ? signedByPath.get(job.storage_path) ?? null : null,
+    }));
+    return json({ ok: true, jobs: withUrls });
   }
 
   if (body?.mode === "report") {
