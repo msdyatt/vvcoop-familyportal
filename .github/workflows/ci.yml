@@ -9,12 +9,15 @@ name: CI
 # whatever happens to be sitting in someone's local working tree, is the
 # source of truth for what's live.
 #
-# supabase-migrations needs one more secret than the other jobs: a database
-# password, on top of SUPABASE_ACCESS_TOKEN. `supabase db push` runs actual
-# SQL against Postgres directly -- unlike `functions deploy`, which goes
-# through the Management API and only needs the access token -- so it needs
-# real Postgres credentials, not just an API token. See that job for what to
-# add and where to find it.
+# supabase-migrations runs actual SQL against Postgres directly (unlike
+# `functions deploy`, which goes through the Management API) -- worth calling
+# out because it looks like it should need a database password on top of
+# SUPABASE_ACCESS_TOKEN, and the CLI's own --help text for `db push`/`link`
+# suggests exactly that. Verified live (27 Aug) that it doesn't: a linked
+# session authenticates the direct DB connection through the access token
+# alone in this CLI version, confirmed by watching a real (harmless, since
+# reverted) test migration actually apply through this exact job with no
+# password supplied at all -- not just a "nothing pending" no-op.
 on:
   push:
     branches: [main]
@@ -138,19 +141,16 @@ jobs:
         with:
           version: latest
 
-      # `db push` connects to Postgres directly to run migration SQL, so
-      # SUPABASE_ACCESS_TOKEN (a Management API token) isn't enough on its
-      # own -- it also needs SUPABASE_DB_PASSWORD, the project's database
-      # password, as a second Production environment secret. Find/reset it at
-      # Supabase dashboard -> Project Settings -> Database -> Database
-      # password (resetting invalidates any existing direct DB connection
-      # using the old one, e.g. a local .env). This step fails with a clear
-      # connection error until that secret exists.
+      # No database password needed -- see the job-level comment above for why
+      # that's worth calling out. If a future CLI version changes this and
+      # `link` starts failing here, add SUPABASE_DB_PASSWORD as a Production
+      # environment secret (Supabase dashboard -> Project Settings ->
+      # Database -> Database password) and pass it as `--password`.
       #
       # Every migration filename's timestamp must equal its real
       # apply_migration version exactly (db push matches by version number,
       # not name) -- see HANDOFF.md's "Migration filenames must carry their
       # real apply_migration timestamp" note before ever hand-editing one.
-      - run: supabase link --project-ref jtwemgyhxylbhjzxgyvh --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+      - run: supabase link --project-ref jtwemgyhxylbhjzxgyvh
 
       - run: supabase db push
