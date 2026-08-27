@@ -60,7 +60,7 @@ export default function NewsSection({ classes }: { classes: { id: string; title:
             <div>
               <b>{post.title}</b>
               <span>
-                {post.published_at ? new Date(post.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : ""}
+                {post.published_at ? new Date(post.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
                 {post.audience === "class" ? ` · ${classTitle(post.class_id) ?? "a class"}` : post.audience === "teachers" ? " · teaching team" : ""}
               </span>
             </div>
@@ -71,7 +71,7 @@ export default function NewsSection({ classes }: { classes: { id: string; title:
 
     {open && <DetailModal title={open.title} onClose={() => setOpenId(null)}>
       <p className="portal-empty compliance-note">
-        {open.published_at ? new Date(open.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : ""}
+        {open.published_at ? new Date(open.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
         {open.audience === "class" ? ` · ${classTitle(open.class_id) ?? "a class"}` : open.audience === "teachers" ? " · teaching team" : ""}
       </p>
       <RichText html={open.body} className="prose-body rich-text" />

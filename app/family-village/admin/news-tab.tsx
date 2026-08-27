@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import SubscribeLink from "../subscribe-link";
 import { uploadPrivateFile } from "../../../lib/storage";
-import { sanitizeRichText, stripRichText } from "../../../lib/rich-text";
+import { inlineImagePaths, sanitizeRichText, stripRichText } from "../../../lib/rich-text";
 import { PostThumbnail, usePostAttachments } from "../post-attachments";
 import RichTextEditor from "../rich-text-editor";
 
@@ -53,7 +53,15 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
     const cleanBody = sanitizeRichText(body);
-    if (!supabase || !title.trim() || !stripRichText(cleanBody)) return;
+    if (!supabase) return;
+    if (!title.trim()) { setStatus("Give the post a headline."); return; }
+    // stripRichText strips every tag, including <img> -- a post that's only
+    // an inline image (the editor's own "Image" button) or only an attached
+    // file (a flyer with no body text) is real, supported content, so
+    // emptiness has to check for those too, not just leftover text, or a
+    // photo/attachment-only post silently never published with no
+    // explanation why.
+    if (!stripRichText(cleanBody) && !inlineImagePaths(cleanBody).length && !files.length) { setStatus("Write something, or add a photo or file, before publishing."); return; }
     if (audience === "class" && !classId) { setStatus("Choose which class this is for."); return; }
     setBusy(true); setStatus("");
 

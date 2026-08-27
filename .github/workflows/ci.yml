@@ -1,0 +1,47 @@
+name: CI
+
+# Runs on every push and PR against main -- build, lint, typecheck, and the
+# test suite, all of which need nothing but the repo itself (no Cloudflare or
+# Supabase credentials). Deployment stays a separate, manual step
+# (HANDOFF.md's documented `wrangler deploy` command) until real deploy
+# secrets are wired up here; this workflow's job is to make sure main never
+# merges something that doesn't even build, lint clean, typecheck, or pass
+# its own tests -- none of which was previously enforced anywhere.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+
+      # NODE_ENV=development on every step: this Mac's local shell has been
+      # seen with NODE_ENV=production set, which makes npm skip
+      # devDependencies entirely (ESLint, TypeScript, Vite, wrangler...) --
+      # see HANDOFF.md. Runner environments default NODE_ENV unset, but
+      # setting it explicitly here keeps this workflow correct regardless of
+      # whatever a future runner image defaults to.
+      - run: npm ci
+        env:
+          NODE_ENV: development
+
+      - run: npm run lint
+        env:
+          NODE_ENV: development
+
+      - run: npm run typecheck
+        env:
+          NODE_ENV: development
+
+      - run: npm test
+        env:
+          NODE_ENV: development

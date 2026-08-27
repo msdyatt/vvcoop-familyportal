@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
 import Avatar from "./avatar";
+import DetailModal from "./detail-modal";
 import { EditableSection, Field, GRADES } from "./admin/admin-ui";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
 
@@ -141,8 +142,14 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         // happens here instead.
         .filter((row) => !row.grades.length || row.grades.includes(childRow.age_band as string))
         .filter((row) => !alreadyIn.has(row.id))
+        // Not-yet-ended, not "currently happening" -- an enrollment period is
+        // routinely opened ahead of a term's start (families sign up for
+        // Spring in December while Fall is still current), and requiring
+        // starts_on <= today filtered out every not-yet-started term's
+        // classes for the entire time enrollment was actually meant to be
+        // open for them.
         .filter((row) => !row.class_terms.length || row.class_terms.some((link) =>
-          link.academic_terms && link.academic_terms.starts_on <= today && today <= link.academic_terms.ends_on))
+          link.academic_terms && today <= link.academic_terms.ends_on))
         .map((row) => ({ id: row.id, title: row.title, description: row.description, is_elective: row.is_elective, schedule: describeSchedule(row) })));
     } else {
       setEligibleClasses([]);
@@ -237,11 +244,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     await load();
   }
 
-  return <div className="child-detail-overlay" role="dialog" aria-modal="true">
-    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- decorative backdrop; Escape and the close button provide keyboard access */}
-    <div className="child-detail-backdrop" onClick={onClose} />
-    <div className="child-detail-panel">
-      <button className="child-detail-close" onClick={onClose} aria-label="Close">×</button>
+  return <DetailModal onClose={onClose}>
       {loading ? <p>Loading…</p> : <>
         <p className="eyebrow">Student</p>
         <div className="child-detail-heading">
@@ -351,6 +354,5 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
           </li>)}</ul> : <p className="portal-empty">No notes yet.</p>}
         </section>
       </>}
-    </div>
-  </div>;
+  </DetailModal>;
 }

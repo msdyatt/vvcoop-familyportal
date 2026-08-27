@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { OpenSignError, sendForSignature, sendFromTemplate } from "../_shared/opensign.ts";
+import { logEdgeError } from "../_shared/error-log.ts";
+import { needsMfaStepUp } from "../_shared/aal.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -18,8 +20,7 @@ function toBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-export default {
-  async fetch(req: Request) {
+async function handle(req: Request): Promise<Response> {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -42,6 +43,7 @@ export default {
       adminClient.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
     ]);
     if (profile?.status !== "active" || !role) return json({ error: "Administrator access is required." }, 403);
+    if (await needsMfaStepUp(userClient)) return json({ error: "Complete two-factor verification before continuing." }, 403);
 
     if (!apiToken) {
       return json({ error: "OpenSign is not configured. Set the OPENSIGN_API_TOKEN secret with `supabase secrets set OPENSIGN_API_TOKEN=...`." }, 400);
@@ -188,6 +190,21 @@ export default {
         await adminClient.from("documents").update({ signature_status: "failed" }).eq("id", document.id);
       }
       return json({ error: message }, 502);
+    }
+}
+
+export default {
+  async fetch(req: Request) {
+    try {
+      return await handle(req);
+    } catch (error) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supabaseUrl && serviceRoleKey) {
+        const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        await logEdgeError(adminClient, "opensign-send", error);
+      }
+      return json({ error: "Something went wrong. This has been logged." }, 500);
     }
   },
 };

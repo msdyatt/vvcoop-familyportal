@@ -271,7 +271,13 @@ function FamilyCompliance({ familyId }: { familyId: string }) {
       if (cancelled) return;
       const rows = (data ?? []) as SchoolYear[];
       setYears(rows);
-      setYearId((current) => current || rows.find((year) => year.is_current)?.id || rows[0]?.id || "");
+      const resolved = rows.find((year) => year.is_current)?.id || rows[0]?.id || "";
+      setYearId((current) => current || resolved);
+      // With no school year at all, the effect below (gated on `if (!yearId)
+      // return`) never runs and never clears loading -- this panel would
+      // otherwise show "Loading…" forever instead of settling into an empty
+      // state.
+      if (!resolved) setLoading(false);
     }
     loadYears();
     return () => { cancelled = true; };

@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ErrorReporter from "./error-reporter";
+import GlobalErrorBoundary from "./global-error-boundary";
 
 export const metadata: Metadata = {
+  // Without this, a relative image URL in openGraph/twitter below resolves
+  // against Next's dev-time fallback (http://localhost:3000) instead of the
+  // real site -- which is exactly why the live Open Graph/Twitter card image
+  // was pointing at localhost.
+  metadataBase: new URL("https://family.veritasvillage.org"),
   title: "Veritas Village | Central Texas Homeschool Co-op",
   description: "A shared place for Central Texas homeschool families to learn with intention and grow in community.",
   icons: {
@@ -40,6 +47,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
       />
     </head>
-    <body>{children}</body>
+    <body>
+      <ErrorReporter />
+      <GlobalErrorBoundary>{children}</GlobalErrorBoundary>
+    </body>
   </html>;
 }

@@ -28,5 +28,11 @@ export function printElement(target: HTMLElement | null) {
   };
   window.addEventListener("afterprint", clean);
   window.print();
-  window.setTimeout(clean, 1000);
+  // A fallback only -- afterprint fires reliably in every browser this app
+  // actually supports, so this exists purely for the browser where it
+  // somehow doesn't. One second used to be the fallback delay, which meant
+  // any print dialog left open longer than that (reviewing printer/page
+  // settings is routine) had its scoping classes stripped mid-dialog,
+  // defeating "print just this report" and printing the whole page instead.
+  window.setTimeout(clean, 60_000);
 }

@@ -1,16 +1,24 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { buildIcs, byDayCode, IcsEvent } from "../_shared/ics.ts";
+import { addDaysDateOnly, DateRange, mergeContiguousRanges } from "../_shared/date-ranges.ts";
+import { logEdgeError } from "../_shared/error-log.ts";
 
 /**
  * Serves a subscribable calendar feed -- no interactive login, because a
  * calendar app polling a webcal URL cannot do one. Three scopes:
  *
  *   ?scope=public                 co-op-wide public events, no auth at all
- *   ?scope=class&id=<classId>     one class's weekly meeting time + its
- *                                 dated events -- the class id is already an
- *                                 unguessable uuid and a meeting time isn't
- *                                 sensitive (it doesn't say who's enrolled)
+ *   ?scope=class&id=<classId>&token=<token>
+ *                                 one class's weekly meeting time + its
+ *                                 dated events, gated by classes.calendar_token
+ *                                 -- the meeting time itself isn't sensitive
+ *                                 (it doesn't say who's enrolled), but a bare
+ *                                 uuid is guessable-adjacent enough (and,
+ *                                 unlike a real secret, not revocable) that a
+ *                                 real per-class token is worth the one extra
+ *                                 query param -- see
+ *                                 regenerate_class_calendar_token()
  *   ?scope=personal&token=<token> everything one profile (family or
  *                                 teacher) is entitled to see, resolved by
  *                                 profiles.calendar_token rather than a
@@ -47,13 +55,6 @@ function localToUtcIso(dateOnly: string, time: string): string {
   return new Date(guess - offsetMinutes(CALENDAR_TZ, new Date(guess)) * 60000).toISOString();
 }
 
-function addDaysDateOnly(dateOnly: string, days: number): string {
-  const [year, month, day] = dateOnly.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 /** First date on/after `from` (both "YYYY-MM-DD") that falls on `dayOfWeek` (Sunday 0 .. Saturday 6). */
 function firstOccurrence(from: string, dayOfWeek: number): string {
   let candidate = from;
@@ -67,8 +68,8 @@ function firstOccurrence(from: string, dayOfWeek: number): string {
 
 type AdminClient = ReturnType<typeof createClient>;
 
-/** The date range a class's recurrence should be bounded to: its own terms if it has any, else its whole school year. */
-async function classDateRange(admin: AdminClient, classId: string, schoolYearId: string | null): Promise<{ starts: string; ends: string } | null> {
+/** The contiguous date spans a class's recurrence should be bounded to: its own terms if it has any, else its whole school year. */
+async function classDateRanges(admin: AdminClient, classId: string, schoolYearId: string | null): Promise<DateRange[]> {
   const { data: termRows } = await admin
     .from("class_terms")
     .select("academic_terms(starts_on,ends_on)")
@@ -76,37 +77,68 @@ async function classDateRange(admin: AdminClient, classId: string, schoolYearId:
   const terms = ((termRows ?? []) as unknown as { academic_terms: { starts_on: string; ends_on: string } | null }[])
     .map((row) => row.academic_terms).filter((term): term is { starts_on: string; ends_on: string } => !!term);
   if (terms.length) {
-    return {
-      starts: terms.reduce((min, term) => (term.starts_on < min ? term.starts_on : min), terms[0].starts_on),
-      ends: terms.reduce((max, term) => (term.ends_on > max ? term.ends_on : max), terms[0].ends_on),
-    };
+    return mergeContiguousRanges(terms.map((term) => ({ starts: term.starts_on, ends: term.ends_on })));
   }
-  if (!schoolYearId) return null;
-  const { data: year } = await admin.from("school_years").select("starts_on,ends_on").eq("id", schoolYearId).maybeSingle();
-  if (!year?.starts_on || !year?.ends_on) return null;
-  return { starts: year.starts_on, ends: year.ends_on };
+  if (!schoolYearId) return [];
+  const { data } = await admin.from("school_years").select("starts_on,ends_on").eq("id", schoolYearId).maybeSingle();
+  const year = data as { starts_on: string | null; ends_on: string | null } | null;
+  if (!year?.starts_on || !year?.ends_on) return [];
+  return [{ starts: year.starts_on, ends: year.ends_on }];
 }
 
-/** One recurring VEVENT for a class's weekly meeting block, or null if the class has no block/no date range. */
-async function classMeetingEvent(admin: AdminClient, klass: { id: string; title: string; block_id: string | null; room_id: string | null; school_year_id: string | null }): Promise<IcsEvent | null> {
-  if (!klass.block_id) return null;
-  const [{ data: block }, { data: room }, range] = await Promise.all([
+type MeetingBlock = { day_of_week: number; starts_at: string; ends_at: string };
+
+/**
+ * One recurring VEVENT per contiguous term span for a class's weekly meeting
+ * block, each bounded to its own span. Pure -- split from the DB read so it can
+ * be exercised directly.
+ *
+ * The times are wall-clock local to the co-op, tagged with CALENDAR_TZ rather
+ * than pre-converted to a UTC instant, so a subscribing app keeps the meeting
+ * at the same clock time when the offset changes at a DST transition mid-term.
+ * RRULE's UNTIL stays UTC per RFC 5545.
+ */
+export function buildClassMeetingEvents(
+  klass: { id: string; title: string },
+  block: MeetingBlock,
+  roomName: string | null,
+  ranges: DateRange[],
+): IcsEvent[] {
+  const single = ranges.length === 1;
+  return ranges.map((range) => {
+    const firstDate = firstOccurrence(range.starts, block.day_of_week);
+    return {
+      // One span keeps the bare class id so an existing subscription's event
+      // is not dropped and recreated; multiple spans need a suffix to stay
+      // distinct, and the span's start date is stable across regenerations.
+      uid: single ? `class-${klass.id}@veritasvillage` : `class-${klass.id}-${range.starts}@veritasvillage`,
+      title: klass.title,
+      location: roomName,
+      allDay: false,
+      local: {
+        tzid: CALENDAR_TZ,
+        startsAt: `${firstDate}T${block.starts_at}`,
+        endsAt: `${firstDate}T${block.ends_at}`,
+      },
+      rrule: { byDay: byDayCode(block.day_of_week), until: localToUtcIso(range.ends, block.ends_at) },
+    };
+  });
+}
+
+/**
+ * Recurring VEVENTs for a class's weekly meeting block. Empty when the class
+ * has no block or no dated span.
+ */
+async function classMeetingEvents(admin: AdminClient, klass: { id: string; title: string; block_id: string | null; room_id: string | null; school_year_id: string | null }): Promise<IcsEvent[]> {
+  if (!klass.block_id) return [];
+  const [{ data: block }, { data: room }, ranges] = await Promise.all([
     admin.from("class_blocks").select("day_of_week,starts_at,ends_at").eq("id", klass.block_id).maybeSingle(),
     klass.room_id ? admin.from("rooms").select("name").eq("id", klass.room_id).maybeSingle() : Promise.resolve({ data: null }),
-    classDateRange(admin, klass.id, klass.school_year_id),
+    classDateRanges(admin, klass.id, klass.school_year_id),
   ]);
-  if (!block || !range) return null;
-
-  const firstDate = firstOccurrence(range.starts, block.day_of_week);
-  return {
-    uid: `class-${klass.id}@veritasvillage`,
-    title: klass.title,
-    location: room?.name ?? null,
-    startsAt: localToUtcIso(firstDate, block.starts_at),
-    endsAt: localToUtcIso(firstDate, block.ends_at),
-    allDay: false,
-    rrule: { byDay: byDayCode(block.day_of_week), until: localToUtcIso(range.ends, block.ends_at) },
-  };
+  if (!block || !ranges.length) return [];
+  const roomName = ((room ?? null) as { name?: string | null } | null)?.name ?? null;
+  return buildClassMeetingEvents(klass, block as MeetingBlock, roomName, ranges);
 }
 
 type EventRow = { id: string; title: string; description: string | null; location: string | null; starts_at: string; ends_at: string | null; all_day: boolean };
@@ -144,16 +176,18 @@ async function handle(req: Request): Promise<Response> {
 
   if (scope === "class") {
     const classId = url.searchParams.get("id");
+    const classToken = url.searchParams.get("token");
     if (!classId) return text("Missing class id.", 400, "text/plain");
-    const { data: klass } = await admin.from("classes").select("id,title,block_id,room_id,school_year_id").eq("id", classId).eq("active", true).maybeSingle();
-    if (!klass) return text("That class was not found.", 404, "text/plain");
+    if (!classToken) return text("Missing token.", 400, "text/plain");
+    const { data: klass } = await admin.from("classes").select("id,title,block_id,room_id,school_year_id").eq("id", classId).eq("calendar_token", classToken).eq("active", true).maybeSingle();
+    if (!klass) return text("That calendar link is no longer valid.", 404, "text/plain");
 
-    const [meeting, { data: eventRows }] = await Promise.all([
-      classMeetingEvent(admin, klass),
+    const [meetings, { data: eventRows }] = await Promise.all([
+      classMeetingEvents(admin, klass),
       admin.from("events").select(EVENT_SELECT).eq("class_id", classId).eq("audience", "class").order("starts_at"),
     ]);
     const events = eventsToIcs((eventRows ?? []) as EventRow[]);
-    return text(buildIcs(meeting ? [meeting, ...events] : events, { name: `Veritas Village – ${klass.title}` }));
+    return text(buildIcs([...meetings, ...events], { name: `Veritas Village – ${klass.title}` }));
   }
 
   if (scope === "personal") {
@@ -193,12 +227,12 @@ async function handle(req: Request): Promise<Response> {
     ]);
 
     const classEventLists = await Promise.all((classRows.data ?? []).map(async (klass) => {
-      const [meeting, { data: eventRows }] = await Promise.all([
-        classMeetingEvent(admin, klass),
+      const [meetings, { data: eventRows }] = await Promise.all([
+        classMeetingEvents(admin, klass),
         admin.from("events").select(EVENT_SELECT).eq("class_id", klass.id).eq("audience", "class").order("starts_at"),
       ]);
       const events = eventsToIcs((eventRows ?? []) as EventRow[]);
-      return meeting ? [meeting, ...events] : events;
+      return [...meetings, ...events];
     }));
 
     return text(buildIcs(
@@ -215,6 +249,19 @@ export default {
     try {
       return await handle(req);
     } catch (error) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supabaseUrl && serviceRoleKey) {
+        const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        // A personal feed's ?token=... is a long-lived bearer credential for
+        // that one person's calendar (see calendar_token.sql) -- logging it
+        // verbatim would hand it to every admin who can read error_log, and
+        // rotating the token afterward wouldn't undo a copy already sitting
+        // there. Redact the value, keep the rest of the URL for debugging.
+        const sanitizedUrl = new URL(req.url);
+        if (sanitizedUrl.searchParams.has("token")) sanitizedUrl.searchParams.set("token", "[redacted]");
+        await logEdgeError(adminClient, "calendar-feed", error, { url: sanitizedUrl.toString() });
+      }
       // A malformed feed is worse than a visible error: a calendar app that
       // gets a 500 with no body just shows "could not refresh," with nothing
       // for anyone to go on.

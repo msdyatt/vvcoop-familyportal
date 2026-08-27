@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
@@ -178,6 +178,45 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   }
 
   /**
+   * A child's enrollments and records move with them -- family_id is the
+   * only column that changes, everything else (enrollments, notes,
+   * compliance history) is keyed to the child, not the household.
+   */
+  async function moveChild(childId: string, childName: string, fromFamilyId: string, toFamilyId: string) {
+    const fromName = families.find((f) => f.id === fromFamilyId);
+    const toName = families.find((f) => f.id === toFamilyId);
+    if (!confirm(`Move ${childName} from ${fromName?.last_name || fromName?.display_name} to ${toName?.last_name || toName?.display_name}?`)) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("children").update({ family_id: toFamilyId }).eq("id", childId);
+    if (error) { setStatus(error.message); return; }
+    await log("child_moved", "child", childId, {
+      first_name: childName,
+      from: fromName?.last_name || fromName?.display_name,
+      to: toName?.last_name || toName?.display_name,
+    });
+    setStatus(`Moved ${childName} to ${toName?.last_name || toName?.display_name}.`);
+    await load();
+  }
+
+  /**
+   * Adds a second (or third) adult to a household that already exists --
+   * the original invite flow only ever created a brand-new household with
+   * one administrator, so a spouse or co-parent had no way in afterward.
+   * Reuses invite-family-admin with a familyId, which skips creating a new
+   * household and links the invited person to this one instead.
+   */
+  async function inviteAdult(familyId: string, adultName: string, email: string, note: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return "The portal is not connected to Supabase.";
+    const { data, error } = await supabase.functions.invoke("invite-family-admin", { body: { familyId, adminName: adultName, email, note } });
+    if (error || data?.error) return await functionErrorMessage(error, data, "The invitation could not be sent.");
+    setStatus(data?.warning ?? `Invitation sent to ${email}.`);
+    await load();
+    return null;
+  }
+
+  /**
    * Removing a member is confirmed once. Removing the *last* member of a
    * household is a different act -- it takes the children, their enrollments
    * and the household record with it -- so that path asks the administrator to
@@ -266,14 +305,15 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
       <p className="compliance-summary">{visibleFamilies.length} shown</p>
     </div>
     <div className="family-manage-list">
-      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} />)}
+      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} allFamilies={families} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onMoveChild={moveChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} onInviteAdult={inviteAdult} />)}
       {!visibleFamilies.length && <p className="portal-empty">No households match those filters.</p>}
     </div>
   </section>;
 }
 
-function FamilyCard({ family, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onUploadAvatar, onRemoveUser, onGrantRole, onRevokeRole }: {
+function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onMoveChild, onUploadAvatar, onRemoveUser, onGrantRole, onRevokeRole, onInviteAdult }: {
   family: Family;
+  allFamilies: Family[];
   roleMap: Record<string, string[]>;
   compliance: ComplianceRow[];
   metrics: { unpaid: number; unsigned: number; taughtClasses: number; missingEnrollment: boolean; noChildren: boolean };
@@ -281,10 +321,12 @@ function FamilyCard({ family, roleMap, compliance, metrics, avatarUrls, onSaveFa
   onSaveFamily: (f: Family) => void;
   onSaveChild: (c: Child) => void;
   onAddChild: (familyId: string, firstName: string) => void;
+  onMoveChild: (childId: string, childName: string, fromFamilyId: string, toFamilyId: string) => void;
   onUploadAvatar: (childId: string, file: File) => void;
   onRemoveUser: (familyId: string, userId: string, displayName: string) => void;
   onGrantRole: (userId: string, role: string) => void;
   onRevokeRole: (userId: string, role: string) => void;
+  onInviteAdult: (familyId: string, adultName: string, email: string, note: string) => Promise<string | null>;
 }) {
   const [lastName, setLastName] = useState(family.last_name ?? family.display_name ?? "");
   const [children, setChildren] = useState(family.children ?? []);
@@ -313,10 +355,7 @@ function FamilyCard({ family, roleMap, compliance, metrics, avatarUrls, onSaveFa
         </span>
       : null}
   >
-    {(metrics.unpaid > 0 || metrics.unsigned > 0) && adults[0]?.profiles?.email && <div className="family-reminder-bar">
-      <span>{metrics.unpaid ? `${metrics.unpaid} unpaid` : ""}{metrics.unpaid && metrics.unsigned ? " · " : ""}{metrics.unsigned ? `${metrics.unsigned} unsigned` : ""}</span>
-      <a href={`mailto:${encodeURIComponent(adults[0].profiles!.email)}?subject=${encodeURIComponent("A reminder from Veritas Village")}&body=${encodeURIComponent(`Hello ${adults[0].profiles?.display_name || "there"},\n\nA quick reminder that your Family Village account has ${[metrics.unpaid ? `${metrics.unpaid} unpaid dues item${metrics.unpaid === 1 ? "" : "s"}` : "", metrics.unsigned ? `${metrics.unsigned} unsigned document${metrics.unsigned === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ")}. You can review these under Paperwork & dues in the portal.\n\nThank you,\nVeritas Village`)}`}>Draft reminder</a>
-    </div>}
+    {(metrics.unpaid > 0 || metrics.unsigned > 0) && adults[0]?.profiles?.email && <ReminderBar familyId={family.id} unpaid={metrics.unpaid} unsigned={metrics.unsigned} />}
     <EditableSection
       label="Household"
       onSave={() => onSaveFamily({ ...family, display_name: lastName, last_name: lastName })}
@@ -351,6 +390,7 @@ function FamilyCard({ family, roleMap, compliance, metrics, avatarUrls, onSaveFa
         </div>;
       })}
       {!adults.length && <p className="portal-empty">No adults have access to this household.</p>}
+      <InviteAdult familyId={family.id} onInvite={onInviteAdult} />
     </div>
 
     <EditableSection label="Children" onSave={async () => { for (const child of children) onSaveChild(child); }} onCancel={() => setChildren(family.children ?? [])}>
@@ -382,6 +422,10 @@ function FamilyCard({ family, roleMap, compliance, metrics, avatarUrls, onSaveFa
               <b>{child.first_name} {child.last_name}</b>
               <span>{child.age_band ? `Grade ${child.age_band}` : "Grade not set"}{child.age_band_override ? " · manual" : ""}{child.active ? "" : " · inactive"}</span>
               <button onClick={() => setViewingChildId(child.id)}>View</button>
+              {allFamilies.length > 1 && <MoveChildControl
+                child={child} currentFamilyId={family.id} allFamilies={allFamilies}
+                onMove={(toFamilyId) => onMoveChild(child.id, child.first_name, family.id, toFamilyId)}
+              />}
             </div>)}
         {!children.length && <p className="portal-empty">No children on this household yet.</p>}
 
@@ -415,4 +459,90 @@ function FamilyCard({ family, roleMap, compliance, metrics, avatarUrls, onSaveFa
 
     {viewingChildId && <ChildDetail childId={viewingChildId} onClose={() => setViewingChildId(null)} />}
   </CollapsibleRecord>;
+}
+
+/** A household picker + confirm, tucked behind a "Move" toggle so it doesn't clutter the common case of never moving anyone. */
+function MoveChildControl({ child, currentFamilyId, allFamilies, onMove }: {
+  child: Child; currentFamilyId: string; allFamilies: Family[]; onMove: (toFamilyId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState("");
+  const options = allFamilies.filter((f) => f.id !== currentFamilyId).sort((a, b) => (a.last_name || a.display_name).localeCompare(b.last_name || b.display_name));
+
+  if (!open) return <button type="button" className="ghost" onClick={() => { setTarget(options[0]?.id ?? ""); setOpen(true); }}>Move</button>;
+
+  return <span className="inline-edit">
+    <select aria-label={`Move ${child.first_name} to`} value={target} onChange={(event) => setTarget(event.target.value)}>
+      {options.map((f) => <option key={f.id} value={f.id}>{f.last_name || f.display_name}</option>)}
+    </select>
+    <button type="button" disabled={!target} onClick={() => { onMove(target); setOpen(false); }}>Move</button>
+    <button type="button" className="ghost" onClick={() => setOpen(false)}>Cancel</button>
+  </span>;
+}
+
+/**
+ * Invites a second adult onto a household that already exists. Kept as its
+ * own small stateful component (not lifted into FamilyCard's state) since
+ * every household's card would otherwise carry email/name/note fields it
+ * almost never uses.
+ */
+function InviteAdult({ familyId, onInvite }: { familyId: string; onInvite: (familyId: string, adultName: string, email: string, note: string) => Promise<string | null> }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function send() {
+    setBusy(true);
+    setError("");
+    const failure = await onInvite(familyId, name.trim(), email.trim(), note.trim());
+    setBusy(false);
+    if (failure) { setError(failure); return; }
+    setName(""); setEmail(""); setNote(""); setOpen(false);
+  }
+
+  if (!open) return <button type="button" className="ghost" onClick={() => setOpen(true)}>Invite another adult</button>;
+
+  return <div className="add-child-row">
+    {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the fields only exist after the admin pressed the button, so focusing follows their intent */}
+    <label>Their name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Jordan Lewis" disabled={busy} /></label>
+    <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="jordan@example.com" disabled={busy} /></label>
+    <label>Personal note <span>optional</span><input value={note} onChange={(event) => setNote(event.target.value)} placeholder="A short welcome from the Village…" disabled={busy} /></label>
+    <div className="row-actions">
+      <button type="button" disabled={busy || !name.trim() || !email.trim()} onClick={send}>{busy ? "Sending…" : "Send invitation"}</button>
+      <button type="button" className="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</button>
+    </div>
+    {error && <p className="admin-form-status" role="status">{error}</p>}
+  </div>;
+}
+
+/**
+ * Sends a real reminder email through Resend, rather than opening the
+ * admin's own mail client with a drafted message they still had to send by
+ * hand -- that manual step was the whole thing the co-op wanted automated.
+ */
+function ReminderBar({ familyId, unpaid, unsigned }: { familyId: string; unpaid: number; unsigned: number }) {
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+
+  async function send() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true);
+    setStatus("");
+    const { data, error } = await supabase.functions.invoke("send-family-reminder", { body: { familyId } });
+    setBusy(false);
+    if (error) { setStatus(await functionErrorMessage(error, data, "The reminder could not be sent.")); return; }
+    setStatus(data?.ok ? `Sent to ${data.sent} of ${data.recipients} adult${data.recipients === 1 ? "" : "s"}.` : (data?.error ?? "The reminder could not be sent."));
+  }
+
+  return <div className="family-reminder-bar">
+    <span>{unpaid ? `${unpaid} unpaid` : ""}{unpaid && unsigned ? " · " : ""}{unsigned ? `${unsigned} unsigned` : ""}</span>
+    <span className="family-reminder-action">
+      {status && <small>{status}</small>}
+      <button type="button" onClick={send} disabled={busy}>{busy ? "Sending…" : "Send reminder"}</button>
+    </span>
+  </div>;
 }

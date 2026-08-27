@@ -6,8 +6,7 @@ import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
 import SubscribeLink from "../subscribe-link";
 import { SchoolYear, formatDate } from "../../../lib/compliance";
 import { ClassBlock, Room, WEEKDAYS, formatBlock, formatBlockTime, formatWeekday } from "../../../lib/schedule";
-import { printElement } from "../../../lib/dom";
-import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES, GradePicker, formatGrades } from "./admin-ui";
+import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES, GradePicker, PrintActions, formatGrades } from "./admin-ui";
 import EnrollmentPeriods from "./enrollment-periods";
 import DetailModal from "../detail-modal";
 
@@ -18,7 +17,7 @@ type ClassTerm = { class_id: string; term_id: string };
 type ClassRow = {
   id: string; title: string; description: string | null; term: string | null;
   grades: string[]; block_id: string | null; room_id: string | null;
-  active: boolean; is_elective: boolean; school_year_id: string | null;
+  active: boolean; is_elective: boolean; school_year_id: string | null; calendar_token: string;
   teacher_assignments: TeacherAssignment[]; enrollments: Enrollment[]; term_ids: string[];
 };
 type TeacherOption = { user_id: string; name: string; email: string };
@@ -53,7 +52,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const [{ data }, { data: teachers }, { data: children }, { data: yearRows }, { data: blockRows }, { data: roomRows }, { data: termRows }, { data: classTermRows }] = await Promise.all([
-      supabase.from("classes").select("id,title,description,term,grades,block_id,room_id,active,is_elective,school_year_id,teacher_assignments(user_id,assignment_role,profiles(display_name,email)),enrollments(child_id,status,children(first_name,last_name,age_band,families(last_name,display_name)))").order("title"),
+      supabase.from("classes").select("id,title,description,term,grades,block_id,room_id,active,is_elective,school_year_id,calendar_token,teacher_assignments(user_id,assignment_role,profiles(display_name,email)),enrollments(child_id,status,children(first_name,last_name,age_band,families(last_name,display_name)))").order("title"),
       // The surname lives on the household, not the profile, so it is joined in
       // rather than showing a bare first name on every roster.
       supabase.from("user_roles").select("user_id,profiles(display_name,email)").eq("role", "teacher"),
@@ -125,8 +124,14 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
    * a co-op morning.
    */
   const clashes = useMemo(() => {
+    // Computed from every class in the year, not `visible` -- a search term
+    // or the class/status filter narrowing what's on screen must not also
+    // narrow which classes get checked against each other, or the clash pill
+    // silently vanishes the moment only one of the two clashing classes
+    // matches the filter, exactly the co-op-morning surprise this exists to
+    // prevent.
     const bySlot = new Map<string, ClassRow[]>();
-    for (const row of visible) {
+    for (const row of yearClasses) {
       if (!row.active || !row.block_id || !row.room_id) continue;
       const key = `${row.block_id}|${row.room_id}`;
       bySlot.set(key, [...(bySlot.get(key) ?? []), row]);
@@ -139,7 +144,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
       }
     }
     return found;
-  }, [visible]);
+  }, [yearClasses]);
 
   const classCounts = useMemo(() => ({
     all: yearClasses.length,
@@ -164,26 +169,34 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
   async function saveClass(row: ClassRow) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { error } = await supabase.from("classes").update({
-      title: row.title, description: row.description, term: row.term,
-      grades: row.grades, block_id: row.block_id, room_id: row.room_id, active: row.active,
-      is_elective: row.is_elective, school_year_id: row.school_year_id,
-    }).eq("id", row.id);
-    if (error) { setStatus(error.message); return; }
-
     const wanted = row.term_ids;
-    const { data: existingRows, error: existingError } = await supabase.from("class_terms").select("term_id").eq("class_id", row.id);
+    // The class_terms read doesn't depend on the classes update completing --
+    // they touch different tables -- so there's no reason to pay for two
+    // round trips back to back before even starting the term diff below.
+    const [{ error }, { data: existingRows, error: existingError }] = await Promise.all([
+      supabase.from("classes").update({
+        title: row.title, description: row.description, term: row.term,
+        grades: row.grades, block_id: row.block_id, room_id: row.room_id, active: row.active,
+        is_elective: row.is_elective, school_year_id: row.school_year_id,
+      }).eq("id", row.id),
+      supabase.from("class_terms").select("term_id").eq("class_id", row.id),
+    ]);
+    if (error) { setStatus(error.message); return; }
     if (existingError) { setStatus(`The class details saved, but its terms could not be checked: ${existingError.message}`); return; }
+
     const existing = new Set((existingRows ?? []).map((item) => item.term_id));
     const add = wanted.filter((termId) => !existing.has(termId));
     const remove = [...existing].filter((termId) => !wanted.includes(termId));
-    if (add.length) {
-      const added = await supabase.from("class_terms").insert(add.map((termId) => ({ class_id: row.id, term_id: termId })));
-      if (added.error) { setStatus(`The class details saved, but its new terms did not: ${added.error.message}`); return; }
-    }
-    if (remove.length) {
-      const removed = await supabase.from("class_terms").delete().eq("class_id", row.id).in("term_id", remove);
-      if (removed.error) { setStatus(`The class details saved, but its old terms were not removed: ${removed.error.message}`); return; }
+    // Disjoint term-id sets -- adding the newly-checked terms and removing
+    // the newly-unchecked ones can't conflict with each other, so there's no
+    // reason to wait for one before starting the other.
+    const [added, removed] = await Promise.all([
+      add.length ? supabase.from("class_terms").insert(add.map((termId) => ({ class_id: row.id, term_id: termId }))) : Promise.resolve({ error: null }),
+      remove.length ? supabase.from("class_terms").delete().eq("class_id", row.id).in("term_id", remove) : Promise.resolve({ error: null }),
+    ]);
+    if (added.error || removed.error) {
+      setStatus(`The class details saved, but its terms did not fully update: ${added.error?.message ?? removed.error?.message}`);
+      return;
     }
     setStatus(`Saved ${row.title}.`);
     await load();
@@ -772,7 +785,12 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
             setLocal({
               ...local,
               school_year_id: schoolYearId,
-              term_ids: local.term_ids.filter((termId) => terms.some((term) => term.id === termId && (!schoolYearId || term.school_year_id === schoolYearId))),
+              // A term only belongs to one school year, so "Unassigned" has
+              // none valid -- `!schoolYearId ||` here used to short-circuit
+              // true and keep every existing term_id verbatim in that case,
+              // leaving a class that was reassigned to a *different* year
+              // later still carrying stale terms from the year before.
+              term_ids: schoolYearId ? local.term_ids.filter((termId) => terms.some((term) => term.id === termId && term.school_year_id === schoolYearId)) : [],
               block_id: keepBlock && keepBlock.school_year_id && schoolYearId && keepBlock.school_year_id !== schoolYearId ? null : local.block_id,
             });
           }}>
@@ -832,7 +850,7 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
 
     <div className="record-section">
       <div className="editable-head"><p className="card-kicker">Roster</p><button onClick={() => setRosterOpen(true)}>Printable roster</button></div>
-      <SubscribeLink query={`scope=class&id=${row.id}`} label="Subscribe to this class’s calendar" />
+      <SubscribeLink query={`scope=class&id=${row.id}&token=${row.calendar_token}`} label="Subscribe to this class’s calendar" />
       {active.map((entry) => <div className="child-line" key={entry.child_id}>
         <b>{entry.children?.first_name} {entry.children?.last_name}</b>
         <span>enrolled</span>
@@ -977,7 +995,7 @@ function MasterRoster({ classes, blocks, rooms, terms, year }: {
   const pages = orderedTerms.length ? orderedTerms : [null];
 
   return <div className="roster-report-shell">
-    <div className="roster-report-actions no-print"><p>{classes.length} class{classes.length === 1 ? "" : "es"} across {orderedTerms.length || 1} page{orderedTerms.length === 1 ? "" : "s"}</p><button onClick={() => printElement(reportRef.current)}>Print master roster</button></div>
+    <div className="roster-report-actions no-print"><p>{classes.length} class{classes.length === 1 ? "" : "es"} across {orderedTerms.length || 1} page{orderedTerms.length === 1 ? "" : "s"}</p><PrintActions title={`${year.label} Class Roster`} targetRef={reportRef} printLabel="Print master roster" /></div>
     <section ref={reportRef} className="roster-print-sheet master-roster">
       {pages.map((term, pageIndex) => {
         const forTerm = classes.filter((row) => !term || !row.term_ids.length || row.term_ids.includes(term.id));
@@ -1025,7 +1043,7 @@ function RosterReport({ row, block, room, teacherName }: {
     .sort((a, b) => `${a.children?.last_name ?? ""}${a.children?.first_name ?? ""}`.localeCompare(`${b.children?.last_name ?? ""}${b.children?.first_name ?? ""}`));
 
   return <div className="roster-report-shell">
-    <div className="roster-report-actions no-print"><p>{active.length} enrolled student{active.length === 1 ? "" : "s"}</p><button onClick={() => printElement(reportRef.current)}>Print roster</button></div>
+    <div className="roster-report-actions no-print"><p>{active.length} enrolled student{active.length === 1 ? "" : "s"}</p><PrintActions title={`${row.title} roster`} targetRef={reportRef} printLabel="Print roster" /></div>
     <section ref={reportRef} className="roster-print-sheet">
       <div className="roster-print-head"><div><p>VERITAS VILLAGE</p><h2>{row.title}</h2></div><span>{block ? formatBlock(block) : "Time to be announced"}<br/>{room?.name ?? "Room to be announced"}</span></div>
       <dl className="roster-print-meta"><div><dt>Teaching team</dt><dd>{row.teacher_assignments.length ? row.teacher_assignments.map((assignment) => `${teacherName(assignment)} (${assignment.assignment_role})`).join(", ") : "Not assigned"}</dd></div><div><dt>Grades</dt><dd>{formatGrades(row.grades)}</dd></div></dl>

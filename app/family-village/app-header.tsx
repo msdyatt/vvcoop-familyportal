@@ -8,6 +8,7 @@ import PortalNav from "./portal-nav";
 import DetailModal from "./detail-modal";
 import AccountSettings from "./account-settings";
 import Avatar from "./avatar";
+import NotificationBell from "./notification-bell";
 import { getSignedFileUrl } from "../../lib/storage";
 
 type PortalKey = "home" | "admin" | "teacher";
@@ -61,6 +62,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
       <div className="app-header-title"><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
       <div className="app-header-actions">
         <PortalNav current={current} roles={roles} />
+        <NotificationBell />
         <div className="account-menu" ref={menuRef}>
           <button type="button" className="account-avatar-button" onClick={() => setMenuOpen((value) => !value)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label="Account menu">
             <Avatar url={avatarUrl} label={initial || "…"} size="sm" />

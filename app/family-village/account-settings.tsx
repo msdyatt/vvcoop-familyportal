@@ -114,6 +114,26 @@ function ContactSection({ onProfileUpdated }: { onProfileUpdated?: () => void })
     onProfileUpdated?.();
   }
 
+  /**
+   * Re-opens the cropper on the photo already saved, rather than only
+   * offering "pick a new file" -- the cropper only works on a File object it
+   * has in hand, so this re-fetches the current signed image and wraps it as
+   * one, the same shape a fresh upload would produce.
+   */
+  async function editExisting() {
+    if (!avatarUrl) return;
+    setAvatarStatus("Opening your photo…");
+    try {
+      const response = await fetch(avatarUrl);
+      if (!response.ok) throw new Error();
+      const blob = await response.blob();
+      setPendingAvatar(new File([blob], "current-avatar.jpg", { type: blob.type || "image/jpeg" }));
+      setAvatarStatus("");
+    } catch {
+      setAvatarStatus("Could not open the current photo for editing.");
+    }
+  }
+
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { load(); }, []);
 
@@ -143,9 +163,10 @@ function ContactSection({ onProfileUpdated }: { onProfileUpdated?: () => void })
     <div className="avatar-uploader">
       <Avatar url={avatarUrl} label={displayName || "?"} size="lg" />
       <div>
-        <label className="file-drop"><span className="field-caption">Photo</span>
+        <label className="file-drop"><span className="field-caption">{avatarUrl ? "Replace photo" : "Photo"}</span>
           <input type="file" accept="image/*" disabled={avatarBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) setPendingAvatar(file); event.currentTarget.value = ""; }} />
         </label>
+        {avatarUrl && <button type="button" className="ghost" onClick={editExisting} disabled={avatarBusy}>Edit crop</button>}
         <p className="admin-form-status" role="status">{avatarStatus}</p>
       </div>
     </div>

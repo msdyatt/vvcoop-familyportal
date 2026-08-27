@@ -14,14 +14,30 @@ export type IcsEvent = {
   title: string;
   description?: string | null;
   location?: string | null;
-  /** ISO timestamp. For an all-day event, only the date portion is used. */
-  startsAt: string;
+  /** ISO timestamp. For an all-day event, only the date portion is used. Unused (and optional) when `local` is set. */
+  startsAt?: string;
   endsAt?: string | null;
   allDay: boolean;
+  /**
+   * A wall-clock time in a named zone, for a weekly class meeting that must
+   * stay at the same clock time when the zone's UTC offset changes at a
+   * daylight-saving transition. When set, DTSTART/DTEND are written as local
+   * times tagged with TZID and buildIcs emits a matching VTIMEZONE -- a bare
+   * UTC DTSTART with a weekly RRULE would instead be expanded by a fixed
+   * 168-hour step and land an hour off for every occurrence after the change.
+   */
+  local?: {
+    /** IANA zone name; buildIcs must have a VTIMEZONE defined for it. */
+    tzid: string;
+    /** Naive wall-clock, no offset or "Z": "2026-09-04T14:00:00". */
+    startsAt: string;
+    /** Naive wall-clock, no offset or "Z". */
+    endsAt: string;
+  };
   /** Set for a recurring class meeting block. */
   rrule?: {
     byDay: string; // e.g. "FR"
-    /** ISO timestamp -- the last date the recurrence can land on. */
+    /** ISO timestamp -- the last start instant the recurrence can land on. Kept in UTC even for a `local` event, per RFC 5545 3.3.10. */
     until: string;
   };
 };
@@ -70,6 +86,18 @@ function formatDateTime(iso: string): string {
   return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`;
 }
 
+/**
+ * "2026-09-04T14:00:00" -> "20260904T140000", by string surgery only. A naive
+ * wall-clock string must never be routed through `new Date()`: that reads it in
+ * whatever zone the runtime happens to be in and shifts the result.
+ */
+function formatLocalDateTime(naive: string): string {
+  const match = naive.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[T ](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+  if (!match) throw new Error(`ics: not a naive local date-time: ${JSON.stringify(naive)}`);
+  const [, year, month, day, hour, minute, second] = match;
+  return `${year}${pad(+month)}${pad(+day)}T${pad(+hour)}${pad(+minute)}${pad(+(second ?? 0))}`;
+}
+
 function addDays(iso: string, days: number): string {
   const date = new Date(iso);
   date.setUTCDate(date.getUTCDate() + days);
@@ -79,11 +107,18 @@ function addDays(iso: string, days: number): string {
 function buildEvent(event: IcsEvent, stamp: string): string[] {
   const lines: string[] = ["BEGIN:VEVENT", `UID:${event.uid}`, `DTSTAMP:${stamp}`];
 
-  if (event.allDay) {
+  if (event.local) {
+    // Local wall time + TZID, so a subscribing app expands the RRULE by this
+    // zone's DST rules (see VTIMEZONE_BLOCKS) rather than a frozen UTC offset.
+    lines.push(`DTSTART;TZID=${event.local.tzid}:${formatLocalDateTime(event.local.startsAt)}`);
+    lines.push(`DTEND;TZID=${event.local.tzid}:${formatLocalDateTime(event.local.endsAt)}`);
+  } else if (event.allDay) {
+    if (!event.startsAt) throw new Error("ics: an all-day event needs startsAt");
     lines.push(`DTSTART;VALUE=DATE:${formatDateOnly(event.startsAt)}`);
     // DTEND is exclusive for an all-day event -- one day after the last day it covers.
     lines.push(`DTEND;VALUE=DATE:${formatDateOnly(addDays(event.endsAt ?? event.startsAt, 1))}`);
   } else {
+    if (!event.startsAt) throw new Error("ics: a timed event needs startsAt");
     lines.push(`DTSTART:${formatDateTime(event.startsAt)}`);
     if (event.endsAt) lines.push(`DTEND:${formatDateTime(event.endsAt)}`);
   }
@@ -98,6 +133,39 @@ function buildEvent(event: IcsEvent, stamp: string): string[] {
 }
 
 /**
+ * VTIMEZONE bodies for every zone a `local` event may name. Emitted into the
+ * VCALENDAR whenever some event references the zone, so a subscribing app has
+ * the DST transition rules on hand to expand a weekly RRULE by wall clock.
+ *
+ * America/Chicago is given under the U.S. rule in force since 2007: CDT
+ * (UTC-5) from 02:00 on the second Sunday of March, CST (UTC-6) from 02:00 on
+ * the first Sunday of November. The 2007 DTSTART is just a real anchor instance
+ * of each yearly rule -- only the RRULE and offsets are consulted for the
+ * years a class actually meets.
+ */
+const VTIMEZONE_BLOCKS: Record<string, string[]> = {
+  "America/Chicago": [
+    "BEGIN:VTIMEZONE",
+    "TZID:America/Chicago",
+    "BEGIN:DAYLIGHT",
+    "DTSTART:20070311T020000",
+    "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
+    "TZOFFSETFROM:-0600",
+    "TZOFFSETTO:-0500",
+    "TZNAME:CDT",
+    "END:DAYLIGHT",
+    "BEGIN:STANDARD",
+    "DTSTART:20071104T020000",
+    "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
+    "TZOFFSETFROM:-0500",
+    "TZOFFSETTO:-0600",
+    "TZNAME:CST",
+    "END:STANDARD",
+    "END:VTIMEZONE",
+  ],
+};
+
+/**
  * Renders a full VCALENDAR document, ready to serve as text/calendar.
  *
  * X-WR-CALNAME (and X-WR-CALDESC) are non-standard but universally
@@ -108,6 +176,12 @@ function buildEvent(event: IcsEvent, stamp: string): string[] {
  */
 export function buildIcs(events: IcsEvent[], calendar: { name: string; description?: string }): string {
   const stamp = formatDateTime(new Date().toISOString());
+  const tzids = [...new Set(events.flatMap((event) => (event.local ? [event.local.tzid] : [])))];
+  const vtimezoneLines = tzids.flatMap((tzid) => {
+    const block = VTIMEZONE_BLOCKS[tzid];
+    if (!block) throw new Error(`ics: no VTIMEZONE defined for ${tzid}`);
+    return block;
+  });
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -115,6 +189,9 @@ export function buildIcs(events: IcsEvent[], calendar: { name: string; descripti
     "CALSCALE:GREGORIAN",
     `X-WR-CALNAME:${escapeText(calendar.name)}`,
     ...(calendar.description ? [`X-WR-CALDESC:${escapeText(calendar.description)}`] : []),
+    // VTIMEZONE components precede the VEVENTs that reference them, as every
+    // real-world producer emits them and some parsers assume it.
+    ...vtimezoneLines,
     ...events.flatMap((event) => buildEvent(event, stamp)),
     "END:VCALENDAR",
   ];

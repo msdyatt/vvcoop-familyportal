@@ -8,6 +8,32 @@ export function isSupabaseConfigured() {
   return Boolean(projectUrl && publishableKey);
 }
 
+/**
+ * The real reason a `supabase.functions.invoke()` call failed.
+ *
+ * When an edge function returns a non-2xx response, supabase-js's `error`
+ * always carries the same generic `error.message` ("Edge Function returned a
+ * non-2xx status code") regardless of what the function actually said --
+ * the real body only lives on `error.context` (the raw Response), which the
+ * caller has to fetch and parse itself. Every call site that skipped this and
+ * just read `error?.message` showed that generic sentence instead of, say,
+ * "Please purchase or renew your subscription" -- which reads as "erroring
+ * out for no reason" instead of "OpenSign needs your attention."
+ */
+export async function functionErrorMessage(error: unknown, data: { error?: string } | null | undefined, fallback: string): Promise<string> {
+  if (data?.error) return data.error;
+  const context = (error as { context?: unknown })?.context;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json();
+      if (typeof body?.error === "string" && body.error) return body.error;
+    } catch {
+      // Body wasn't JSON (or already consumed) -- fall through.
+    }
+  }
+  return (error as { message?: string })?.message || fallback;
+}
+
 /** Public HTTPS URL for a deployed edge function -- e.g. the calendar feed, which a calendar app polls directly rather than through the supabase-js client. */
 export function edgeFunctionUrl(name: string) {
   return `${projectUrl}/functions/v1/${name}`;

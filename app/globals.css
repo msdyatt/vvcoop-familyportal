@@ -71,6 +71,105 @@ a {
   color:inherit;
 }
 
+/* Every text input, select, and textarea in the site shares this base --
+   before this rule existed, ~15 contexts (portal forms, admin forms, the
+   news composer, table-row inline edits, filter bars) each hand-rolled their
+   own slightly different padding/font-size/border, so two fields sitting
+   next to each other from different contexts looked visibly inconsistent.
+   :where() keeps this at zero specificity, so a context that genuinely needs
+   to differ (e.g. a compact table-row field) can still override it with a
+   plain, single class-level selector rather than needing !important. */
+:where(input:not([type=checkbox]):not([type=radio]), select, textarea) {
+  width:100%;
+  padding:11px 12px;
+  background:var(--surface-sunken);
+  color:var(--navy);
+  /* 16px keeps iOS Safari from zooming the viewport on focus. */
+  font:16px var(--sans);
+  border:1px solid rgba(var(--navy-rgb),.18);
+  border-radius:2px;
+}
+
+/* A checkbox/radio caught by the text-control rule above rendered as a huge
+   full-width bordered box instead of a normal checkbox -- only three of the
+   dozen-plus checkboxes across the app happened to sit inside a context that
+   overrode it back (.event-composer/.portal-form's .checkbox-field), so most
+   were silently broken. One global reset, same :where() zero-specificity
+   convention as above, instead of hunting down every remaining context. */
+:where(input[type=checkbox], input[type=radio]) {
+  width:17px;
+  height:17px;
+  flex-shrink:0;
+  accent-color:var(--portal-accent);
+  cursor:pointer;
+}
+
+:where(input, textarea, select):focus-visible {
+  outline:2px solid var(--portal-accent);
+  outline-offset:1px;
+}
+
+:where(select) {
+  appearance:none;
+  padding-right:34px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--portal-accent) 50%),linear-gradient(135deg,var(--portal-accent) 50%,transparent 50%);
+  background-position:calc(100% - 18px) calc(50% + 2px),calc(100% - 13px) calc(50% + 2px);
+  background-size:5px 5px,5px 5px;
+  background-repeat:no-repeat;
+  cursor:pointer;
+}
+
+/* Table-row and card-inline contexts are deliberately smaller than a full
+   form field -- grouped here so their size stays consistent with each other
+   instead of five separately-drifted numbers. */
+.add-row select,
+.child-row input, .member-row input,
+.assign-row select,
+.integration-card select {
+  padding:8px 10px;
+  font-size:14px;
+}
+
+/* Same story as the form-control base above, but for buttons: "ghost"
+   (secondary/neutral) and "danger" (destructive) are used as class names in
+   roughly two dozen places across the admin and family portals, but each
+   only had real CSS in the ~4-6 contexts someone had gotten around to
+   styling. Everywhere else, className="ghost"/"danger" did nothing at all --
+   the button rendered with no border or fill, which is exactly why some
+   controls didn't read as clickable. :where() keeps this at zero
+   specificity, so the handful of contexts that already style their own
+   .ghost/.danger more specifically (e.g. .compliance-editor-actions
+   button.ghost) still win unchanged. */
+:where(button.ghost, a.ghost) {
+  display:inline-block;
+  padding:9px 14px;
+  background:transparent;
+  color:var(--navy);
+  font:600 12px var(--sans);
+  border:1px solid rgba(var(--navy-rgb),.3);
+  border-radius:2px;
+  cursor:pointer;
+  text-decoration:none;
+}
+
+:where(button.ghost):hover, :where(a.ghost):hover {
+  background:var(--panel);
+}
+
+:where(button.danger) {
+  padding:9px 14px;
+  background:transparent;
+  color:var(--terracotta-deep);
+  font:600 12px var(--sans);
+  border:1px solid var(--terracotta);
+  border-radius:2px;
+  cursor:pointer;
+}
+
+:where(button.danger):hover {
+  background:var(--warm-tint);
+}
+
 .site-header {
   position:absolute;
   z-index:10;
@@ -882,12 +981,25 @@ footer nav a:hover {
   font-weight:700;
 }
 
-.family-reminder-bar a {
+.family-reminder-action {
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.family-reminder-action small {
+  font-weight:400;
+  color:var(--terracotta-deep);
+}
+
+.family-reminder-bar a,
+.family-reminder-bar button {
   padding:7px 10px;
   background:var(--surface);
   color:var(--navy);
   text-decoration:none;
   border:1px solid rgba(var(--navy-rgb),.2);
+  cursor:pointer;
 }
 
 .import-payer {
@@ -1012,11 +1124,6 @@ footer nav a:hover {
   font:400 14px var(--sans);
 }
 
-.event-composer .checkbox-field input[type=checkbox] {
-  width:17px;
-  height:17px;
-}
-
 .event-composer .composer-row label {
   display:grid;
   gap:5px;
@@ -1050,6 +1157,16 @@ footer nav a:hover {
 
 .teacher-calendar {
   overflow-x:auto;
+}
+
+/* Wraps a wide table (dues-import's preview, the print-jobs list) so IT
+   scrolls sideways on a narrow viewport instead of the whole page body --
+   used in markup already (dues-import.tsx) but never had a matching rule, so
+   that table has been silently overflowing the page edge-to-edge instead of
+   scrolling within its own box. */
+.scroller {
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
 }
 
 .calendar-list-view {
@@ -1274,6 +1391,14 @@ footer nav a:hover {
   gap:24px;
 }
 
+.reports-export-row {
+  display:grid;
+  gap:10px;
+  padding:20px 24px;
+  background:var(--surface);
+  border:1px solid rgba(var(--navy-rgb),.12);
+}
+
 .printable-report,
 .roster-print-sheet {
   padding:24px;
@@ -1338,6 +1463,41 @@ footer nav a:hover {
   gap:12px;
   align-items:center;
   margin-bottom:12px;
+}
+
+.print-actions {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.print-duplex-toggle {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  font-weight:600;
+  color:var(--sage-text);
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+/* .printable-report/.roster-report-actions's own `button` rule above paints
+   every button navy-filled, including this group's secondary action -- these
+   two selectors both carry real specificity (unlike the sitewide :where()
+   ghost-button fallback, which is zero), so they need a matching level of
+   specificity here to actually win. */
+.printable-report .print-actions button.ghost,
+.roster-report-actions .print-actions button.ghost {
+  background:transparent;
+  color:var(--navy);
+  border:1px solid rgba(var(--navy-rgb),.3);
+}
+
+.print-actions-status {
+  font-size:12px;
+  color:var(--sage-text);
 }
 
 .roster-print-meta {
@@ -1449,6 +1609,16 @@ footer nav a:hover {
 }
 
 @media print {
+  /* Every printed page in this app -- rosters, master rosters, printable
+     reports -- is a wide table (class/room/teacher/roster columns), which
+     fights portrait orientation. There is exactly one print path in the whole
+     site (printElement() below), so this is safe to set unconditionally
+     rather than needing to scope it per report. */
+  @page {
+    size: landscape;
+    margin: 0.5in;
+  }
+
   /* Hides everything EXCEPT the print target, everything inside it, and its
      own ancestor chain -- not "hide everything, then revert the target,"
      which the first version of this did. Reverting display:none back with
@@ -2252,7 +2422,10 @@ footer nav a:hover {
 
 .document-list>article>span {
   align-self:center;
-  color:var(--terracotta);
+  /* --terracotta-text, not --terracotta -- per the :root comment on the two
+     variables, plain --terracotta is only 4.0:1 on cream, which fails AA
+     for anything under 18.66px bold. This is 9px. */
+  color:var(--terracotta-text);
   font-size:9px;
   font-weight:700;
   text-transform:uppercase;
@@ -2484,32 +2657,6 @@ footer nav a:hover {
   letter-spacing:0;
   text-transform:none;
   opacity:.8;
-}
-
-.portal-form input,.portal-form textarea,.portal-form select {
-  width:100%;
-  padding:11px 12px;
-  background:var(--surface-sunken);
-  color:var(--navy);
-  /* 16px keeps iOS Safari from zooming the viewport on focus. */
-  font:16px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.18);
-  border-radius:2px;
-}
-
-.portal-form select {
-  appearance:none;
-  padding-right:34px;
-  background-image:linear-gradient(45deg,transparent 50%,var(--portal-accent) 50%),linear-gradient(135deg,var(--portal-accent) 50%,transparent 50%);
-  background-position:calc(100% - 18px) calc(50% + 2px),calc(100% - 13px) calc(50% + 2px);
-  background-size:5px 5px,5px 5px;
-  background-repeat:no-repeat;
-  cursor:pointer;
-}
-
-.portal-form input:focus-visible,.portal-form textarea:focus-visible,.portal-form select:focus-visible {
-  outline:2px solid var(--portal-accent);
-  outline-offset:1px;
 }
 
 .portal-form textarea {
@@ -2977,15 +3124,6 @@ footer nav a:hover {
   font-weight:400;
 }
 
-.admin-invite-form input,.admin-invite-form textarea,.accept-invite input {
-  width:100%;
-  padding:13px 14px;
-  background:var(--surface-sunken);
-  color:var(--navy);
-  font:15px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.18);
-}
-
 .admin-invite-form textarea {
   min-height:90px;
   resize:vertical;
@@ -3020,11 +3158,11 @@ footer nav a:hover {
   box-shadow:0 18px 45px rgba(0,0,0,.18);
 }
 
-.email-vv {
-  margin:0!important;
-  color:var(--navy)!important;
-  font:700 18px var(--serif)!important;
-  letter-spacing:1px;
+.email-logo {
+  display:block;
+  width:150px;
+  height:auto;
+  margin:0;
 }
 
 .email-rule {
@@ -3322,14 +3460,6 @@ footer nav a:hover {
   text-transform:uppercase;
 }
 
-.child-row input,.member-row input {
-  padding:8px 10px;
-  background:var(--surface-sunken);
-  color:var(--navy);
-  font:13px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.16);
-}
-
 .child-row .checkbox-field,.member-row .checkbox-field {
   flex-direction:row;
   align-items:center;
@@ -3380,14 +3510,6 @@ footer nav a:hover {
   border:1px solid rgba(var(--navy-rgb),.12);
 }
 
-.news-composer input,.news-composer textarea,.news-composer select {
-  padding:12px;
-  background:var(--surface-sunken);
-  color:var(--navy);
-  font:14px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.16);
-}
-
 .news-composer textarea {
   min-height:110px;
 }
@@ -3435,6 +3557,18 @@ footer nav a:hover {
 
 .news-item div {
   flex:1;
+}
+
+/* .news-item div above also matches .row-actions -- it's a div too -- so it
+   was inheriting flex:1 and stretching to the same height as the (often
+   multi-line) text column next to it. Flex's default align-items:stretch
+   then stretched the buttons inside it to fill that height, so "Edit" and
+   "Delete" rendered as ~100px-tall bars instead of normal buttons. Confirmed
+   live via getBoundingClientRect before landing this fix. */
+.news-item .row-actions {
+  flex:0 0 auto;
+  align-self:flex-start;
+  align-items:flex-start;
 }
 
 .news-item b {
@@ -3551,30 +3685,29 @@ footer nav a:hover {
   transform:translateY(-2px);
 }
 
-.child-detail-overlay {
+/* detail-modal.tsx renders this class directly on a <dialog>, opened via
+   showModal() -- its :modal state's own UA default is position:fixed with
+   inset-block:0, which is what actually centers it in the browser's
+   top-layer; overriding that back to position:relative (the old div-based
+   layout's positioning) would break that centering, so this only adds what
+   showModal() doesn't already provide: the size, the visible chrome, and
+   this element's own backdrop (dialog's ::backdrop pseudo-element, not a
+   separate div). */
+.child-detail-panel {
   position:fixed;
   inset:0;
-  z-index:50;
-  display:grid;
-  place-items:center;
-  padding:20px;
-}
-
-.child-detail-backdrop {
-  position:absolute;
-  inset:0;
-  background:rgba(var(--navy-rgb),.55);
-}
-
-.child-detail-panel {
-  position:relative;
-  z-index:1;
-  width:min(560px,100%);
+  margin:auto;
+  width:min(560px,calc(100vw - 40px));
   max-height:85vh;
   overflow-y:auto;
   padding:clamp(26px,4vw,42px);
   background:var(--surface);
+  border:0;
   box-shadow:0 24px 60px rgba(0,0,0,.25);
+}
+
+.child-detail-panel::backdrop {
+  background:rgba(var(--navy-rgb),.55);
 }
 
 .child-detail-heading {
@@ -3744,12 +3877,6 @@ footer nav a:hover {
   margin-top:10px;
 }
 
-.add-row select {
-  padding:8px 10px;
-  background:var(--surface-sunken);
-  border:1px solid rgba(var(--navy-rgb),.16);
-}
-
 .add-row button {
   padding:8px 12px;
   background:transparent;
@@ -3784,10 +3911,31 @@ footer nav a:hover {
   font:700 21px var(--serif);
 }
 
-.integration-card select {
-  padding:8px 10px;
-  background:var(--surface-sunken);
-  border:1px solid rgba(var(--navy-rgb),.16);
+.print-jobs-table {
+  width:100%;
+  min-width:520px;
+  border-collapse:collapse;
+  font-size:13px;
+}
+
+.print-jobs-table th,
+.print-jobs-table td {
+  padding:9px 8px;
+  text-align:left;
+  white-space:nowrap;
+  border-bottom:1px solid rgba(var(--navy-rgb),.1);
+}
+
+.print-jobs-table thead th {
+  color:var(--sage-text);
+  font:700 10px var(--sans);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.print-jobs-table button {
+  padding:6px 10px;
+  font-size:12px;
 }
 
 .integration-card label {
@@ -4204,6 +4352,10 @@ footer nav a:hover {
   border-radius:50%;
   object-fit:cover;
   flex-shrink:0;
+  /* A slight dim rather than full brightness -- a real photo or the bright
+     terracotta fallback circle both read as a touch harsh at these small,
+     high-contrast sizes without it. */
+  filter:brightness(0.93);
 }
 
 .avatar-fallback {
@@ -4237,7 +4389,7 @@ footer nav a:hover {
   margin:14px 0 20px;
 }
 
-.avatar-uploader .file-drop { margin:0; }
+.avatar-uploader .file-drop { margin:0 0 8px; }
 
 .danger-zone .card-kicker {
   color:var(--terracotta-on-navy);
@@ -4282,7 +4434,12 @@ footer nav a:hover {
 
 .passkey-button {
   border-color:var(--terracotta) !important;
-  color:var(--terracotta) !important;
+  /* --terracotta-text, not --terracotta -- the same distinction the rest of
+     the site already draws between an accent color (for borders/fills) and
+     its pre-darkened text-safe counterpart. Plain --terracotta on this
+     button's light background measured ~4.0:1, short of WCAG AA's 4.5:1;
+     --terracotta-text clears it at ~4.9:1. */
+  color:var(--terracotta-text) !important;
   font-weight:700;
 }
 
@@ -4335,6 +4492,133 @@ footer nav a:hover {
   align-items:center;
   gap:12px;
   flex-wrap:wrap;
+}
+
+.notification-bell {
+  position:relative;
+}
+
+.notification-bell-button {
+  /* --portal-band-fg/--portal-band-rule, not a hardcoded navy -- the admin
+     header runs dark (cream-on-navy), and a navy icon on a navy background
+     is invisible there. Confirmed live: the button worked (it opened the
+     dropdown), it just couldn't be seen. */
+  position:relative;
+  width:40px;
+  height:40px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:transparent;
+  border:1px solid var(--portal-band-rule);
+  color:var(--portal-band-fg);
+  cursor:pointer;
+  flex-shrink:0;
+}
+
+.notification-bell-button:hover {
+  background:var(--panel);
+}
+
+.notification-badge {
+  position:absolute;
+  top:-4px;
+  right:-4px;
+  min-width:16px;
+  height:16px;
+  padding:0 3px;
+  display:grid;
+  place-items:center;
+  background:var(--terracotta);
+  color:var(--cream);
+  font-size:10px;
+  font-weight:700;
+  border-radius:8px;
+  border:2px solid var(--portal-band-bg);
+}
+
+.notification-dropdown {
+  /* fixed, not absolute -- top/left/width are set inline per-render from the
+     bell button's real getBoundingClientRect(), not CSS right:0. The bell
+     sits mid-header (not at the far edge like the account menu), so an
+     edge-anchored dropdown ran off the left side of a narrow screen; see
+     notification-bell.tsx's reposition(). */
+  position:fixed;
+  z-index:20;
+  max-height:70vh;
+  overflow-y:auto;
+  background:var(--surface);
+  border:1px solid rgba(var(--navy-rgb),.18);
+  box-shadow:0 12px 30px rgba(var(--navy-rgb),.15);
+}
+
+.notification-dropdown-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:12px 14px 6px;
+}
+
+.notification-dropdown-head button {
+  background:transparent;
+  border:0;
+  color:var(--terracotta-text);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.notification-dropdown .portal-empty {
+  padding:6px 14px 16px;
+}
+
+.notification-dropdown ul {
+  list-style:none;
+  margin:0;
+  padding:0 6px 6px;
+  display:grid;
+  gap:2px;
+}
+
+.notification-item {
+  width:100%;
+  display:grid;
+  gap:2px;
+  padding:10px 8px;
+  background:transparent;
+  border:0;
+  text-align:left;
+  cursor:pointer;
+}
+
+.notification-item:hover {
+  background:var(--panel);
+}
+
+.notification-item.unread {
+  background:rgba(187,97,65,.08);
+}
+
+.notification-item-title {
+  color:var(--navy);
+  font-size:13px;
+  font-weight:700;
+}
+
+.notification-item-body {
+  color:var(--sage-text);
+  font-size:12px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+
+.notification-item-time {
+  color:var(--sage-text);
+  font-size:11px;
 }
 
 .account-menu {
@@ -4926,14 +5210,6 @@ footer nav a:hover {
   text-transform:uppercase;
 }
 
-.compliance-toolbar select {
-  padding:10px 12px;
-  background:var(--surface-sunken);
-  color:var(--navy);
-  font:15px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.18);
-}
-
 .compliance-summary {
   margin:0 0 8px;
   color:var(--sage-text);
@@ -5122,12 +5398,6 @@ footer nav a:hover {
 
 .inline-edit input {
   min-width:min(340px,60vw);
-  padding:9px 11px;
-  background:var(--surface);
-  color:var(--navy);
-  font:14px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.2);
-  border-radius:2px;
 }
 
 .compliance-requirement .row-actions button.ghost {
@@ -5274,13 +5544,6 @@ footer nav a:hover {
   text-transform:none;
 }
 
-.portal-form .checkbox-field input[type=checkbox] {
-  width:17px;
-  height:17px;
-  flex-shrink:0;
-  accent-color:var(--portal-accent);
-  cursor:pointer;
-}
 
 /* The prep flag also appears in the child detail list, which styles its spans
    the same way the portal list does -- so it needs the same weight there. */
@@ -5449,17 +5712,38 @@ footer nav a:hover {
   text-transform:uppercase;
 }
 
-.activity-filters select {
-  padding:9px 11px;
-  background:var(--surface-sunken);
-  color:var(--navy);
-  font:14px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.18);
-  border-radius:2px;
-}
-
 .activity-count {
   margin:0 0 10px auto;
+  color:var(--sage-text);
+  font-size:13px;
+  font-variant-numeric:tabular-nums;
+}
+
+.activity-pager {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:16px;
+  padding-top:16px;
+  border-top:1px solid rgba(var(--navy-rgb),.1);
+}
+
+.activity-pager label {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.activity-pager select {
+  width:auto;
+}
+
+.activity-pager-nav {
+  display:flex;
+  align-items:center;
+  gap:12px;
   color:var(--sage-text);
   font-size:13px;
   font-variant-numeric:tabular-nums;
@@ -5469,6 +5753,11 @@ footer nav a:hover {
   color:var(--navy);
   font-size:15px;
   line-height:1.5;
+}
+
+.activity-line-url {
+  color:var(--sage-text);
+  font-size:12px;
 }
 
 .activity-detail-toggle {
@@ -5617,15 +5906,6 @@ footer nav a:hover {
 
 .field-value em, .field-note em { color:var(--sage-text); }
 
-.field input,.field select {
-  width:100%;
-  padding:9px 11px;
-  background:var(--surface-sunken);
-  color:var(--navy);
-  font:15px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.18);
-  border-radius:2px;
-}
 
 .field-note {
   grid-column:1/-1;
@@ -5681,15 +5961,6 @@ footer nav a:hover {
 .add-child-button:hover { background:var(--surface-sunken); }
 
 .assign-row { gap:8px; flex-wrap:wrap; }
-
-.assign-row select {
-  padding:8px 10px;
-  background:var(--surface-sunken);
-  color:var(--navy);
-  font:14px var(--sans);
-  border:1px solid rgba(var(--navy-rgb),.18);
-  border-radius:2px;
-}
 
 /* --- Grades ---------------------------------------------------------------- */
 .grade-picker { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
@@ -5750,4 +6021,24 @@ footer nav a:hover {
   :where(a,button,.record-head):hover {
     transform:none;
   }
+}
+
+.global-error-fallback {
+  min-height:100dvh;
+  display:grid;
+  place-items:center;
+  justify-items:center;
+  gap:10px;
+  text-align:center;
+  padding:24px;
+  background:var(--cream);
+}
+
+.global-error-fallback h1 {
+  margin:0;
+}
+
+.global-error-fallback p {
+  max-width:420px;
+  color:var(--sage-text);
 }

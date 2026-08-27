@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { uploadPrivateFile } from "../../../lib/storage";
 import {
   FamilyRequirement, Requirement, SchoolYear,
@@ -240,7 +240,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
       },
     });
     if (error || data?.error) {
-      const reason = data?.error || error?.message || "The signing link could not be created.";
+      const reason = await functionErrorMessage(error, data, "The signing link could not be created.");
       if (!opts.quiet) { setStatus(reason); await load(); }
       return reason;
     }
@@ -307,7 +307,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
     if (!supabase) return;
     setStatus("Checking OpenSign for signatures…");
     const { data, error } = await supabase.functions.invoke("opensign-sync", { body: {} });
-    if (error || data?.error) { setStatus(data?.error || error?.message || "Could not reach OpenSign."); return; }
+    if (error || data?.error) { setStatus(await functionErrorMessage(error, data, "Could not reach OpenSign.")); return; }
 
     // A poll that fails on every document still returns ok:true with a list of
     // problems. Reporting only the counts is how tracking looked healthy while

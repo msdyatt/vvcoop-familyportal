@@ -4,8 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 
 /**
  * A deliberately small, dependency-free square cropper for account photos.
- * The controls stay understandable on a phone and the exported 512px JPEG is
- * large enough for portal avatars without storing a full camera original.
+ * The controls stay understandable on a phone and the exported JPEG is large
+ * enough for portal avatars without storing a full camera original.
+ *
+ * The largest an avatar is ever actually shown is .avatar-lg at 72px (app/
+ * globals.css) -- 240px covers that at 3x retina with room to spare, so
+ * exporting at 512px (the original figure here) was several times more data
+ * than any real display size in this app ever uses.
  *
  * The preview and the export share one geometry calculation (`geometry()`)
  * instead of two independent approximations of it. The first version used
@@ -19,6 +24,8 @@ import { useEffect, useMemo, useState } from "react";
  * exact sourceX/sourceY/cropSize the export uses means a pan with no real
  * effect now visibly does nothing in the preview too, instead of lying.
  */
+const AVATAR_EXPORT_SIZE = 240;
+
 export default function AvatarCropper({ file, busy, onCancel, onSave }: {
   file: File;
   busy: boolean;
@@ -65,13 +72,13 @@ export default function AvatarCropper({ file, busy, onCancel, onSave }: {
       const bitmap = await createImageBitmap(file);
       const { cropSize, sourceX, sourceY } = geometry(dimensions.width, dimensions.height);
       const canvas = document.createElement("canvas");
-      canvas.width = 512;
-      canvas.height = 512;
+      canvas.width = AVATAR_EXPORT_SIZE;
+      canvas.height = AVATAR_EXPORT_SIZE;
       const context = canvas.getContext("2d");
       if (!context) throw new Error("This browser could not prepare the photo.");
-      context.drawImage(bitmap, sourceX, sourceY, cropSize, cropSize, 0, 0, 512, 512);
+      context.drawImage(bitmap, sourceX, sourceY, cropSize, cropSize, 0, 0, AVATAR_EXPORT_SIZE, AVATAR_EXPORT_SIZE);
       bitmap.close();
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", .9));
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", .82));
       if (!blob) throw new Error("This browser could not prepare the photo.");
       await onSave(new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "profile"}-avatar.jpg`, { type: "image/jpeg" }));
     } catch (error) {

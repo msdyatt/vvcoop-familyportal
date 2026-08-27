@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { checkCredentials, getDocumentState, mapStatus } from "../_shared/opensign.ts";
+import { logEdgeError } from "../_shared/error-log.ts";
+import { needsMfaStepUp } from "../_shared/aal.ts";
 
 /**
  * Asks OpenSign what happened to every document still outstanding.
@@ -55,8 +57,7 @@ async function storeSignedCopy(
   }
 }
 
-export default {
-  async fetch(req: Request) {
+async function handle(req: Request): Promise<Response> {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -77,6 +78,7 @@ export default {
       adminClient.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
     ]);
     if (profile?.status !== "active" || !role) return json({ error: "Administrator access is required." }, 403);
+    if (await needsMfaStepUp(userClient)) return json({ error: "Complete two-factor verification before continuing." }, 403);
     if (!apiToken) return json({ error: "OpenSign is not configured. Set the OPENSIGN_API_TOKEN secret." }, 400);
 
     const { data: integration } = await adminClient
@@ -91,7 +93,7 @@ export default {
     if (body?.mode === "test") {
       const check = await checkCredentials(baseUrl, apiToken);
       await adminClient.from("integration_settings")
-        .update({ status: check.ok ? "connected" : "attention" }).eq("id", "opensign");
+        .update({ status: check.ok ? "connected" : "attention", last_checked_at: new Date().toISOString() }).eq("id", "opensign");
       return json({ ok: check.ok, detail: check.detail });
     }
 
@@ -142,5 +144,20 @@ export default {
     }
 
     return json({ ok: true, checked, completed, problems });
+}
+
+export default {
+  async fetch(req: Request) {
+    try {
+      return await handle(req);
+    } catch (error) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supabaseUrl && serviceRoleKey) {
+        const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        await logEdgeError(adminClient, "opensign-sync", error);
+      }
+      return json({ error: "Something went wrong. This has been logged." }, 500);
+    }
   },
 };

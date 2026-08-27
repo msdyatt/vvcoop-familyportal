@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { extractDocumentId, mapStatus } from "../_shared/opensign.ts";
+import { logEdgeError } from "../_shared/error-log.ts";
+import { safeEqual } from "../_shared/crypto.ts";
 
 /**
  * Receives OpenSign completion callbacks and moves the matching rows in
@@ -18,17 +20,6 @@ import { extractDocumentId, mapStatus } from "../_shared/opensign.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-/** Constant-time comparison, so a wrong secret cannot be found byte by byte. */
-function safeEqual(a: string, b: string) {
-  const encoder = new TextEncoder();
-  const left = encoder.encode(a);
-  const right = encoder.encode(b);
-  if (left.length !== right.length) return false;
-  let diff = 0;
-  for (let i = 0; i < left.length; i++) diff |= left[i] ^ right[i];
-  return diff === 0;
-}
-
 function readString(record: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = record[key];
@@ -37,8 +28,7 @@ function readString(record: Record<string, unknown>, keys: string[]): string | n
   return null;
 }
 
-export default {
-  async fetch(req: Request) {
+async function handle(req: Request): Promise<Response> {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -102,5 +92,20 @@ export default {
       .eq("provider_document_id", providerDocumentId);
 
     return json({ ok: true, status, documentStatus });
+}
+
+export default {
+  async fetch(req: Request) {
+    try {
+      return await handle(req);
+    } catch (error) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supabaseUrl && serviceRoleKey) {
+        const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        await logEdgeError(adminClient, "opensign-webhook", error);
+      }
+      return json({ error: "Something went wrong. This has been logged." }, 500);
+    }
   },
 };

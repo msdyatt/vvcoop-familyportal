@@ -64,7 +64,8 @@ export function stripRichText(value: string) {
     .trim();
 }
 
-function inlineImagePaths(html: string): string[] {
+/** Every `data-path` an inline <img> in this HTML carries -- also what makes an image-only post (no text at all) tell apart from a genuinely empty one. */
+export function inlineImagePaths(html: string): string[] {
   const paths = new Set<string>();
   const pattern = /data-path="([^"]*)"/g;
   let match: RegExpExecArray | null;
