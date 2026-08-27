@@ -10,6 +10,11 @@
 export default function Avatar({ url, label, size = "md" }: { url: string | null; label: string; size?: "sm" | "md" | "lg" }) {
   const initial = label.trim().slice(0, 1).toUpperCase() || "?";
   return url
+    // next/image needs the Supabase storage domain allow-listed to optimize a
+    // remote URL, and gains nothing here anyway -- `url` is a signed URL whose
+    // token invalidates on every load, so there is no stable cache key for an
+    // optimizer to key off of.
+    // eslint-disable-next-line @next/next/no-img-element
     ? <img className={`avatar avatar-${size}`} src={url} alt="" width={64} height={64} />
     : <span className={`avatar avatar-${size} avatar-fallback`} aria-hidden="true">{initial}</span>;
 }

@@ -331,6 +331,10 @@ function TwoFactorSection() {
       <button onClick={startEnroll} disabled={busy}>Set up two-factor authentication</button>
     </>}
     {status === "enrolling" && <div className="mfa-enroll">
+      {/* `qr` is a data: URI Supabase's own MFA enrollment call returns -- there is
+          no network fetch here for next/image to optimize, and it does not accept
+          a data: source anyway. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       {qr && <img src={qr} alt="Scan this QR code with your authenticator app" style={{ width: 180, height: 180 }} />}
       <label>Enter the 6-digit code from your app<input value={code} onChange={(event) => setCode(event.target.value.trim())} maxLength={6} disabled={busy} /></label>
       <button onClick={verify} disabled={busy}>Confirm</button>
