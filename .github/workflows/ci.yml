@@ -2,11 +2,12 @@ name: CI
 
 # Runs on every push and PR against main -- build, lint, typecheck, and the
 # test suite, all of which need nothing but the repo itself (no Cloudflare or
-# Supabase credentials). Deployment stays a separate, manual step
-# (HANDOFF.md's documented `wrangler deploy` command) until real deploy
-# secrets are wired up here; this workflow's job is to make sure main never
-# merges something that doesn't even build, lint clean, typecheck, or pass
-# its own tests -- none of which was previously enforced anywhere.
+# Supabase credentials). On a push to main only (not PRs -- a PR from a fork
+# has no access to secrets, and shouldn't deploy anyway), a second job
+# redeploys the Worker using the exact command HANDOFF.md has always
+# documented as the manual step, gated on build-lint-test succeeding first --
+# so GitHub, not whatever happens to be sitting in someone's local working
+# tree, is the source of truth for what's live.
 on:
   push:
     branches: [main]
@@ -45,3 +46,41 @@ jobs:
       - run: npm test
         env:
           NODE_ENV: development
+
+  deploy:
+    needs: build-lint-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # A Cloudflare API token scoped to Account > Workers Scripts > Edit on
+    # this one account only (see HANDOFF.md) -- no zone/DNS permission, since
+    # this deploy never touches the Custom Domain attachment, only the Worker
+    # script and its static assets.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+
+      - run: npm ci
+        env:
+          NODE_ENV: development
+
+      # Same build the build-lint-test job already ran -- re-running it here
+      # rather than passing an artifact between jobs keeps this job simple
+      # and self-contained, and it's a ~1s vinext build, not worth optimizing.
+      - run: npm run build
+        env:
+          NODE_ENV: development
+
+      # The exact command HANDOFF.md has documented as the manual deploy step
+      # throughout this project -- `--name veritas-village` is load-bearing:
+      # a bare `wrangler deploy` has landed on a stray leftover Worker before.
+      - run: npx wrangler deploy --config dist/server/wrangler.json --name veritas-village dist/server/index.js
+        env:
+          NODE_ENV: development
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

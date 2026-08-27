@@ -195,7 +195,7 @@ a {
 
 .mini-brand span {
   margin-left:5px;
-  color:var(--terracotta);
+  color:var(--terracotta-text);
   font:700 9px var(--sans);
   letter-spacing:2.5px;
   text-transform:uppercase;
@@ -321,7 +321,7 @@ a {
 }
 
 .primary-link span {
-  color:var(--terracotta);
+  color:var(--terracotta-text);
 }
 
 .scroll-note {
@@ -337,7 +337,7 @@ a {
 .scroll-note i {
   display:block;
   margin-top:5px;
-  color:var(--terracotta);
+  color:var(--terracotta-text);
   font:normal 16px var(--sans);
 }
 
@@ -352,7 +352,7 @@ a {
 }
 
 .welcome-title span {
-  color:var(--terracotta);
+  color:var(--terracotta-text);
   font-size:10px;
   font-weight:700;
   letter-spacing:2px;
@@ -503,7 +503,7 @@ a {
   width:28px;
   height:28px;
   background:var(--cream);
-  color:var(--terracotta);
+  color:var(--terracotta-text);
   font-size:10px;
   font-weight:700;
   border:1px solid var(--terracotta);
@@ -1674,7 +1674,7 @@ footer nav a:hover {
 
 .panel-label {
   margin:0 0 24px;
-  color:var(--terracotta);
+  color:var(--terracotta-text);
   font-size:10px;
   font-weight:700;
   letter-spacing:2px;
@@ -1916,7 +1916,7 @@ footer nav a:hover {
 .signin-stack button span {
   display:inline-block;
   width:25px;
-  color:var(--terracotta);
+  color:var(--terracotta-text);
 }
 
 .signin-stack button:disabled {
@@ -2991,7 +2991,7 @@ footer nav a:hover {
 
 .portal-list time {
   min-width:46px;
-  color:var(--terracotta);
+  color:var(--terracotta-text);
   font:700 12px var(--sans);
   text-transform:uppercase;
 }
@@ -3355,7 +3355,7 @@ footer nav a:hover {
 }
 
 .portal-nav-menu a.active {
-  color:var(--terracotta);
+  color:var(--terracotta-text);
 }
 
 .portal-nav-menu a span {
