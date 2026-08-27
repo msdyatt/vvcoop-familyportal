@@ -413,6 +413,18 @@ enabled = true
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
 
+# This section was reconciled against the actual deployed verify_jwt value for
+# every function (list_edge_functions, 27 Aug) rather than trusted as-is: four
+# functions (calendar-feed, deliver-emails, send-family-reminder,
+# printer-dispatch) were missing entirely, and opensign-send/opensign-sync were
+# recorded here as verify_jwt=true while actually deployed as false. That
+# mismatch matters now that CI runs `supabase functions deploy` on every push
+# to main -- a deploy driven by the stale `true` would have silently flipped
+# both back to requiring a platform-level JWT check, which rejects their own
+# CORS preflight (OPTIONS carries no Authorization header) before the
+# function's own `if (req.method === "OPTIONS")` handler ever runs. That is
+# almost certainly what VV-17's intermittent OpenSign 502/503s actually were.
+
 [functions.invite-family-admin]
 enabled = true
 verify_jwt = true
@@ -424,9 +436,12 @@ entrypoint = "./functions/invite-family-admin/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/invite-family-admin/*.html" ]
 
+# Handles its own CORS preflight (an OPTIONS request carries no Authorization
+# header, so verify_jwt=true would reject it before this function's own
+# OPTIONS branch ever runs) -- see the section note above.
 [functions.opensign-send]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/opensign-send/deno.json"
 entrypoint = "./functions/opensign-send/index.ts"
 
@@ -441,8 +456,43 @@ verify_jwt = false
 import_map = "./functions/opensign-webhook/deno.json"
 entrypoint = "./functions/opensign-webhook/index.ts"
 
+# Same self-handled-CORS reasoning as opensign-send above.
 [functions.opensign-sync]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/opensign-sync/deno.json"
 entrypoint = "./functions/opensign-sync/index.ts"
+
+# Unauthenticated (no Supabase session) subscription feed, gated instead by the
+# per-class/per-family calendar_token in the URL itself (VV-08).
+[functions.calendar-feed]
+enabled = true
+verify_jwt = false
+import_map = "./functions/calendar-feed/deno.json"
+entrypoint = "./functions/calendar-feed/index.ts"
+
+# mode:"process" is invoked by pg_cron, which carries no Supabase session at
+# all -- gated by a Vault-stored shared secret instead. mode:"test" is
+# admin-invoked and checks the session itself inside the function.
+[functions.deliver-emails]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deliver-emails/deno.json"
+entrypoint = "./functions/deliver-emails/index.ts"
+
+# Admin-only, always called with a real session -- no self-handled CORS
+# exception needed, so this is the one function that can use the platform's
+# own JWT gate.
+[functions.send-family-reminder]
+enabled = true
+verify_jwt = true
+import_map = "./functions/send-family-reminder/deno.json"
+entrypoint = "./functions/send-family-reminder/index.ts"
+
+# Polled by a Raspberry Pi with no Supabase session at all -- gated by a
+# Vault-stored shared secret (PRINT_DELIVERY_SECRET) instead.
+[functions.printer-dispatch]
+enabled = true
+verify_jwt = false
+import_map = "./functions/printer-dispatch/deno.json"
+entrypoint = "./functions/printer-dispatch/index.ts"
