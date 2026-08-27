@@ -51,6 +51,11 @@ jobs:
     needs: build-lint-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID live as Environment secrets
+    # on "Production" (scoped to Account > Workers Scripts > Edit -- see
+    # HANDOFF.md), not repo-level secrets -- a job only sees Environment
+    # secrets for an environment it explicitly declares here.
+    environment: Production
     # A Cloudflare API token scoped to Account > Workers Scripts > Edit on
     # this one account only (see HANDOFF.md) -- no zone/DNS permission, since
     # this deploy never touches the Custom Domain attachment, only the Worker
