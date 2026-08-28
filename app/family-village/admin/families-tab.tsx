@@ -302,6 +302,23 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
     await load();
   }
 
+  /**
+   * removeUser()'s household-delete path only fires when the *last* adult is
+   * removed -- a household with zero adults to begin with (orphaned by an
+   * earlier bug, or just never had one added) has no way through that door
+   * at all. This is the direct path: available on every household, not
+   * gated behind an adult-removal step.
+   */
+  async function deleteHousehold(familyId: string, familyName: string, childCount: number, adultCount: number) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("families").delete().eq("id", familyId);
+    if (error) { setStatus(`Could not delete ${familyName}: ${error.message}`); return; }
+    await log("household_deleted", "family", familyId, { display_name: familyName, children: childCount, adults: adultCount });
+    setStatus(`Deleted ${familyName} and everything in it.`);
+    await load();
+  }
+
   async function grantRole(userId: string, role: string) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
@@ -338,13 +355,13 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
       <p className="compliance-summary">{visibleFamilies.length} shown</p>
     </div>
     <div className="family-manage-list">
-      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} allFamilies={families} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onDeleteChild={deleteChild} onMoveChild={moveChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} onInviteAdult={inviteAdult} />)}
+      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} allFamilies={families} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onDeleteChild={deleteChild} onMoveChild={moveChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onDeleteHousehold={deleteHousehold} onGrantRole={grantRole} onRevokeRole={revokeRole} onInviteAdult={inviteAdult} />)}
       {!visibleFamilies.length && <p className="portal-empty">No households match those filters.</p>}
     </div>
   </section>;
 }
 
-function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onDeleteChild, onMoveChild, onUploadAvatar, onRemoveUser, onGrantRole, onRevokeRole, onInviteAdult }: {
+function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onDeleteChild, onMoveChild, onUploadAvatar, onRemoveUser, onDeleteHousehold, onGrantRole, onRevokeRole, onInviteAdult }: {
   family: Family;
   allFamilies: Family[];
   roleMap: Record<string, string[]>;
@@ -358,6 +375,7 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
   onMoveChild: (childId: string, childName: string, fromFamilyId: string, toFamilyId: string) => void;
   onUploadAvatar: (childId: string, file: File) => void;
   onRemoveUser: (familyId: string, userId: string, displayName: string) => void;
+  onDeleteHousehold: (familyId: string, familyName: string, childCount: number, adultCount: number) => Promise<void>;
   onGrantRole: (userId: string, role: string) => void;
   onRevokeRole: (userId: string, role: string) => void;
   onInviteAdult: (familyId: string, adultName: string, email: string, note: string) => Promise<string | null>;
@@ -367,6 +385,8 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
   const [viewingChildId, setViewingChildId] = useState<string | null>(null);
   const [deletingChild, setDeletingChild] = useState<Child | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deletingHousehold, setDeletingHousehold] = useState(false);
+  const [deleteHouseholdBusy, setDeleteHouseholdBusy] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
   const [newChildName, setNewChildName] = useState("");
 
@@ -404,6 +424,13 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
         {editing && <p className="field-note">Children without a custom surname follow this name.</p>}
       </div>}
     </EditableSection>
+
+    {/* Removing the last adult already deletes the household along with them
+        -- this is the other door in, for a household with no adult to
+        remove in the first place (orphaned, or never had one added). */}
+    <div className="row-actions">
+      <button type="button" className="danger" onClick={() => setDeletingHousehold(true)}>Delete household</button>
+    </div>
 
     <div className="record-section">
       <p className="card-kicker">Adults</p>
@@ -506,6 +533,21 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
         setDeletingChild(null);
       }}
       onCancel={() => setDeletingChild(null)}
+    />}
+    {deletingHousehold && <ConfirmDeleteModal
+      title={`Delete ${name}?`}
+      description={<>
+        This permanently deletes the {name} household{adults.length > 0 ? `, removing access for ${adults.length} adult${adults.length === 1 ? "" : "s"}` : ""}, along with {children.length} child record{children.length === 1 ? "" : "s"},
+        every class enrollment, and the household&rsquo;s documents and compliance record. This cannot be undone.
+      </>}
+      busy={deleteHouseholdBusy}
+      onConfirm={async () => {
+        setDeleteHouseholdBusy(true);
+        await onDeleteHousehold(family.id, name, children.length, adults.length);
+        setDeleteHouseholdBusy(false);
+        setDeletingHousehold(false);
+      }}
+      onCancel={() => setDeletingHousehold(false)}
     />}
   </CollapsibleRecord>;
 }
