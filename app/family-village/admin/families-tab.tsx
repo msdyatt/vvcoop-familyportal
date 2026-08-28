@@ -5,7 +5,7 @@ import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/sup
 import { getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
-import { CollapsibleRecord, EditableSection, Field, GRADES } from "./admin-ui";
+import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES } from "./admin-ui";
 import FamilyDocuments from "./family-documents";
 import { FamilyRequirement, Requirement, activeAdults, isSettled, statusLabel, statusTone } from "../../../lib/compliance";
 
@@ -178,6 +178,26 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   }
 
   /**
+   * The "Active" checkbox in the edit view is the everyday off switch --
+   * this is the other one: a genuine, permanent removal for a child that
+   * was added by mistake or duplicated, not a graduate or a withdrawal
+   * (those stay recorded as inactive). Every table with a child_id cascades
+   * on delete (enrollments, teacher_notes, documents, media_consents,
+   * event_completions, enrollment_requests), so this takes their whole
+   * history with it -- that's exactly why ConfirmDeleteModal, not a plain
+   * confirm(), gates it.
+   */
+  async function deleteChild(childId: string, childName: string, familyId: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("children").delete().eq("id", childId);
+    if (error) { setStatus(error.message); return; }
+    await log("child_deleted", "child", childId, { family_id: familyId, first_name: childName });
+    setStatus(`Deleted ${childName}.`);
+    await load();
+  }
+
+  /**
    * A child's enrollments and records move with them -- family_id is the
    * only column that changes, everything else (enrollments, notes,
    * compliance history) is keyed to the child, not the household.
@@ -318,13 +338,13 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
       <p className="compliance-summary">{visibleFamilies.length} shown</p>
     </div>
     <div className="family-manage-list">
-      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} allFamilies={families} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onMoveChild={moveChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} onInviteAdult={inviteAdult} />)}
+      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} allFamilies={families} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onDeleteChild={deleteChild} onMoveChild={moveChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onGrantRole={grantRole} onRevokeRole={revokeRole} onInviteAdult={inviteAdult} />)}
       {!visibleFamilies.length && <p className="portal-empty">No households match those filters.</p>}
     </div>
   </section>;
 }
 
-function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onMoveChild, onUploadAvatar, onRemoveUser, onGrantRole, onRevokeRole, onInviteAdult }: {
+function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onDeleteChild, onMoveChild, onUploadAvatar, onRemoveUser, onGrantRole, onRevokeRole, onInviteAdult }: {
   family: Family;
   allFamilies: Family[];
   roleMap: Record<string, string[]>;
@@ -334,6 +354,7 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
   onSaveFamily: (f: Family) => void;
   onSaveChild: (c: Child) => void;
   onAddChild: (familyId: string, firstName: string) => void;
+  onDeleteChild: (childId: string, childName: string, familyId: string) => Promise<void>;
   onMoveChild: (childId: string, childName: string, fromFamilyId: string, toFamilyId: string) => void;
   onUploadAvatar: (childId: string, file: File) => void;
   onRemoveUser: (familyId: string, userId: string, displayName: string) => void;
@@ -344,6 +365,8 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
   const [lastName, setLastName] = useState(family.last_name ?? family.display_name ?? "");
   const [children, setChildren] = useState(family.children ?? []);
   const [viewingChildId, setViewingChildId] = useState<string | null>(null);
+  const [deletingChild, setDeletingChild] = useState<Child | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
   const [newChildName, setNewChildName] = useState("");
 
@@ -439,6 +462,7 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
                 child={child} currentFamilyId={family.id} allFamilies={allFamilies}
                 onMove={(toFamilyId) => onMoveChild(child.id, child.first_name, family.id, toFamilyId)}
               />}
+              <button className="danger" onClick={() => setDeletingChild(child)}>Delete</button>
             </div>)}
         {!children.length && <p className="portal-empty">No children on this household yet.</p>}
 
@@ -471,6 +495,18 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
     <FamilyDocuments familyId={family.id} familyName={name} />
 
     {viewingChildId && <ChildDetail childId={viewingChildId} onClose={() => setViewingChildId(null)} />}
+    {deletingChild && <ConfirmDeleteModal
+      title={`Delete ${deletingChild.first_name}?`}
+      description={<>This permanently removes {deletingChild.first_name}&rsquo;s record, including their class enrollments, teacher notes, documents, and photo consents. This is different from the Active checkbox — a withdrawn or graduated child should stay Active: false instead, so their history is kept. This cannot be undone.</>}
+      busy={deleteBusy}
+      onConfirm={async () => {
+        setDeleteBusy(true);
+        await onDeleteChild(deletingChild.id, deletingChild.first_name, family.id);
+        setDeleteBusy(false);
+        setDeletingChild(null);
+      }}
+      onCancel={() => setDeletingChild(null)}
+    />}
   </CollapsibleRecord>;
 }
 
