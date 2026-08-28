@@ -223,6 +223,19 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
    * type the word, and says exactly what goes.
    */
   async function removeUser(familyId: string, userId: string, displayName: string) {
+    // This flow assumes the acting admin keeps admin access all the way
+    // through -- three parallel writes, then (for the last-adult case) a
+    // follow-up household delete. Targeting your own account breaks that
+    // assumption at the first write: the moment your own status flips to
+    // 'removed', you lose admin access for the rest of this same flow, and
+    // the database now refuses those later writes outright rather than
+    // silently no-opping them (28 Aug 2026 -- an admin locked themselves out
+    // and left a household half-deleted this exact way). Self-removal has
+    // its own correct, single-step path: Account Settings.
+    if (userId === actorUserId) {
+      setStatus("You can't remove your own access from here — use Account Settings to leave a household, or have another admin remove you.");
+      return;
+    }
     const family = families.find((row) => row.id === familyId);
     const remaining = activeAdults(family?.family_members ?? []).filter((member) => member.user_id !== userId);
     const who = displayName || "this person";
