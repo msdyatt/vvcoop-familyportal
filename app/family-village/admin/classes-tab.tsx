@@ -17,11 +17,12 @@ type AcademicTerm = { id: string; school_year_id: string; label: string; starts_
 type ClassTerm = { class_id: string; term_id: string };
 type ClassRow = {
   id: string; title: string; description: string | null; term: string | null;
-  grades: string[]; block_id: string | null; room_id: string | null;
+  grades: string[]; block_id: string | null; room_id: string | null; capacity: number | null;
   active: boolean; is_elective: boolean; school_year_id: string | null; calendar_token: string;
-  teacher_assignments: TeacherAssignment[]; enrollments: Enrollment[]; term_ids: string[];
+  teacher_assignments: TeacherAssignment[]; enrollments: Enrollment[]; term_ids: string[]; prerequisite_ids: string[];
 };
 type TeacherOption = { user_id: string; name: string; email: string };
+type ClassOption = { id: string; title: string };
 type ChildOption = { id: string; first_name: string; last_name: string | null; families: { last_name: string | null; display_name: string } | null };
 
 /** Full name where we have one. A roster of first names is useless the moment two Susies appear. */
@@ -52,8 +53,8 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const [{ data }, { data: teachers }, { data: children }, { data: yearRows }, { data: blockRows }, { data: roomRows }, { data: termRows }, { data: classTermRows }] = await Promise.all([
-      supabase.from("classes").select("id,title,description,term,grades,block_id,room_id,active,is_elective,school_year_id,calendar_token,teacher_assignments(user_id,assignment_role,profiles(display_name,email)),enrollments(child_id,status,children(first_name,last_name,age_band,families(last_name,display_name)))").order("title"),
+    const [{ data }, { data: teachers }, { data: children }, { data: yearRows }, { data: blockRows }, { data: roomRows }, { data: termRows }, { data: classTermRows }, { data: prereqRows }] = await Promise.all([
+      supabase.from("classes").select("id,title,description,term,grades,block_id,room_id,capacity,active,is_elective,school_year_id,calendar_token,teacher_assignments(user_id,assignment_role,profiles(display_name,email)),enrollments(child_id,status,children(first_name,last_name,age_band,families(last_name,display_name)))").order("title"),
       // The surname lives on the household, not the profile, so it is joined in
       // rather than showing a bare first name on every roster.
       supabase.from("user_roles").select("user_id,profiles(display_name,email)").eq("role", "teacher"),
@@ -63,6 +64,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
       supabase.from("rooms").select("id,name,note,active,sort_order").order("sort_order").order("name"),
       supabase.from("academic_terms").select("id,school_year_id,label,starts_on,ends_on,sort_order").order("sort_order").order("starts_on"),
       supabase.from("class_terms").select("class_id,term_id"),
+      supabase.from("class_prerequisites").select("class_id,prerequisite_class_id"),
     ]);
 
     const teacherRows = (teachers ?? []) as unknown as { user_id: string; profiles: { display_name: string | null; email: string } | null }[];
@@ -73,9 +75,11 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
       .map((row) => [row.user_id, row.families?.last_name ?? null]));
 
     const termLinks = (classTermRows ?? []) as ClassTerm[];
-    setClasses(((data ?? []) as unknown as Omit<ClassRow, "term_ids">[]).map((row) => ({
+    const prereqLinks = (prereqRows ?? []) as { class_id: string; prerequisite_class_id: string }[];
+    setClasses(((data ?? []) as unknown as Omit<ClassRow, "term_ids" | "prerequisite_ids">[]).map((row) => ({
       ...row,
       term_ids: termLinks.filter((link) => link.class_id === row.id).map((link) => link.term_id),
+      prerequisite_ids: prereqLinks.filter((link) => link.class_id === row.id).map((link) => link.prerequisite_class_id),
     })));
     setTeacherOptions(teacherRows.map((row) => ({
       user_id: row.user_id,
@@ -171,32 +175,44 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const wanted = row.term_ids;
-    // The class_terms read doesn't depend on the classes update completing --
-    // they touch different tables -- so there's no reason to pay for two
-    // round trips back to back before even starting the term diff below.
-    const [{ error }, { data: existingRows, error: existingError }] = await Promise.all([
+    const wantedPrereqs = row.prerequisite_ids;
+    // The join-table reads don't depend on the classes update completing --
+    // they touch different tables -- so there's no reason to pay for the round
+    // trips back to back before even starting the diffs below.
+    const [{ error }, { data: existingRows, error: existingError }, { data: existingPrereqRows, error: existingPrereqError }] = await Promise.all([
       supabase.from("classes").update({
         title: row.title, description: row.description, term: row.term,
         grades: row.grades, block_id: row.block_id, room_id: row.room_id, active: row.active,
-        is_elective: row.is_elective, school_year_id: row.school_year_id,
+        capacity: row.capacity, is_elective: row.is_elective, school_year_id: row.school_year_id,
       }).eq("id", row.id),
       supabase.from("class_terms").select("term_id").eq("class_id", row.id),
+      supabase.from("class_prerequisites").select("prerequisite_class_id").eq("class_id", row.id),
     ]);
     if (error) { setStatus(error.message); return; }
     if (existingError) { setStatus(`The class details saved, but its terms could not be checked: ${existingError.message}`); return; }
+    if (existingPrereqError) { setStatus(`The class details saved, but its prerequisites could not be checked: ${existingPrereqError.message}`); return; }
 
     const existing = new Set((existingRows ?? []).map((item) => item.term_id));
     const add = wanted.filter((termId) => !existing.has(termId));
     const remove = [...existing].filter((termId) => !wanted.includes(termId));
-    // Disjoint term-id sets -- adding the newly-checked terms and removing
-    // the newly-unchecked ones can't conflict with each other, so there's no
-    // reason to wait for one before starting the other.
-    const [added, removed] = await Promise.all([
+    const existingPrereqs = new Set((existingPrereqRows ?? []).map((item) => item.prerequisite_class_id));
+    const addPrereqs = wantedPrereqs.filter((id) => !existingPrereqs.has(id));
+    const removePrereqs = [...existingPrereqs].filter((id) => !wantedPrereqs.includes(id));
+    // Disjoint id sets across two independent join tables -- adding the
+    // newly-checked rows and removing the newly-unchecked ones can't conflict
+    // with each other, so there's no reason to wait for one before the next.
+    const [added, removed, addedPrereqs, removedPrereqs] = await Promise.all([
       add.length ? supabase.from("class_terms").insert(add.map((termId) => ({ class_id: row.id, term_id: termId }))) : Promise.resolve({ error: null }),
       remove.length ? supabase.from("class_terms").delete().eq("class_id", row.id).in("term_id", remove) : Promise.resolve({ error: null }),
+      addPrereqs.length ? supabase.from("class_prerequisites").insert(addPrereqs.map((id) => ({ class_id: row.id, prerequisite_class_id: id }))) : Promise.resolve({ error: null }),
+      removePrereqs.length ? supabase.from("class_prerequisites").delete().eq("class_id", row.id).in("prerequisite_class_id", removePrereqs) : Promise.resolve({ error: null }),
     ]);
     if (added.error || removed.error) {
       setStatus(`The class details saved, but its terms did not fully update: ${added.error?.message ?? removed.error?.message}`);
+      return;
+    }
+    if (addedPrereqs.error || removedPrereqs.error) {
+      setStatus(`The class details saved, but its prerequisites did not fully update: ${addedPrereqs.error?.message ?? removedPrereqs.error?.message}`);
       return;
     }
     setStatus(`Saved ${row.title}.`);
@@ -292,6 +308,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
       {visible.map((row) => <ClassCard key={row.id} row={row} years={years} blocks={blocks} rooms={rooms}
         terms={terms}
         clash={clashes.get(row.id) ?? null}
+        classOptions={yearClasses.map((klass) => ({ id: klass.id, title: klass.title }))}
         teacherOptions={teacherOptions} childOptions={childOptions}
         actorUserId={actorUserId}
         onSave={saveClass} onAssignTeacher={assignTeacher} onRemoveTeacher={removeTeacher}
@@ -710,8 +727,9 @@ function RoomRow({ room, onSave, onToggle }: { room: Room; onSave: (room: Room) 
   </div>;
 }
 
-function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, childOptions, actorUserId, onSave, onAssignTeacher, onRemoveTeacher, onEnrollChild, onSetEnrollmentStatus }: {
+function ClassCard({ row, years, blocks, rooms, terms, clash, classOptions, teacherOptions, childOptions, actorUserId, onSave, onAssignTeacher, onRemoveTeacher, onEnrollChild, onSetEnrollmentStatus }: {
   row: ClassRow; years: SchoolYear[]; blocks: ClassBlock[]; rooms: Room[]; terms: AcademicTerm[]; clash: string | null;
+  classOptions: ClassOption[];
   teacherOptions: TeacherOption[]; childOptions: ChildOption[]; actorUserId: string;
   onSave: (row: ClassRow) => void;
   onAssignTeacher: (classId: string, userId: string, role: string) => void;
@@ -729,6 +747,9 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
   useEffect(() => { setLocal(row); }, [row]);
 
   const active = row.enrollments.filter((entry) => entry.status === "active");
+  const overCapacity = row.capacity != null && active.length > row.capacity;
+  const prereqClasses = classOptions.filter((option) => row.prerequisite_ids.includes(option.id));
+  const otherClasses = classOptions.filter((option) => option.id !== row.id);
   const block = blocks.find((option) => option.id === row.block_id) ?? null;
   const room = rooms.find((option) => option.id === row.room_id) ?? null;
   const classTerms = terms.filter((term) => row.term_ids.includes(term.id));
@@ -747,12 +768,14 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
       room?.name,
       classTerms.map((term) => term.label).join(", ") || null,
       formatGrades(row.grades),
-      `${active.length} enrolled`,
+      `${active.length}${row.capacity != null ? `/${row.capacity}` : ""} enrolled`,
+      prereqClasses.length ? `needs ${prereqClasses.map((option) => option.title).join(", ")}` : null,
       row.is_elective ? "elective" : null,
       row.active ? null : "inactive",
     ].filter(Boolean).join(" · ")}
     chips={<>
       {clash && <span className="status-pill outstanding">Room clash: {clash}</span>}
+      {overCapacity && <span className="status-pill outstanding">Over capacity: {active.length}/{row.capacity}</span>}
       {row.teacher_assignments.length
         ? <span className="record-teachers">{row.teacher_assignments.map(teacherName).join(", ")}</span>
         : <span className="status-pill outstanding">No teacher</span>}
@@ -778,6 +801,10 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
         </Field>
         <Field label="Grades" value={formatGrades(row.grades)} editing={editing}>
           <GradePicker selected={local.grades ?? []} onChange={(grades) => setLocal({ ...local, grades })} />
+        </Field>
+        <Field label="Capacity" value={row.capacity != null ? `${row.capacity} student${row.capacity === 1 ? "" : "s"}` : "No limit"} editing={editing}>
+          <input type="number" min={0} step={1} value={local.capacity ?? ""} placeholder="No limit"
+            onChange={(event) => setLocal({ ...local, capacity: event.target.value === "" ? null : Math.max(0, Math.floor(Number(event.target.value))) })} />
         </Field>
         <Field label="School year" value={years.find((year) => year.id === row.school_year_id)?.label ?? "Unassigned"} editing={editing}>
           <select value={local.school_year_id ?? ""} onChange={(event) => {
@@ -810,6 +837,21 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, teacherOptions, ch
             </label>)}
             {!availableTerms.length && <span className="field-note">Create school-year terms in Schedule &amp; enrollment settings first.</span>}
           </div>
+        </Field>
+        <Field label="Prerequisites" value={prereqClasses.map((option) => option.title).join(", ") || "None"} editing={editing}>
+          <div className="term-picker">
+            {otherClasses.map((option) => <label key={option.id}>
+              <input type="checkbox" checked={local.prerequisite_ids.includes(option.id)} onChange={(event) => setLocal({
+                ...local,
+                prerequisite_ids: event.target.checked
+                  ? [...local.prerequisite_ids, option.id]
+                  : local.prerequisite_ids.filter((id) => id !== option.id),
+              })} />
+              <span>{option.title}</span>
+            </label>)}
+            {!otherClasses.length && <span className="field-note">Add more classes to this year first.</span>}
+          </div>
+          <p className="field-note">A family can only self-enroll a child who already holds an active enrollment in every class checked here. Admins placing a child by hand are not blocked.</p>
         </Field>
         <Field label="Description" value={row.description} editing={editing}>
           <input value={local.description ?? ""} onChange={(event) => setLocal({ ...local, description: event.target.value })} />
