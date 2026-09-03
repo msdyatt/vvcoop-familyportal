@@ -15,7 +15,10 @@ type NoteInfo = { id: string; body: string; visibility: string; created_at: stri
 type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null; age_band_override: boolean; birthdate: string | null; avatar_path: string | null };
 
 type OpenPeriod = { id: string; title: string; closes_at: string; electives_only: boolean };
-type EligibleClass = { id: string; title: string; description: string | null; is_elective: boolean; schedule: string };
+type EligibleClass = {
+  id: string; title: string; description: string | null; is_elective: boolean; schedule: string;
+  is_full: boolean; missing_prerequisites: string[];
+};
 
 export default function ChildDetail({ childId, onClose }: { childId: string; onClose: () => void }) {
   const [child, setChild] = useState<ChildRecord | null>(null);
@@ -132,7 +135,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
       ]);
       const alreadyIn = new Set((enrolledRows ?? []).map((row) => row.class_id));
       const today = new Date().toISOString().slice(0, 10);
-      setEligibleClasses(((classRows2 ?? []) as unknown as ({
+      const matched = ((classRows2 ?? []) as unknown as ({
         id: string; title: string; description: string | null; is_elective: boolean; grades: string[];
         class_terms: { academic_terms: { starts_on: string; ends_on: string } | null }[];
       } & ClassSchedule)[])
@@ -149,8 +152,30 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         // classes for the entire time enrollment was actually meant to be
         // open for them.
         .filter((row) => !row.class_terms.length || row.class_terms.some((link) =>
-          link.academic_terms && today <= link.academic_terms.ends_on))
-        .map((row) => ({ id: row.id, title: row.title, description: row.description, is_elective: row.is_elective, schedule: describeSchedule(row) })));
+          link.academic_terms && today <= link.academic_terms.ends_on));
+
+      // Capacity and prerequisites can't be checked client-side -- a family
+      // can't read another household's enrollments to count seats. This
+      // SECURITY DEFINER RPC returns, for this child, which of these classes
+      // are full and which prerequisites are still outstanding. A full or
+      // locked class is still shown, greyed out with the reason, rather than
+      // hidden -- "why can't I pick this" is a worse experience than seeing it.
+      const optionMap = new Map<string, { is_full: boolean; missing_prerequisites: string[] }>();
+      if (matched.length) {
+        const { data: optionRows } = await supabase.rpc("family_enrollment_options", {
+          p_child_id: childId, p_class_ids: matched.map((row) => row.id),
+        });
+        for (const opt of (optionRows ?? []) as { class_id: string; is_full: boolean; missing_prerequisites: string[] | null }[]) {
+          optionMap.set(opt.class_id, { is_full: opt.is_full, missing_prerequisites: opt.missing_prerequisites ?? [] });
+        }
+      }
+
+      setEligibleClasses(matched.map((row) => ({
+        id: row.id, title: row.title, description: row.description, is_elective: row.is_elective,
+        schedule: describeSchedule(row),
+        is_full: optionMap.get(row.id)?.is_full ?? false,
+        missing_prerequisites: optionMap.get(row.id)?.missing_prerequisites ?? [],
+      })));
     } else {
       setEligibleClasses([]);
     }
@@ -222,12 +247,14 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
   /**
    * Enrolls immediately -- no admin approval step. family_self_enroll
    * re-checks eligibility server-side (window open, grade matches, no
-   * same-block clash) rather than trusting the picker's own filtering, since
-   * that list was built from what the page loaded with, not the instant of
-   * clicking.
+   * same-block clash, seats left, prerequisites met) rather than trusting the
+   * picker's own filtering, since that list was built from what the page
+   * loaded with, not the instant of clicking.
    */
   async function enrollInClass() {
     if (!openPeriod || !classPick) return;
+    const picked = eligibleClasses.find((option) => option.id === classPick);
+    if (picked && (picked.is_full || picked.missing_prerequisites.length)) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !userId) return;
     setEnrollStatus("Enrolling…");
@@ -330,10 +357,22 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
           </p>
           {eligibleClasses.length
             ? <><div className="enrollment-class-options" role="radiogroup" aria-label={`Classes available to ${child?.first_name}`}>
-                {eligibleClasses.map((option) => <div key={option.id} className={classPick === option.id ? "selected" : ""}>
-                  <input id={`enroll-${option.id}`} type="radio" name={`class-${childId}`} value={option.id} checked={classPick === option.id} onChange={() => setClassPick(option.id)} />
-                  <label htmlFor={`enroll-${option.id}`}><b>{option.title}</b><small>{option.schedule}</small><p>{option.description || "No class description has been added yet."}</p></label>
-                </div>)}
+                {eligibleClasses.map((option) => {
+                  const locked = option.is_full || option.missing_prerequisites.length > 0;
+                  const reason = option.is_full
+                    ? "Class full"
+                    : option.missing_prerequisites.length
+                      ? `Requires ${option.missing_prerequisites.join(", ")} first`
+                      : null;
+                  return <div key={option.id} className={`${classPick === option.id ? "selected" : ""}${locked ? " disabled" : ""}`}>
+                    <input id={`enroll-${option.id}`} type="radio" name={`class-${childId}`} value={option.id} checked={classPick === option.id} disabled={locked} onChange={() => setClassPick(option.id)} />
+                    <label htmlFor={`enroll-${option.id}`}>
+                      <b>{option.title}</b>
+                      <small>{[option.schedule, reason].filter(Boolean).join(" · ")}</small>
+                      <p>{option.description || "No class description has been added yet."}</p>
+                    </label>
+                  </div>;
+                })}
               </div><button className="enroll-confirm" disabled={!classPick} onClick={enrollInClass}>Enroll {child?.first_name}</button></>
             : <p className="portal-empty">No open classes match {child?.first_name}&rsquo;s grade right now.</p>}
           {enrollStatus && <p className="admin-form-status" role="status">{enrollStatus}</p>}
