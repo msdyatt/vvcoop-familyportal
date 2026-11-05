@@ -4458,7 +4458,10 @@ footer nav a:hover {
   gap:20px;
   flex-wrap:wrap;
   margin:calc(-1 * var(--portal-pad)) calc(-1 * var(--portal-pad)) 38px;
-  padding:20px var(--portal-pad);
+  /* The page draws edge to edge (viewport-fit=cover) so the installed app
+     fills the screen; the safe-area insets keep the header's content clear of
+     the status bar and notch while its band colour runs underneath them. */
+  padding:calc(20px + env(safe-area-inset-top)) max(var(--portal-pad), env(safe-area-inset-right)) 20px max(var(--portal-pad), env(safe-area-inset-left));
   background:var(--portal-band-bg);
   color:var(--portal-band-fg);
   border-bottom:2px solid var(--portal-band-rule);
@@ -4770,6 +4773,13 @@ footer nav a:hover {
 }
 
 @media(max-width:700px) {
+  /* On a phone the Family/Teacher/Admin button is the leftmost control, so a
+     menu pinned to its right edge opens leftward, off the screen. Open
+     rightward from the button instead. */
+  .portal-nav-menu {
+    left:0;
+    right:auto;
+  }
   .app-header {
     align-items:flex-start;
   }
