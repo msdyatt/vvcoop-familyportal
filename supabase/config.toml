@@ -496,3 +496,13 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/printer-dispatch/deno.json"
 entrypoint = "./functions/printer-dispatch/index.ts"
+
+# mode:"process" is invoked by pg_cron (no session; gated by the same
+# Vault-stored delivery secret as deliver-emails). mode:"public-key" is
+# unauthenticated by design -- the VAPID public key is public. mode:"test"
+# checks the caller's session itself and only ever sends to that caller.
+[functions.deliver-push]
+enabled = true
+verify_jwt = false
+import_map = "./functions/deliver-push/deno.json"
+entrypoint = "./functions/deliver-push/index.ts"

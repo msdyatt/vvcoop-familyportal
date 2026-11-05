@@ -10,6 +10,7 @@ import AccountSettings from "./account-settings";
 import Avatar from "./avatar";
 import NotificationBell from "./notification-bell";
 import { getSignedFileUrl } from "../../lib/storage";
+import { disablePush } from "../../lib/push";
 
 type PortalKey = "home" | "admin" | "teacher";
 
@@ -40,6 +41,9 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
   useOutsideClick(menuRef, () => setMenuOpen(false));
 
   async function signOut() {
+    // Stop pushes to this device before the session goes away, so the next
+    // person to use a shared phone or computer doesn't receive them.
+    await disablePush().catch(() => {});
     await getSupabaseBrowserClient()?.auth.signOut();
     window.location.assign("/family-village");
   }
