@@ -108,22 +108,11 @@ jobs:
       - name: Start a local Supabase
         run: supabase start -x studio,mailpit,imgproxy,vector,logflare,edge-runtime
 
-      - name: Dump replayed grants (diagnostic)
-        if: always()
-        run: |
-          DB=$(docker ps --filter name=supabase_db --format '{{.Names}}' | head -1)
-          echo "::group::GRANTS"
-          docker exec -i "$DB" psql -U postgres -At < supabase/ci-bootstrap/grants_dump.sql.txt
-          echo "::endgroup::"
-          echo "::group::SCHEMA"
-          docker exec -i "$DB" psql -U postgres -At < supabase/ci-bootstrap/schema_dump.sql.txt
-          echo "::endgroup::"
-
       - name: Run database tests
         run: supabase test db
 
   deploy:
-    needs: build-lint-test
+    needs: [build-lint-test, edge-function-tests, database-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID live as Environment secrets
@@ -166,7 +155,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   supabase-functions:
-    needs: build-lint-test
+    needs: [build-lint-test, edge-function-tests, database-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: Production
@@ -194,7 +183,7 @@ jobs:
       - run: supabase functions deploy --project-ref jtwemgyhxylbhjzxgyvh
 
   supabase-migrations:
-    needs: build-lint-test
+    needs: [build-lint-test, edge-function-tests, database-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: Production
