@@ -1,8 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.3";
+import type { AdminClient } from "../_shared/types.ts";
 import { buildIcs, byDayCode, IcsEvent } from "../_shared/ics.ts";
 import { addDaysDateOnly, DateRange, mergeContiguousRanges } from "../_shared/date-ranges.ts";
 import { logEdgeError } from "../_shared/error-log.ts";
+import { corsHeaders } from "../_shared/http.ts";
 
 /**
  * Serves a subscribable calendar feed -- no interactive login, because a
@@ -29,7 +31,6 @@ import { logEdgeError } from "../_shared/error-log.ts";
  * are re-derived by hand here instead.
  */
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const text = (body: string, status = 200, contentType = "text/calendar; charset=utf-8") =>
   new Response(body, { status, headers: { ...corsHeaders, "Content-Type": contentType } });
 
@@ -66,7 +67,6 @@ function firstOccurrence(from: string, dayOfWeek: number): string {
   return from;
 }
 
-type AdminClient = ReturnType<typeof createClient>;
 
 /** The contiguous date spans a class's recurrence should be bounded to: its own terms if it has any, else its whole school year. */
 async function classDateRanges(admin: AdminClient, classId: string, schoolYearId: string | null): Promise<DateRange[]> {
@@ -171,7 +171,7 @@ async function handle(req: Request): Promise<Response> {
 
   if (scope === "public") {
     const { data } = await admin.from("events").select(EVENT_SELECT).eq("audience", "public").order("starts_at");
-    return text(buildIcs(eventsToIcs((data ?? []) as EventRow[]), { name: "Veritas Village" }));
+    return text(buildIcs(eventsToIcs((data ?? []) as unknown as EventRow[]), { name: "Veritas Village" }));
   }
 
   if (scope === "class") {
@@ -186,7 +186,7 @@ async function handle(req: Request): Promise<Response> {
       classMeetingEvents(admin, klass),
       admin.from("events").select(EVENT_SELECT).eq("class_id", classId).eq("audience", "class").order("starts_at"),
     ]);
-    const events = eventsToIcs((eventRows ?? []) as EventRow[]);
+    const events = eventsToIcs((eventRows ?? []) as unknown as EventRow[]);
     return text(buildIcs([...meetings, ...events], { name: `Veritas Village – ${klass.title}` }));
   }
 
@@ -231,12 +231,12 @@ async function handle(req: Request): Promise<Response> {
         classMeetingEvents(admin, klass),
         admin.from("events").select(EVENT_SELECT).eq("class_id", klass.id).eq("audience", "class").order("starts_at"),
       ]);
-      const events = eventsToIcs((eventRows ?? []) as EventRow[]);
+      const events = eventsToIcs((eventRows ?? []) as unknown as EventRow[]);
       return [...meetings, ...events];
     }));
 
     return text(buildIcs(
-      [...classEventLists.flat(), ...eventsToIcs((generalEventRows ?? []) as EventRow[])],
+      [...classEventLists.flat(), ...eventsToIcs((generalEventRows ?? []) as unknown as EventRow[])],
       { name: `${personalName} – Veritas Village` },
     ));
   }

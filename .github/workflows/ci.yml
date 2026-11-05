@@ -57,8 +57,72 @@ jobs:
         env:
           NODE_ENV: development
 
+  # Edge functions are TypeScript for the Deno runtime, which npm run typecheck
+  # never sees. This type-checks each one and runs the unit tests (calendar
+  # recurrence, the invitation delete/resend guards, shared helpers).
+  edge-function-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.8.2
+
+      - name: Type-check every edge function
+        run: |
+          set -e
+          for dir in supabase/functions/*/; do
+            [ -f "$dir/index.ts" ] || continue
+            echo "== $dir"
+            (cd "$dir" && deno check --node-modules-dir=none --config deno.json index.ts)
+          done
+
+      - name: Unit tests
+        run: |
+          cd supabase/functions
+          deno test --node-modules-dir=none --config invite-family-admin/deno.json _shared/ calendar-feed/
+
+  # Replays every migration into a fresh local Supabase, then runs the pgTAP
+  # tests in supabase/tests/database. Proves two things at once: that the
+  # migration history still builds a working database from scratch, and that
+  # the permission rules behind past incidents still hold.
+  database-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned for the same reason as the deploy jobs below.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.1
+
+      # Production has tables and columns that were created by hand and never
+      # appeared in a migration. These stand-ins are dropped into this
+      # throwaway database's migration list at the point each is needed
+      # (their filenames carry the version they slot in at). Never committed,
+      # never applied anywhere else. See supabase/ci-bootstrap.
+      - name: Add the hand-made-object baseline among the migrations
+        run: cp supabase/ci-bootstrap/*.sql supabase/migrations/
+
+      # Retried: a hosted runner occasionally has a port taken or a registry
+      # pull rate-limited, which says nothing about the code under test. A
+      # real migration failure fails all three attempts the same way.
+      - name: Start a local Supabase
+        run: |
+          for attempt in 1 2 3; do
+            supabase start -x studio,mailpit,imgproxy,vector,logflare,edge-runtime && exit 0
+            echo "supabase start failed (attempt $attempt); cleaning up and retrying"
+            supabase stop --no-backup || true
+            sleep 10
+          done
+          exit 1
+
+      - name: Run database tests
+        run: supabase test db
+
   deploy:
-    needs: build-lint-test
+    needs: [build-lint-test, edge-function-tests, database-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID live as Environment secrets
@@ -101,7 +165,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   supabase-functions:
-    needs: build-lint-test
+    needs: [build-lint-test, edge-function-tests, database-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: Production
@@ -129,7 +193,7 @@ jobs:
       - run: supabase functions deploy --project-ref jtwemgyhxylbhjzxgyvh
 
   supabase-migrations:
-    needs: build-lint-test
+    needs: [build-lint-test, edge-function-tests, database-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: Production

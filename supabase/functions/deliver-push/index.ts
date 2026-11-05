@@ -4,6 +4,8 @@ import webpush from "npm:web-push@3.6.7";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { readVaultSecret } from "../_shared/resend.ts";
 import { safeEqual } from "../_shared/crypto.ts";
+import { safePath } from "../_shared/paths.ts";
+import { corsHeaders, json } from "../_shared/http.ts";
 
 /**
  * Sends web push for rows in public.notifications.
@@ -18,8 +20,6 @@ import { safeEqual } from "../_shared/crypto.ts";
  *                             own devices only.
  */
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const VAPID_SECRET = "VAPID_KEYS";
 const VAPID_SUBJECT = "mailto:admin@veritasvillage.org";
@@ -53,11 +53,6 @@ async function sendOne(sub: Subscription, payload: Payload): Promise<"sent" | "g
     const status = (error as { statusCode?: number }).statusCode;
     return status === 404 || status === 410 ? "gone" : "failed";
   }
-}
-
-/** A notification's link is always a path on this site; anything else becomes the home page. */
-function safePath(path: string | null): string {
-  return path && path.startsWith("/") && !path.startsWith("//") ? path : "/family-village/home";
 }
 
 async function handle(req: Request): Promise<Response> {
