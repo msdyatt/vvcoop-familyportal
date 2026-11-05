@@ -115,6 +115,9 @@ jobs:
           echo "::group::GRANTS"
           docker exec -i "$DB" psql -U postgres -At < supabase/ci-bootstrap/grants_dump.sql.txt
           echo "::endgroup::"
+          echo "::group::SCHEMA"
+          docker exec -i "$DB" psql -U postgres -At < supabase/ci-bootstrap/schema_dump.sql.txt
+          echo "::endgroup::"
 
       - name: Run database tests
         run: supabase test db
