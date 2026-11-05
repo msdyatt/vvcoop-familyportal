@@ -2,6 +2,7 @@
 -- (classes_grades_and_enrollment) reads it, and a later one drops it. Replay
 -- needs it to exist at this point. CI-only; see 20260801000000_drift_baseline.sql.
 alter table public.classes add column if not exists age_band text;
+alter table public.classes add column if not exists block_label text;
 
 -- The enrollment_requests policy added by that migration calls this, and the
 -- function itself was also created by hand. A permissive stand-in is enough to
