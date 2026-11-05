@@ -1,7 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ErrorReporter from "./error-reporter";
 import GlobalErrorBoundary from "./global-error-boundary";
+
+export const viewport: Viewport = {
+  themeColor: "#0b2a3d",
+  // Lets the portal run edge to edge on notched phones once installed.
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   // Without this, a relative image URL in openGraph/twitter below resolves
@@ -11,12 +17,14 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://family.veritasvillage.org"),
   title: "Veritas Village | Central Texas Homeschool Co-op",
   description: "A shared place for Central Texas homeschool families to learn with intention and grow in community.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Veritas Village", statusBarStyle: "default" },
   icons: {
     icon: [
       { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
       { url: "/brand/favicon-96.png", sizes: "96x96", type: "image/png" },
     ],
-    apple: { url: "/brand/favicon-180.png", sizes: "180x180", type: "image/png" },
+    apple: { url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
   },
   openGraph: {
     title: "Veritas Village",

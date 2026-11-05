@@ -1,0 +1,168 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
+import webpush from "npm:web-push@3.6.7";
+import { logEdgeError } from "../_shared/error-log.ts";
+import { readVaultSecret } from "../_shared/resend.ts";
+import { safeEqual } from "../_shared/crypto.ts";
+
+/**
+ * Sends web push for rows in public.notifications.
+ *
+ *   { mode: "public-key" } -- returns the VAPID public key the browser needs
+ *                             to subscribe. Public by design. Creates the key
+ *                             pair on first use and keeps it in Vault.
+ *   { mode: "process" }    -- pg_cron, every minute when there is something to
+ *                             send. No session; gated by the same Vault shared
+ *                             secret deliver-emails uses.
+ *   { mode: "test" }       -- a signed-in person sends a test push to their
+ *                             own devices only.
+ */
+
+const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+const VAPID_SECRET = "VAPID_KEYS";
+const VAPID_SUBJECT = "mailto:admin@veritasvillage.org";
+
+type VapidKeys = { publicKey: string; privateKey: string };
+
+async function getVapidKeys(admin: SupabaseClient): Promise<VapidKeys> {
+  const existing = await readVaultSecret(admin, VAPID_SECRET);
+  if (existing) return JSON.parse(existing) as VapidKeys;
+  await admin.rpc("vault_create_secret_if_absent", { secret_name: VAPID_SECRET, secret_value: JSON.stringify(webpush.generateVAPIDKeys()) });
+  // Re-read rather than trust our own copy: if two first calls raced, only one
+  // insert won and both must agree on which key pair that was.
+  const stored = await readVaultSecret(admin, VAPID_SECRET);
+  if (!stored) throw new Error("Could not store the VAPID key pair in Vault.");
+  return JSON.parse(stored) as VapidKeys;
+}
+
+type Subscription = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
+type Payload = { title: string; body: string; url: string; tag: string };
+
+/** Sends one payload to one device. Returns "gone" when the device has unsubscribed for good. */
+async function sendOne(sub: Subscription, payload: Payload): Promise<"sent" | "gone" | "failed"> {
+  try {
+    await webpush.sendNotification(
+      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+      JSON.stringify(payload),
+      { TTL: 60 * 60 * 24, urgency: "normal" },
+    );
+    return "sent";
+  } catch (error) {
+    const status = (error as { statusCode?: number }).statusCode;
+    return status === 404 || status === 410 ? "gone" : "failed";
+  }
+}
+
+/** A notification's link is always a path on this site; anything else becomes the home page. */
+function safePath(path: string | null): string {
+  return path && path.startsWith("/") && !path.startsWith("//") ? path : "/family-village/home";
+}
+
+async function handle(req: Request): Promise<Response> {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const publishableKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !publishableKey || !serviceRoleKey) return json({ error: "Server not configured" }, 500);
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  const body = await req.json().catch(() => null) as { mode?: string } | null;
+
+  if (body?.mode === "public-key") {
+    const keys = await getVapidKeys(admin);
+    return json({ publicKey: keys.publicKey });
+  }
+
+  if (body?.mode === "test") {
+    const authorization = req.headers.get("Authorization");
+    if (!authorization) return json({ error: "Unauthorized" }, 401);
+    const userClient = createClient(supabaseUrl, publishableKey, { global: { headers: { Authorization: authorization } } });
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) return json({ error: "Your session has expired. Please sign in again." }, 401);
+
+    const keys = await getVapidKeys(admin);
+    webpush.setVapidDetails(VAPID_SUBJECT, keys.publicKey, keys.privateKey);
+    const { data: subs } = await admin.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").eq("user_id", user.id);
+    const results = await Promise.all(((subs ?? []) as Subscription[]).map(async (sub) => ({
+      sub, result: await sendOne(sub, { title: "Veritas Village", body: "Notifications are working on this device.", url: "/family-village/home", tag: "test" }),
+    })));
+    const gone = results.filter((r) => r.result === "gone").map((r) => r.sub.id);
+    if (gone.length) await admin.from("push_subscriptions").delete().in("id", gone);
+    return json({ ok: true, sent: results.filter((r) => r.result === "sent").length });
+  }
+
+  if (body?.mode === "process") {
+    const secret = await readVaultSecret(admin, "EMAIL_DELIVERY_SECRET");
+    const presented = req.headers.get("x-delivery-secret") ?? "";
+    if (!secret || !safeEqual(presented, secret)) return json({ error: "Unauthorized" }, 401);
+
+    // 15 minutes, not a day: a person who turns notifications on later must not
+    // receive a burst of yesterday's, and the cron runs every minute anyway.
+    const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { data: recent } = await admin.from("notifications")
+      .select("id,recipient_user_id,title,body,link_path")
+      .gte("created_at", since).order("created_at").limit(500);
+    const candidates = (recent ?? []) as { id: string; recipient_user_id: string; title: string; body: string | null; link_path: string | null }[];
+    if (!candidates.length) return json({ ok: true, sent: 0 });
+
+    // Claim first. ignoreDuplicates makes the insert return only the rows this
+    // run actually created, so an overlapping run can't send the same one.
+    const { data: claimedRows } = await admin.from("notification_push_log")
+      .upsert(candidates.map((n) => ({ notification_id: n.id })), { onConflict: "notification_id", ignoreDuplicates: true })
+      .select("notification_id");
+    const claimed = new Set((claimedRows ?? []).map((row: { notification_id: string }) => row.notification_id));
+    const work = candidates.filter((n) => claimed.has(n.id));
+    if (!work.length) return json({ ok: true, sent: 0 });
+
+    const userIds = [...new Set(work.map((n) => n.recipient_user_id))];
+    const { data: subRows } = await admin.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", userIds);
+    const subsByUser = new Map<string, Subscription[]>();
+    for (const sub of (subRows ?? []) as Subscription[]) subsByUser.set(sub.user_id, [...(subsByUser.get(sub.user_id) ?? []), sub]);
+
+    const keys = await getVapidKeys(admin);
+    webpush.setVapidDetails(VAPID_SUBJECT, keys.publicKey, keys.privateKey);
+
+    const gone = new Set<string>();
+    let sent = 0;
+    let failed = 0;
+    const BATCH_SIZE = 10;
+    const jobs = work.flatMap((n) => (subsByUser.get(n.recipient_user_id) ?? []).map((sub) => ({ n, sub })));
+    const perNotification = new Map<string, { sent: number; failed: number }>();
+    for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
+      await Promise.all(jobs.slice(i, i + BATCH_SIZE).map(async ({ n, sub }) => {
+        const result = await sendOne(sub, { title: n.title, body: n.body ?? "", url: safePath(n.link_path), tag: n.id });
+        const tally = perNotification.get(n.id) ?? { sent: 0, failed: 0 };
+        if (result === "sent") { sent += 1; tally.sent += 1; } else { failed += 1; tally.failed += 1; }
+        if (result === "gone") gone.add(sub.id);
+        perNotification.set(n.id, tally);
+      }));
+    }
+
+    if (gone.size) await admin.from("push_subscriptions").delete().in("id", [...gone]);
+    await Promise.all([...perNotification].map(([id, tally]) =>
+      admin.from("notification_push_log").update({ sent_count: tally.sent, failed_count: tally.failed }).eq("notification_id", id)));
+    return json({ ok: true, sent, failed, removed: gone.size });
+  }
+
+  return json({ error: "Unknown mode." }, 400);
+}
+
+export default {
+  async fetch(req: Request) {
+    try {
+      return await handle(req);
+    } catch (error) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supabaseUrl && serviceRoleKey) {
+        const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        await logEdgeError(admin, "deliver-push", error);
+      }
+      return json({ error: "Something went wrong. This has been logged." }, 500);
+    }
+  },
+};

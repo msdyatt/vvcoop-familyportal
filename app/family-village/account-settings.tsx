@@ -6,6 +6,7 @@ import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
 import SubscribeLink from "./subscribe-link";
 import Avatar from "./avatar";
 import AvatarCropper from "./avatar-cropper";
+import PushSection from "./push-section";
 
 export default function AccountSettings({ email, onSignOut, onProfileUpdated }: { email: string; onSignOut: () => void; onProfileUpdated?: () => void }) {
   return <div className="account-settings">
@@ -13,6 +14,7 @@ export default function AccountSettings({ email, onSignOut, onProfileUpdated }: 
     <PasswordSection email={email} />
     <PasskeySection />
     <TwoFactorSection />
+    <PushSection />
     <CalendarSection />
     <DangerZone onSignOut={onSignOut} />
   </div>;
