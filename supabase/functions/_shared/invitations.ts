@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
 import { json } from "./http.ts";
+import type { AdminClient } from "./types.ts";
 import { sendAndLog } from "./resend.ts";
 import { buildInviteEmail, INVITE_SUBJECT } from "./invite-email.ts";
 
@@ -15,9 +16,7 @@ export type SendInviteEmail = (admin: SupabaseClient, opts: { to: string; subjec
  * never confirmed, never signed in -- not from the invitations row alone.
  */
 export async function manageInvitation(
-  // No generated database types in this project, so the client is schema-less (`any`).
-  // deno-lint-ignore no-explicit-any
-  adminClient: SupabaseClient<any, "public", any>,
+  adminClient: AdminClient,
   actorId: string,
   action: "resend" | "delete",
   invitationId?: string,

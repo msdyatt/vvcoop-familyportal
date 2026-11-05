@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
+import { createClient } from "npm:@supabase/supabase-js@2.112.3";
+import type { AdminClient } from "../_shared/types.ts";
 import { buildIcs, byDayCode, IcsEvent } from "../_shared/ics.ts";
 import { addDaysDateOnly, DateRange, mergeContiguousRanges } from "../_shared/date-ranges.ts";
 import { logEdgeError } from "../_shared/error-log.ts";
@@ -66,9 +67,6 @@ function firstOccurrence(from: string, dayOfWeek: number): string {
   return from;
 }
 
-// No generated database types in this project, so the client is schema-less (`any`).
-// deno-lint-ignore no-explicit-any
-type AdminClient = SupabaseClient<any, "public", any>;
 
 /** The contiguous date spans a class's recurrence should be bounded to: its own terms if it has any, else its whole school year. */
 async function classDateRanges(admin: AdminClient, classId: string, schoolYearId: string | null): Promise<DateRange[]> {

@@ -32,6 +32,7 @@ function fakeClient(db: Db, authUsers: AuthUsers) {
     private matching() { return (db[this.table] ??= []).filter((row) => this.filters.every((fn) => fn(row))); }
     maybeSingle() { return Promise.resolve({ data: this.matching()[0] ?? null, error: null }); }
     // deno-lint-ignore no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     then(resolve: (value: any) => unknown, reject?: (reason: unknown) => unknown) {
       const rows = this.matching();
       let result: Row;

@@ -97,6 +97,13 @@ jobs:
         with:
           version: 2.122.1
 
+      # Production has a few tables that were created by hand and never
+      # appeared in a migration. This puts a stand-in for them ahead of the
+      # real migrations in this throwaway database only (never committed, never
+      # applied anywhere else). See the file for what is in it and why.
+      - name: Add the hand-made-table baseline ahead of the migrations
+        run: cp supabase/tests/bootstrap/drift_baseline.sql supabase/migrations/20260801000000_drift_baseline.sql
+
       - name: Start a local Supabase
         run: supabase start -x studio,mailpit,imgproxy,vector,logflare,edge-runtime
 

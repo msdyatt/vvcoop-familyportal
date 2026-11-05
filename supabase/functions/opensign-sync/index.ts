@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
+import { createClient } from "npm:@supabase/supabase-js@2.112.3";
+import type { AdminClient } from "../_shared/types.ts";
 import { checkCredentials, getDocumentState, mapStatus } from "../_shared/opensign.ts";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
@@ -28,9 +29,7 @@ const PRIVATE_BUCKET = "family-village-private";
  * their account staying live and the link staying valid. A copy is kept here.
  */
 async function storeSignedCopy(
-  // No generated database types in this project, so the client is schema-less (`any`).
-  // deno-lint-ignore no-explicit-any
-  adminClient: SupabaseClient<any, "public", any>,
+  adminClient: AdminClient,
   fileUrl: string,
   familyId: string | null,
   title: string,
