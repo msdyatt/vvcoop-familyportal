@@ -101,12 +101,20 @@ jobs:
       # appeared in a migration. These stand-ins are dropped into this
       # throwaway database's migration list at the point each is needed
       # (their filenames carry the version they slot in at). Never committed,
-      # never applied anywhere else. See supabase/tests/bootstrap.
+      # never applied anywhere else. See supabase/ci-bootstrap.
       - name: Add the hand-made-object baseline among the migrations
-        run: cp supabase/tests/bootstrap/*.sql supabase/migrations/
+        run: cp supabase/ci-bootstrap/*.sql supabase/migrations/
 
       - name: Start a local Supabase
         run: supabase start -x studio,mailpit,imgproxy,vector,logflare,edge-runtime
+
+      - name: Dump replayed grants (diagnostic)
+        if: always()
+        run: |
+          DB=$(docker ps --filter name=supabase_db --format '{{.Names}}' | head -1)
+          echo "::group::GRANTS"
+          docker exec -i "$DB" psql -U postgres -At < supabase/ci-bootstrap/grants_dump.sql.txt
+          echo "::endgroup::"
 
       - name: Run database tests
         run: supabase test db

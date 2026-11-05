@@ -1,0 +1,13 @@
+with tl as (
+  select table_name, grantee, privilege_type from information_schema.role_table_grants
+  where table_schema = 'public' and grantee in ('anon', 'authenticated', 'service_role')
+)
+select line from (
+  select format('%s|%s|%s', table_name, grantee, string_agg(privilege_type, ',' order by privilege_type)) as line from tl group by table_name, grantee
+  union all
+  select format('%s|%s|COL %s: %s', c.table_name, c.grantee, c.privilege_type, string_agg(c.column_name, ',' order by c.column_name))
+  from information_schema.column_privileges c
+  where c.table_schema = 'public' and c.grantee in ('anon', 'authenticated', 'service_role')
+    and not exists (select 1 from tl where tl.table_name = c.table_name and tl.grantee = c.grantee and tl.privilege_type = c.privilege_type)
+  group by c.table_name, c.grantee, c.privilege_type
+) x order by line;
