@@ -3247,6 +3247,18 @@ footer nav a:hover {
   font-size:12px;
 }
 
+.recent-invitations article {
+  flex-wrap:wrap;
+}
+
+.recent-invitations .invitation-actions {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  flex-basis:100%;
+}
+
 .recent-invitations article>span {
   align-self:center;
   padding:6px 8px;
