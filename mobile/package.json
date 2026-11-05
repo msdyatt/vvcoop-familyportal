@@ -1,0 +1,25 @@
+{
+  "name": "veritas-village-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native iOS and Android shell for the Veritas Village Family Portal (Capacitor). The portal itself is the web app in the parent directory.",
+  "scripts": {
+    "sync": "cap sync",
+    "assets": "capacitor-assets generate --iconBackgroundColor '#0b2a3d' --splashBackgroundColor '#0b2a3d' --iconBackgroundColorDark '#0b2a3d' --splashBackgroundColorDark '#0b2a3d'",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "4.0.0",
+    "@capacitor/cli": "8.6.0"
+  }
+}

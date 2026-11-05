@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The native app shell is its own project (own package.json); the
+    // generated Xcode/Gradle files and copied web assets are not ours to lint.
+    "mobile/**",
   ]),
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>Veritas Village</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0b2a3d; color: #faf7f1;
+      font: 16px/1.5 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+    main { min-height: 100%; display: grid; place-content: center; justify-items: center; gap: 14px;
+      padding: 32px; text-align: center; box-sizing: border-box; }
+    img { width: 96px; height: 96px; }
+    h1 { margin: 0; font: 600 22px Georgia, "Playfair Display", serif; }
+    p { margin: 0; max-width: 28ch; color: #bbc0b8; }
+    button { margin-top: 6px; padding: 12px 22px; border: 1px solid #d7a590; background: transparent;
+      color: #faf7f1; font: 600 15px inherit; border-radius: 0; }
+    [hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="icon.png" alt="" width="96" height="96">
+    <h1>Veritas Village</h1>
+    <p id="status" role="status">Opening your portal…</p>
+    <button id="retry" type="button" style="display:none">Try again</button>
+  </main>
+  <script>
+    // Hands over to the live portal once it is reachable. If it is not (no
+    // signal, airplane mode), say so plainly instead of showing a browser
+    // error page, and try again by itself when the connection returns.
+    var PORTAL = "https://family.veritasvillage.org/family-village/home";
+    var PROBE = "https://family.veritasvillage.org/brand/icon-192.png";
+    var status = document.getElementById("status");
+    var retry = document.getElementById("retry");
+    var busy = false;
+
+    // Show any script failure on screen: a blank launcher with no explanation is
+    // the worst outcome for someone opening the app.
+    window.addEventListener("error", function (event) {
+      status.textContent = "Something went wrong opening the portal (" + event.message + ").";
+      retry.style.display = "inline-block";
+    });
+
+    function open() { window.location.replace(PORTAL); }
+
+    function check() {
+      if (busy) return;
+      busy = true;
+      retry.style.display = "none";
+      status.textContent = "Opening your portal…";
+      var controller = new AbortController();
+      var timer = setTimeout(function () { controller.abort(); }, 8000);
+      fetch(PROBE, { mode: "no-cors", cache: "no-store", signal: controller.signal })
+        .then(function () { clearTimeout(timer); open(); })
+        .catch(function () {
+          clearTimeout(timer);
+          busy = false;
+          status.textContent = "You appear to be offline. Veritas Village needs a connection to open.";
+          retry.style.display = "inline-block";
+        });
+    }
+
+    retry.addEventListener("click", check);
+    window.addEventListener("online", check);
+    check();
+  </script>
+</body>
+</html>

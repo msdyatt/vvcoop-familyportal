@@ -1,0 +1,44 @@
+name: Mobile app
+
+# Only when the native shell changes. Proves the Android project still builds
+# (the Mac this is developed on has no Android toolchain, so CI is the check).
+# The iOS project is built locally in Xcode; a macOS runner costs ten times a
+# Linux one, so it is not run here yet.
+on:
+  push:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/mobile.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/mobile.yml"]
+
+jobs:
+  android-debug-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - run: npm ci
+        env:
+          NODE_ENV: development
+
+      # Copies the launch page and plugin list into the Android project.
+      - run: npx cap sync android
+
+      - name: Assemble a debug build
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon

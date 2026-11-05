@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Veritas Village</string>
+    <string name="title_activity_main">Veritas Village</string>
+    <string name="package_name">org.veritasvillage.family</string>
+    <string name="custom_url_scheme">org.veritasvillage.family</string>
+</resources>

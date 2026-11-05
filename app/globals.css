@@ -1857,7 +1857,7 @@ footer nav a:hover {
 .portal-back {
   position:absolute;
   z-index:2;
-  top:28px;
+  top:calc(28px + env(safe-area-inset-top));
   left:34px;
   color:var(--sage-text);
   font-size:12px;
@@ -1872,7 +1872,7 @@ footer nav a:hover {
   justify-content:center;
   width:min(820px,100%);
   min-height:100vh;
-  padding:90px clamp(24px,8vw,110px);
+  padding:calc(90px + env(safe-area-inset-top)) clamp(24px,8vw,110px) 90px;
   text-align:center;
 }
 
@@ -2487,7 +2487,7 @@ footer nav a:hover {
 
 @media(max-width:560px) {
   .portal-entry-card {
-    padding:90px 24px 65px;
+    padding:calc(90px + env(safe-area-inset-top)) 24px 65px;
   }
   .portal-back {
     left:20px;
@@ -6082,4 +6082,14 @@ footer nav a:hover {
 .global-error-fallback p {
   max-width:420px;
   color:var(--sage-text);
+}
+
+/* In the installed app and the native shell the page draws edge to edge
+   (viewport-fit=cover), so anything near the top edge sits under the status
+   bar and notch unless it allows for them. The app header does this itself and
+   lets its band run underneath; the sign-in page does it above. Everything
+   else (loading and "please sign in" screens, public pages) gets the padding
+   here. env() is 0 in an ordinary browser, so nothing changes there. */
+body:not(:has(.app-header)):not(:has(.portal-entry)) {
+  padding-top: env(safe-area-inset-top);
 }

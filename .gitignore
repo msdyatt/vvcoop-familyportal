@@ -46,3 +46,13 @@ yarn-error.log*
 
 # wrangler local secrets
 .dev.vars
+
+# mobile app shell (Capacitor) -- its own project; generated build output stays out
+/mobile/node_modules
+/mobile/ios/App/build
+/mobile/ios/App/.build
+/mobile/android/.gradle
+/mobile/android/build
+/mobile/android/app/build
+/mobile/android/local.properties
+/mobile/android/.idea
