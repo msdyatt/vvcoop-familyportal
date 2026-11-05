@@ -7,7 +7,7 @@
 --     (children.family_id on 27 Aug, classes.capacity on 5 Nov)
 -- Each test file runs in its own transaction that is rolled back.
 begin;
-select plan(25);
+select plan(28);
 
 insert into auth.users (id, email, aud, role) values
   ('00000000-0000-0000-0000-00000000000a', 'admin@t.test', 'authenticated', 'authenticated'),
@@ -150,6 +150,18 @@ select ok(
   and not has_function_privilege('authenticated', 'public.vault_create_secret_if_absent(text,text)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.vault_create_secret_if_absent(text,text)', 'EXECUTE'),
   'only the service role can write Vault secrets');
+
+-- ---- the last administrator cannot be removed -------------------------------
+select throws_ok(
+  $$delete from public.user_roles where user_id = '00000000-0000-0000-0000-00000000000a' and role = 'admin'$$,
+  'P0001', 'The final administrator role cannot be removed.', 'the only administrator cannot lose the role, even by direct SQL');
+insert into public.user_roles (user_id, role) values ('00000000-0000-0000-0000-00000000000c', 'admin');
+select lives_ok(
+  $$delete from public.user_roles where user_id = '00000000-0000-0000-0000-00000000000a' and role = 'admin'$$,
+  'but with a second administrator in place the first can be removed');
+select throws_ok(
+  $$delete from public.user_roles where user_id = '00000000-0000-0000-0000-00000000000c' and role = 'admin'$$,
+  'P0001', 'The final administrator role cannot be removed.', 'and then the remaining one is protected');
 
 select * from finish();
 rollback;

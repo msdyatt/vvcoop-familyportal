@@ -11,7 +11,7 @@
 --
 -- Every statement here is already true in production, so applying this
 -- migration there changes nothing; it makes the history match reality.
-grant update on public.children to authenticated;
+grant insert, update, delete on public.children to authenticated;
 grant update on public.documents to authenticated;
 grant insert, update, delete on public.events to authenticated;
 grant insert, update, delete on public.families to authenticated;
