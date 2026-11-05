@@ -105,8 +105,18 @@ jobs:
       - name: Add the hand-made-object baseline among the migrations
         run: cp supabase/ci-bootstrap/*.sql supabase/migrations/
 
+      # Retried: a hosted runner occasionally has a port taken or a registry
+      # pull rate-limited, which says nothing about the code under test. A
+      # real migration failure fails all three attempts the same way.
       - name: Start a local Supabase
-        run: supabase start -x studio,mailpit,imgproxy,vector,logflare,edge-runtime
+        run: |
+          for attempt in 1 2 3; do
+            supabase start -x studio,mailpit,imgproxy,vector,logflare,edge-runtime && exit 0
+            echo "supabase start failed (attempt $attempt); cleaning up and retrying"
+            supabase stop --no-backup || true
+            sleep 10
+          done
+          exit 1
 
       - name: Run database tests
         run: supabase test db
