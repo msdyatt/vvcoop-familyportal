@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { readVaultSecret } from "../_shared/resend.ts";
 import { safeEqual } from "../_shared/crypto.ts";
+import { corsHeaders, json } from "../_shared/http.ts";
 
 /**
  * The other end of the print_jobs queue: a Raspberry Pi wired to the office
@@ -39,8 +40,6 @@ import { safeEqual } from "../_shared/crypto.ts";
  *                                                 tried it.
  */
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

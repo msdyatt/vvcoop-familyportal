@@ -1,8 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.112.3";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
 import { checkCredentials, getDocumentState, mapStatus } from "../_shared/opensign.ts";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
+import { corsHeaders, json } from "../_shared/http.ts";
 
 /**
  * Asks OpenSign what happened to every document still outstanding.
@@ -17,8 +18,6 @@ import { needsMfaStepUp } from "../_shared/aal.ts";
  * the family can open their own copy from the portal.
  */
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const PRIVATE_BUCKET = "family-village-private";
 
@@ -29,7 +28,9 @@ const PRIVATE_BUCKET = "family-village-private";
  * their account staying live and the link staying valid. A copy is kept here.
  */
 async function storeSignedCopy(
-  adminClient: ReturnType<typeof createClient>,
+  // No generated database types in this project, so the client is schema-less (`any`).
+  // deno-lint-ignore no-explicit-any
+  adminClient: SupabaseClient<any, "public", any>,
   fileUrl: string,
   familyId: string | null,
   title: string,

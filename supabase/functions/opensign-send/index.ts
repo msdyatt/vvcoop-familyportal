@@ -3,9 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { OpenSignError, sendForSignature, sendFromTemplate } from "../_shared/opensign.ts";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
+import { corsHeaders, json } from "../_shared/http.ts";
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const PRIVATE_BUCKET = "family-village-private";
 

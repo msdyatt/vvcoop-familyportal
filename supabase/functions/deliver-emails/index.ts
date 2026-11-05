@@ -4,6 +4,7 @@ import { logEdgeError } from "../_shared/error-log.ts";
 import { readVaultSecret, sendViaResend } from "../_shared/resend.ts";
 import { safeEqual } from "../_shared/crypto.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
+import { corsHeaders, json } from "../_shared/http.ts";
 
 /**
  * Sends queued email_outbox rows through Resend, and offers an admin-only
@@ -27,8 +28,6 @@ import { needsMfaStepUp } from "../_shared/aal.ts";
  *                                  project (opensign-send, opensign-sync).
  */
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

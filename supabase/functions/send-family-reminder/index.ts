@@ -4,6 +4,7 @@ import { logEdgeError } from "../_shared/error-log.ts";
 import { sendAndLog } from "../_shared/resend.ts";
 import { escapeHtml, renderEmail } from "../_shared/email-template.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
+import { corsHeaders, json } from "../_shared/http.ts";
 
 /**
  * Sends an ad-hoc compliance reminder to one household right now, on admin
@@ -19,8 +20,6 @@ import { needsMfaStepUp } from "../_shared/aal.ts";
  * browser happened to have cached.
  */
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 type OutstandingRow = {
   status: string;

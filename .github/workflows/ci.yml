@@ -57,6 +57,52 @@ jobs:
         env:
           NODE_ENV: development
 
+  # Edge functions are TypeScript for the Deno runtime, which npm run typecheck
+  # never sees. This type-checks each one and runs the unit tests (calendar
+  # recurrence, the invitation delete/resend guards, shared helpers).
+  edge-function-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.8.2
+
+      - name: Type-check every edge function
+        run: |
+          set -e
+          for dir in supabase/functions/*/; do
+            [ -f "$dir/index.ts" ] || continue
+            echo "== $dir"
+            (cd "$dir" && deno check --node-modules-dir=none --config deno.json index.ts)
+          done
+
+      - name: Unit tests
+        run: |
+          cd supabase/functions
+          deno test --node-modules-dir=none --config invite-family-admin/deno.json _shared/ calendar-feed/
+
+  # Replays every migration into a fresh local Supabase, then runs the pgTAP
+  # tests in supabase/tests/database. Proves two things at once: that the
+  # migration history still builds a working database from scratch, and that
+  # the permission rules behind past incidents still hold.
+  database-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned for the same reason as the deploy jobs below.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.1
+
+      - name: Start a local Supabase
+        run: supabase start -x studio,mailpit,imgproxy,vector,logflare,edge-runtime
+
+      - name: Run database tests
+        run: supabase test db
+
   deploy:
     needs: build-lint-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
