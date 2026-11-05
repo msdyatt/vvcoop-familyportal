@@ -1309,6 +1309,14 @@ footer nav a:hover {
   border-color:var(--terracotta);
 }
 
+.enrollment-class-options>div.disabled {
+  opacity:.55;
+}
+
+.enrollment-class-options>div.disabled label {
+  cursor:not-allowed;
+}
+
 .enrollment-class-options label {
   display:grid;
   gap:3px;
