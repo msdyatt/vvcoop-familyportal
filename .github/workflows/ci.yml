@@ -112,9 +112,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned, not `latest`: v3.0.0 (2 Nov 2026) flipped `db push` to target a
+      # local stack by default and made `functions deploy` demand --yes, which
+      # broke both deploy jobs on the next push. Move to v3 deliberately.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.1
 
       # supabase/config.toml's [functions.*] verify_jwt values are the
       # authoritative source here -- deploying without them (or with a stale
@@ -137,9 +140,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned, not `latest`: v3.0.0 (2 Nov 2026) flipped `db push` to target a
+      # local stack by default and made `functions deploy` demand --yes, which
+      # broke both deploy jobs on the next push. Move to v3 deliberately.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.1
 
       # No database password needed -- see the job-level comment above for why
       # that's worth calling out. If a future CLI version changes this and
