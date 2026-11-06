@@ -522,3 +522,42 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/demo-accounts/deno.json"
 entrypoint = "./functions/demo-accounts/index.ts"
+
+# --- Stripe dues ------------------------------------------------------------
+# Called by Stripe, which has no Supabase session. The Stripe-Signature header
+# is verified against the webhook secret in Vault before anything is parsed, and
+# the function refuses everything when no secret is set.
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/stripe-webhook/deno.json"
+entrypoint = "./functions/stripe-webhook/index.ts"
+
+# Called from the browser with the signed-in person's own session. They handle
+# their own CORS preflight (an OPTIONS request has no Authorization header), so
+# the platform JWT gate stays off and each function checks the session itself:
+# active account, household or administrator role, two-factor step-up.
+[functions.dues-checkout]
+enabled = true
+verify_jwt = false
+import_map = "./functions/dues-checkout/deno.json"
+entrypoint = "./functions/dues-checkout/index.ts"
+
+[functions.dues-admin]
+enabled = true
+verify_jwt = false
+import_map = "./functions/dues-admin/deno.json"
+entrypoint = "./functions/dues-admin/index.ts"
+
+[functions.dues-receipt]
+enabled = true
+verify_jwt = false
+import_map = "./functions/dues-receipt/deno.json"
+entrypoint = "./functions/dues-receipt/index.ts"
+
+# Called by pg_cron once a day; no session. Gated by the Vault delivery secret.
+[functions.dues-daily]
+enabled = true
+verify_jwt = false
+import_map = "./functions/dues-daily/deno.json"
+entrypoint = "./functions/dues-daily/index.ts"
