@@ -6685,3 +6685,52 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 .danger-choice small {
   color:var(--sage-text);
 }
+
+/* ---- First-run tour ------------------------------------------------------ */
+.tour {
+  display:grid;
+  gap:12px;
+}
+
+.tour h2 {
+  margin:0;
+  font:600 28px/1.15 var(--serif);
+}
+
+.tour-body {
+  display:grid;
+  gap:10px;
+}
+
+.tour-body p {
+  margin:0;
+}
+
+.tour-dots {
+  display:flex;
+  gap:6px;
+  margin:6px 0 0;
+  padding:0;
+  list-style:none;
+}
+
+.tour-dots li {
+  width:8px;
+  height:8px;
+  background:rgba(var(--navy-rgb),.18);
+  border-radius:50%;
+}
+
+.tour-dots li.seen {
+  background:rgba(var(--navy-rgb),.45);
+}
+
+.tour-dots li.active {
+  background:var(--terracotta);
+  width:22px;
+  border-radius:4px;
+}
+
+.tour-skip {
+  margin-left:auto;
+}
