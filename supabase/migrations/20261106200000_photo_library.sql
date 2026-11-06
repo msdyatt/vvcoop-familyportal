@@ -157,11 +157,6 @@ begin
   if p_visibility = 'class' and v_class is null then raise exception 'Choose a class for a class-only photo.'; end if;
 
   if exists (select 1 from public.photos where id = p_id) then raise exception 'That photo was already added.'; end if;
-  if (select count(*) from storage.objects where bucket_id = 'family-village-private'
-        and name in ('library/' || p_id::text || '/full.jpg', 'library/' || p_id::text || '/thumb.jpg')) <> 2 then
-    raise exception 'The photo files are missing. Please try uploading again.';
-  end if;
-
   if p_album_id is not null then
     select * into v_album from public.photo_albums where id = p_album_id;
     if v_album.id is null then raise exception 'That album does not exist.'; end if;
@@ -173,6 +168,11 @@ begin
   -- Filing under a class (and sharing to it) is for people who belong to it.
   if v_class is not null and not private.can_see_class_media(v_class) then
     raise exception 'You can only use a class you teach or have a child in.';
+  end if;
+
+  if (select count(*) from storage.objects where bucket_id = 'family-village-private'
+        and name in ('library/' || p_id::text || '/full.jpg', 'library/' || p_id::text || '/thumb.jpg')) <> 2 then
+    raise exception 'The photo files are missing. Please try uploading again.';
   end if;
 
   -- Staff publish straight away; everyone else waits for approval.
@@ -364,9 +364,11 @@ create policy library_photo_delete on storage.objects
   using (bucket_id = 'family-village-private' and name like 'library/%'
          and (private.has_role('admin') or private.has_role('teacher') or owner_id = (select auth.uid())::text));
 
-revoke all on function private.can_see_class_media(uuid) from public, anon, authenticated;
+-- can_see_class_media and library_path_photo are called from row-level security
+-- policies, which run as the signed-in user, so they must stay executable by
+-- that role (the private schema is not exposed through the API). can_manage_photo
+-- is only called from the functions below, which run as their owner.
 revoke all on function private.can_manage_photo(uuid, text, uuid) from public, anon, authenticated;
-revoke all on function private.library_path_photo(text) from public, anon, authenticated;
 
 revoke all on function public.create_album(text, uuid, uuid, date) from public, anon;
 revoke all on function public.add_photo(uuid, text, uuid, uuid, text, date, boolean) from public, anon;

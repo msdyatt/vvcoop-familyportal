@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { PRIVATE_BUCKET } from "../../../lib/storage";
 import { resizeImage } from "../../../lib/image-resize";
@@ -32,25 +32,26 @@ export default function PhotoUpload({ roles, userId, classes, albums, teachingId
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [message, setMessage] = useState("");
-  const [myClasses, setMyClasses] = useState<ClassOption[]>([]);
+  const [childClasses, setChildClasses] = useState<ClassOption[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Which classes this person may file photos under: any (administrator), the ones
-  // they teach, or the ones their children are in.
+  // The classes a person may file photos under: any (administrator), the ones
+  // they teach, and the ones their children are in.
   useEffect(() => {
-    if (isAdmin) { setMyClasses(classes); return; }
-    if (roles.includes("teacher")) { setMyClasses(classes.filter((row) => teachingIds.has(row.id))); }
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     void supabase.from("enrollments").select("class_id,classes(id,title)").eq("status", "active").then(({ data }) => {
-      const fromChildren = (data ?? []).map((row) => (row as unknown as { classes: ClassOption | null }).classes).filter((row): row is ClassOption => !!row);
-      setMyClasses((previous) => {
-        const known = new Map(previous.map((row) => [row.id, row]));
-        for (const row of fromChildren) known.set(row.id, row);
-        return [...known.values()].sort((a, b) => a.title.localeCompare(b.title));
-      });
+      setChildClasses((data ?? []).map((row) => (row as unknown as { classes: ClassOption | null }).classes).filter((row): row is ClassOption => !!row));
     });
-  }, [isAdmin, roles, classes, teachingIds]);
+  }, []);
+
+  const myClasses = useMemo(() => {
+    if (isAdmin) return classes;
+    const known = new Map<string, ClassOption>();
+    if (roles.includes("teacher")) for (const row of classes) if (teachingIds.has(row.id)) known.set(row.id, row);
+    for (const row of childClasses) known.set(row.id, row);
+    return [...known.values()].sort((a, b) => a.title.localeCompare(b.title));
+  }, [isAdmin, roles, classes, teachingIds, childClasses]);
 
   const albumChoices = albums.filter((album) => !album.class_id || myClasses.some((row) => row.id === album.class_id) || isAdmin);
   const needsClass = visibility === "class";
