@@ -112,7 +112,7 @@ export default function CalendarView() {
     setView("day");
   }
 
-  const pill = (event: CalEvent) => <button key={event.id} type="button" className={`cal-pill ${event.audience === "class" ? "class" : "coop"}`} onClick={(click) => { click.stopPropagation(); setOpen(event); }} title={event.title}>
+  const pill = (event: CalEvent) => <button key={event.id} type="button" className={`cal-pill ${event.audience === "class" ? "class" : "coop"}`} onClick={() => setOpen(event)} title={event.title}>
     {!event.all_day && <i>{timeLabel(event.starts_at)}</i>}{event.title}
   </button>;
 
@@ -155,12 +155,11 @@ export default function CalendarView() {
             const items = byDay.get(key) ?? [];
             const inMonth = date.getMonth() === anchor.getMonth();
             return (
-              // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the number button inside is the keyboard path; tapping anywhere in the cell is a touch convenience
               <div key={key} role="gridcell" className={`cal-day${inMonth ? "" : " outside"}${key === todayKey ? " today" : ""}${key === selected ? " selected" : ""}`} onClick={() => setSelected(key)}>
-                <button type="button" className="cal-daynum" onClick={(event) => { event.stopPropagation(); setSelected(key); }} onDoubleClick={() => goToDay(key)} aria-label={`${date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}${items.length ? `, ${items.length} event${items.length === 1 ? "" : "s"}` : ""}`}>{date.getDate()}</button>
+                <button type="button" className="cal-daynum" onClick={() => setSelected(key)} onDoubleClick={() => goToDay(key)} aria-label={`${date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}${items.length ? `, ${items.length} event${items.length === 1 ? "" : "s"}` : ""}`}><span className="cal-num">{date.getDate()}</span></button>
                 <div className="cal-pills">
                   {items.slice(0, 3).map(pill)}
-                  {items.length > 3 && <button type="button" className="cal-more" onClick={(event) => { event.stopPropagation(); goToDay(key); }}>+{items.length - 3} more</button>}
+                  {items.length > 3 && <button type="button" className="cal-more" onClick={() => goToDay(key)}>+{items.length - 3} more</button>}
                 </div>
                 {items.length > 0 && <span className="cal-dots" aria-hidden="true">{items.slice(0, 3).map((event) => <i key={event.id} className={event.audience === "class" ? "class" : "coop"} />)}</span>}
               </div>

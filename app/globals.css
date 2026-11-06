@@ -7088,7 +7088,15 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   border-radius:13px;
 }
 
-.cal-day.today .cal-daynum {
+.cal-num {
+  display:grid;
+  place-items:center;
+  min-width:26px;
+  height:26px;
+  border-radius:13px;
+}
+
+.cal-day.today .cal-num {
   color:var(--cream);
   background:var(--terracotta-deep,var(--terracotta));
 }
@@ -7314,13 +7322,27 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   .cal-dots {
     display:flex;
   }
+  /* On a phone the whole cell is the button for choosing the day. */
   .cal-day {
     min-height:54px;
-    align-items:center;
-    padding:3px 0;
+    padding:0;
   }
   .cal-daynum {
-    align-self:center;
+    position:absolute;
+    inset:0;
+    align-content:start;
+    justify-content:center;
+    width:100%;
+    height:100%;
+    padding:6px 0 0;
+    border-radius:0;
+  }
+  .cal-dots {
+    position:absolute;
+    pointer-events:none;
+    right:0;
+    bottom:5px;
+    left:0;
   }
   .cal-week {
     grid-template-columns:1fr;
