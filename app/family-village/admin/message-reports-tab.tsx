@@ -5,6 +5,7 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { PRIVATE_BUCKET, getSignedFileUrls } from "../../../lib/storage";
 import { shortTime } from "../../../lib/messages";
 import DetailModal from "../detail-modal";
+import MessagingSettingsCard from "./messaging-settings-card";
 
 type Report = {
   id: string; message_id: string; status: "open" | "actioned" | "dismissed"; reason: string; created_at: string;
@@ -142,6 +143,10 @@ export default function MessageReportsTab() {
   </article>;
 
   return <section className="admin-section">
+    <p className="eyebrow">Channels</p>
+    <h2>Channel settings</h2>
+    <MessagingSettingsCard />
+
     <p className="eyebrow">Photos</p>
     <h2>Reported photos</h2>
     {loaded && !openPhotos.length && <p className="portal-empty">No photos are waiting for review.</p>}

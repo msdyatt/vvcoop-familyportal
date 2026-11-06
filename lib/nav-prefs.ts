@@ -46,7 +46,7 @@ export const DESTINATIONS: Destination[] = [
   { id: "admin-news", label: "News", href: `${ADMIN}?tab=news`, icon: "news", role: "admin", group: "Administration" },
   { id: "admin-reports", label: "Reports", href: `${ADMIN}?tab=reports`, icon: "reports", role: "admin", group: "Administration" },
   { id: "admin-activity", label: "Activity", href: `${ADMIN}?tab=activity`, icon: "activity", role: "admin", group: "Administration" },
-  { id: "admin-flagged", label: "Flagged", href: `${ADMIN}?tab=message-reports`, icon: "flag", role: "admin", group: "Administration" },
+  { id: "admin-flagged", label: "Messaging", href: `${ADMIN}?tab=message-reports`, icon: "flag", role: "admin", group: "Administration" },
   { id: "admin-integrations", label: "Services", href: `${ADMIN}?tab=integrations`, icon: "integrations", role: "admin", group: "Administration" },
 ];
 

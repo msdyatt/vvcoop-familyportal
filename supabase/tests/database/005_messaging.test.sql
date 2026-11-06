@@ -42,6 +42,12 @@ insert into public.enrollments (class_id, child_id, status) values
   ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000c2', 'active'),
   ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000c3', 'active');
 
+-- These tests are about direct messages, groups and class channels. Every
+-- active member is also placed in the co-op-wide channels (see 011), so take
+-- the fixtures out of them here to keep the counts below about what they test.
+delete from public.conversation_members m using public.conversations c
+  where c.id = m.conversation_id and c.audience = 'everyone';
+
 -- ---- who can message whom ---------------------------------------------------
 select ok(private.can_message('00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000b1'), 'a teacher can message the parent of a child in their class');
 select ok(private.can_message('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b3'), 'two parents with children in the same class can message each other');
