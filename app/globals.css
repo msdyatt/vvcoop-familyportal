@@ -6380,7 +6380,7 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   font-weight:700;
 }
 
-.messages-sender i,.messages-people i,.messages-members i,.messages-check i {
+.messages-sender i,.messages-people i,.messages-members i,.messages-check i,.messages-suggest i {
   margin-left:6px;
   color:var(--terracotta-text);
   font-size:10px;
@@ -6976,4 +6976,125 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
+}
+
+/* ---- Replies, reactions, mentions ----------------------------------------- */
+.messages-quote {
+  display:grid;
+  gap:1px;
+  padding:4px 8px;
+  color:inherit;
+  font-size:12px;
+  text-decoration:none;
+  border-left:3px solid var(--terracotta);
+  background:rgba(var(--navy-rgb),.06);
+  border-radius:4px;
+}
+
+.messages-bubble.mine .messages-quote {
+  background:rgba(255,255,255,.12);
+}
+
+.messages-quote span {
+  overflow:hidden;
+  opacity:.8;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.messages-reactions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+}
+
+.messages-chip {
+  padding:2px 8px;
+  color:inherit;
+  font-size:12px;
+  background:rgba(var(--navy-rgb),.08);
+  border:1px solid transparent;
+  border-radius:999px;
+  cursor:pointer;
+}
+
+.messages-chip.mine {
+  border-color:var(--terracotta);
+  background:rgba(var(--navy-rgb),.14);
+}
+
+.messages-picker {
+  display:flex;
+  gap:2px;
+}
+
+.messages-picker button {
+  padding:4px 6px;
+  font-size:18px;
+  background:none;
+  border:0;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.messages-picker button:hover {
+  background:rgba(var(--navy-rgb),.1);
+}
+
+.messages-mention {
+  padding:0 2px;
+  font-weight:700;
+  color:var(--terracotta-text);
+  background:rgba(var(--navy-rgb),.07);
+  border-radius:4px;
+}
+
+.messages-mention.me {
+  background:rgba(var(--terracotta-rgb,196,98,63),.22);
+}
+
+.messages-bubble.mine .messages-mention {
+  color:var(--terracotta-on-navy);
+  background:rgba(255,255,255,.14);
+}
+
+.messages-replying {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:6px 12px;
+  font-size:12px;
+  border-top:1px solid rgba(var(--navy-rgb),.15);
+  background:var(--panel);
+}
+
+.messages-replying span {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.messages-suggest {
+  margin:0;
+  padding:4px 0;
+  list-style:none;
+  border-top:1px solid rgba(var(--navy-rgb),.15);
+  background:var(--surface);
+}
+
+.messages-suggest button {
+  display:block;
+  width:100%;
+  padding:10px 16px;
+  color:var(--navy);
+  text-align:left;
+  background:none;
+  border:0;
+  border-radius:0;
+  cursor:pointer;
+}
+
+.messages-suggest button:hover {
+  background:var(--panel);
 }
