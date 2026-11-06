@@ -26,7 +26,11 @@ export type PortalAccess = {
   recheck: () => void;
 };
 
-export function usePortalAccess(requiredRole: "admin" | "teacher"): PortalAccess {
+/**
+ * `requiredRole` "member" means any active, signed-in household member or staff
+ * (no particular role), for pages every account uses, such as Messages.
+ */
+export function usePortalAccess(requiredRole: "admin" | "teacher" | "member"): PortalAccess {
   const [state, setState] = useState<PortalAccessState>(() => getSupabaseBrowserClient() ? "loading" : "denied");
   const [userId, setUserId] = useState("");
   const [roles, setRoles] = useState<string[]>([]);
@@ -50,7 +54,9 @@ export function usePortalAccess(requiredRole: "admin" | "teacher"): PortalAccess
 
       const [{ data: profile }, { data: role }, { data: allRoles }] = await Promise.all([
         supabase.from("profiles").select("status").eq("id", data.user.id).single(),
-        supabase.from("user_roles").select("role").eq("user_id", data.user.id).eq("role", requiredRole).maybeSingle(),
+        requiredRole === "member"
+          ? Promise.resolve({ data: { role: "member" } })
+          : supabase.from("user_roles").select("role").eq("user_id", data.user.id).eq("role", requiredRole).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", data.user.id),
       ]);
 
