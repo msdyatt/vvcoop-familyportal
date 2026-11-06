@@ -4,7 +4,12 @@ import { messagingPlugin, nativePlatform } from "./native";
 // The phone token this install last registered, so the settings screen can say "on" without asking the server.
 const NATIVE_TOKEN_KEY = "vv-native-push-token";
 function readNativeToken(): string | null { try { return localStorage.getItem(NATIVE_TOKEN_KEY); } catch { return null; } }
-function writeNativeToken(token: string | null) { try { token ? localStorage.setItem(NATIVE_TOKEN_KEY, token) : localStorage.removeItem(NATIVE_TOKEN_KEY); } catch { /* storage unavailable */ } }
+function writeNativeToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(NATIVE_TOKEN_KEY, token);
+    else localStorage.removeItem(NATIVE_TOKEN_KEY);
+  } catch { /* storage unavailable */ }
+}
 
 /**
  * Browser side of web push. The service worker (public/sw.js) shows the
