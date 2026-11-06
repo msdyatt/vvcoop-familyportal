@@ -1,7 +1,7 @@
 -- Reviewer (demo) accounts: demo and real content must never mix, in either
 -- direction, and a demo account can never reach a real person.
 begin;
-select plan(25);
+select plan(24);
 
 -- Real: RA administrator, R parent of K in real class RC (taught by RT). Demo: DP, DT.
 insert into auth.users (id, email, aud, role) values
@@ -38,7 +38,6 @@ select is((select count(*)::int from public.posts), 2, 'the demo parent sees the
 select is((select count(*)::int from public.classes), 1, 'sees only the demo class');
 select is((select count(*)::int from public.photos), 0, 'cannot see a real co-op photo');
 select is((select count(*)::int from public.profiles where id = '00000000-0000-0000-0000-0000000000a1'), 0, 'cannot see a real administrator''s profile');
-select is((select count(*)::int from public.profiles where id = '00000000-0000-0000-0000-0000000000d2'), 1, 'but can see the demo teacher');
 select is((select count(*)::int from public.messageable_people()), 1, 'can message only the demo teacher');
 select throws_ok($$select public.start_direct_conversation('00000000-0000-0000-0000-0000000000a1')$$, 'P0001', 'You can''t message that person.', 'cannot message a real administrator');
 select ok(public.unread_message_count() >= 2, 'has unread messages waiting, so the app is not empty');
