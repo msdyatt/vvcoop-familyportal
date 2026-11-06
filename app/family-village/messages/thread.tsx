@@ -9,6 +9,17 @@ import DetailModal from "../detail-modal";
 
 const PAGE = 50;
 
+/** Pairs each message with its day label and whether it is the first of that day. */
+function withDaySeparators(messages: MessageRow[]) {
+  let previous = "";
+  return messages.map((message) => {
+    const day = dayLabel(message.created_at);
+    const showDay = day !== previous;
+    previous = day;
+    return { message, day, showDay };
+  });
+}
+
 export default function Thread({ conversation, userId, tick, onBack, onChanged }: {
   conversation: ConversationRow; userId: string; tick: number; onBack: () => void; onChanged: () => void | Promise<void>;
 }) {
@@ -82,6 +93,7 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
   // A live event or the slow poll: look again, and keep it read while it is open.
   useEffect(() => {
     if (!tick) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- refetch when the live feed or poll fires
     void fetchLatest();
     if (document.visibilityState === "visible") void markRead();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to the tick only
@@ -196,7 +208,7 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
     onBack();
   }
 
-  let lastDay = "";
+  const rows = withDaySeparators(messages);
   return <div className="messages-thread">
     <header className="messages-thread-head">
       <button type="button" className="ghost messages-back" onClick={onBack} aria-label="Back to conversations">← Back</button>
@@ -217,10 +229,7 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
     }}>
       {hasMore && <button type="button" className="ghost messages-earlier" onClick={loadEarlier}>Earlier messages</button>}
       {!messages.length && <p className="portal-empty">Say hello.</p>}
-      {messages.map((message) => {
-        const day = dayLabel(message.created_at);
-        const showDay = day !== lastDay;
-        lastDay = day;
+      {rows.map(({ message, day, showDay }) => {
         const mine = message.sender_id === userId;
         const sender = message.sender_id ? people.get(message.sender_id) : undefined;
         const url = message.image_path ? imageUrls.get(message.image_path) : undefined;
@@ -237,7 +246,7 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
                 : <>
                     {url && <button type="button" className="messages-photo" onClick={() => setViewing(url)} aria-label="Open photo">
                       {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage; next/image can't optimize it */}
-                      <img src={url} alt="Shared photo" loading="lazy" />
+                      <img src={url} alt="Attachment" loading="lazy" />
                     </button>}
                     {message.image_path && !url && <span className="messages-photo-loading">Loading photo…</span>}
                     {message.body && <p>{message.body}</p>}
@@ -257,7 +266,7 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
 
     {photoPreview && <div className="messages-attach">
       {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the chosen file */}
-      <img src={photoPreview} alt="Photo to send" />
+      <img src={photoPreview} alt="Attachment preview" />
       <button type="button" className="ghost" onClick={clearPhoto}>Remove photo</button>
     </div>}
 
@@ -288,7 +297,7 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
 
     {viewing && <DetailModal title="Photo" onClose={() => setViewing(null)}>
       {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage */}
-      <img className="messages-lightbox" src={viewing} alt="Shared photo, full size" />
+      <img className="messages-lightbox" src={viewing} alt="Attachment, full size" />
     </DetailModal>}
 
     {showMembers && <DetailModal title={`${title}: members`} onClose={() => setShowMembers(false)}>

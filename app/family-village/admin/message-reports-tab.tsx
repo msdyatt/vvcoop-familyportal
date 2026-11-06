@@ -86,7 +86,7 @@ export default function MessageReportsTab() {
           {report.body && <blockquote>{report.body}</blockquote>}
           {report.image_path && images.get(report.image_path) && (
             // eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage
-            <img className="messages-report-photo" src={images.get(report.image_path)} alt="Reported photo" />
+            <img className="messages-report-photo" src={images.get(report.image_path)} alt="Reported attachment" />
           )}
         </>}
     <div className="row-actions">
@@ -116,7 +116,7 @@ export default function MessageReportsTab() {
             {row.body && <p>{row.body}</p>}
             {row.image_path && images.get(row.image_path) && (
               // eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage
-              <img className="messages-report-photo" src={images.get(row.image_path)} alt="Photo in the conversation" />
+              <img className="messages-report-photo" src={images.get(row.image_path)} alt="Attachment in the conversation" />
             )}
           </>}
         </li>)}

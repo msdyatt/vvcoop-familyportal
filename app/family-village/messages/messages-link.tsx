@@ -16,7 +16,6 @@ export default function MessagesLink() {
       const { data } = await supabase.rpc("unread_message_count");
       setUnread(typeof data === "number" ? data : 0);
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch on mount
     void load();
     const timer = setInterval(load, POLL_MS);
     return () => clearInterval(timer);

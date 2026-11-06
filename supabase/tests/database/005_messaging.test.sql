@@ -78,6 +78,9 @@ reset role;
 select throws_ok($$select public.send_message((select id from public.conversations limit 1), 'hi')$$, 'P0001', 'You are not part of that conversation.', 'nor can an administrator who is not a member');
 
 -- ---- unread counts and read state --------------------------------------------
+-- A test file is one transaction, so now() never advances; in real use a message
+-- and the recipient's read marker come from different transactions. Backdate it.
+update public.conversation_members set last_read_at = now() - interval '1 hour';
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a2","role":"authenticated"}', true);
 set local role authenticated;
 select is((select unread_count from public.my_conversations() limit 1), 1, 'the teacher has one unread message');
