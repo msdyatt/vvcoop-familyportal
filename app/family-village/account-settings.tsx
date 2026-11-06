@@ -17,6 +17,7 @@ export default function AccountSettings({ email, onSignOut, onProfileUpdated }: 
     <PushSection />
     <CalendarSection />
     <DangerZone onSignOut={onSignOut} />
+    <p className="portal-legal-links"><a href="/privacy">Privacy policy</a> · <a href="/terms">Terms</a></p>
   </div>;
 }
 
