@@ -110,6 +110,9 @@ export default function MessagesApp() {
       </section>
     </div>
 
+    {/* Android's main action, as an extended floating button (hidden elsewhere by CSS). */}
+    <button type="button" className="messages-fab" onClick={() => setCreating(true)}>+ New message</button>
+
     {creating && <NewConversation roles={roles} userId={userId} onClose={() => setCreating(false)}
       onOpen={(id) => { setCreating(false); void loadConversations(); select(id); }} />}
   </main>;
