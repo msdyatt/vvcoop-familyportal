@@ -155,7 +155,7 @@ export default function CalendarView() {
             const items = byDay.get(key) ?? [];
             const inMonth = date.getMonth() === anchor.getMonth();
             return (
-              <div key={key} role="gridcell" className={`cal-day${inMonth ? "" : " outside"}${key === todayKey ? " today" : ""}${key === selected ? " selected" : ""}`} onClick={() => setSelected(key)}>
+              <div key={key} role="gridcell" className={`cal-day${inMonth ? "" : " outside"}${key === todayKey ? " today" : ""}${key === selected ? " selected" : ""}`}>
                 <button type="button" className="cal-daynum" onClick={() => setSelected(key)} onDoubleClick={() => goToDay(key)} aria-label={`${date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}${items.length ? `, ${items.length} event${items.length === 1 ? "" : "s"}` : ""}`}><span className="cal-num">{date.getDate()}</span></button>
                 <div className="cal-pills">
                   {items.slice(0, 3).map(pill)}
