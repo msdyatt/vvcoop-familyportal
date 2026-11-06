@@ -514,3 +514,11 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/delete-account/deno.json"
 entrypoint = "./functions/delete-account/index.ts"
+
+# Administrator-only; always called with a real session. Checked inside as well
+# (active administrator, not a demo account, MFA step-up).
+[functions.demo-accounts]
+enabled = true
+verify_jwt = true
+import_map = "./functions/demo-accounts/deno.json"
+entrypoint = "./functions/demo-accounts/index.ts"

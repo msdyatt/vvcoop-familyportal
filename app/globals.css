@@ -6802,3 +6802,8 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 .tour-skip {
   margin-left:auto;
 }
+
+.demo-credentials { display: grid; gap: 12px; margin-top: 12px; }
+.demo-credential { border: 1px solid var(--line, rgba(0,0,0,.15)); border-radius: 12px; padding: 12px 14px; }
+.demo-credential p { margin: 4px 0; overflow-wrap: anywhere; }
+.demo-credential code { user-select: all; }
