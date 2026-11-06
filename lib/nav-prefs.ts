@@ -29,10 +29,12 @@ const ADMIN = "/family-village/admin";
 
 export const DESTINATIONS: Destination[] = [
   { id: "home", label: "Home", href: FAMILY, icon: "home", group: "Family" },
-  { id: "news", label: "News", href: `${FAMILY}#news`, icon: "news", group: "Family" },
+  { id: "news", label: "News", href: "/family-village/news", icon: "news", group: "Family" },
   { id: "calendar", label: "Calendar", href: "/family-village/calendar", icon: "calendar", group: "Everywhere" },
-  { id: "children", label: "Children", href: `${FAMILY}#my-children`, icon: "children", group: "Family" },
-  { id: "paperwork", label: "Paperwork", href: `${FAMILY}#paperwork`, icon: "paperwork", group: "Family" },
+  { id: "children", label: "Children", href: "/family-village/children", icon: "children", group: "Family" },
+  { id: "family-classes", label: "Classes", href: "/family-village/classes", icon: "classes", group: "Family" },
+  { id: "documents", label: "Documents", href: "/family-village/documents", icon: "paperwork", group: "Family" },
+  { id: "paperwork", label: "Paperwork", href: "/family-village/paperwork", icon: "paperwork", group: "Family" },
   { id: "photos", label: "Photos", href: "/family-village/photos", icon: "photos", group: "Everywhere" },
   { id: "messages", label: "Messages", href: "/family-village/messages", icon: "messages", group: "Everywhere" },
   { id: "teacher-home", label: "Teaching", href: TEACHER, icon: "teach", role: "teacher", group: "Teaching" },

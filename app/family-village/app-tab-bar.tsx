@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import {
-  cleanPrefs, isActive, readCachedPrefs, readLastSection, resolveBar, writeCachedPrefs, writeLastSection,
+  availableDestinations, cleanPrefs, isActive, readCachedPrefs, readLastSection, resolveBar, writeCachedPrefs, writeLastSection,
   type IconName, type NavPrefs, type Section,
 } from "../../lib/nav-prefs";
 import { useUnreadCount } from "./messages/messages-link";
@@ -131,7 +131,8 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
 
     {menuOpen && <DetailModal title="Menu" onClose={() => setMenuOpen(false)}>
       <ul className="app-menu">
-        <li><a href="/family-village/home">Family</a></li>
+        <li><a href="/family-village/home">Family home</a></li>
+        {availableDestinations(roles).filter((d) => d.group === "Family" && d.id !== "home").map((d) => <li key={d.id}><a className="app-menu-sub" href={d.href}>{d.label}</a></li>)}
         {roles.includes("teacher") && <li><a href="/family-village/teacher">Teacher&rsquo;s Lounge</a></li>}
         {roles.includes("admin") && <li><a href="/family-village/admin">Administration</a></li>}
         <li><button type="button" onClick={() => { setMenuOpen(false); setEditing(true); }}>Customize bottom bar</button></li>

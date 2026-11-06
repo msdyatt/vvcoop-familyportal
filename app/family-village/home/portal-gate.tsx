@@ -46,7 +46,20 @@ function toComplianceItems(rows: unknown): ComplianceItem[] {
   });
 }
 
-export default function PortalGate() {
+/** Home shows everything; each section also has a page of its own, which shows only that section. */
+export type PortalView = "home" | "children" | "news" | "classes" | "documents" | "paperwork";
+
+const VIEW_HEADERS: Record<PortalView, { title: string; subtitle: string }> = {
+  home: { title: "Family Village", subtitle: "Your household\u2019s week, gathered in one place." },
+  children: { title: "Your children", subtitle: "Profiles, classes and enrollment." },
+  news: { title: "News & notices", subtitle: "From the co-op." },
+  classes: { title: "Classes", subtitle: "Dates and prep for your children\u2019s classes." },
+  documents: { title: "Handouts & documents", subtitle: "Files shared with your household." },
+  paperwork: { title: "Paperwork & dues", subtitle: "Forms, signatures and dues for this year." },
+};
+
+export default function PortalGate({ view = "home" }: { view?: PortalView }) {
+  const show = (section: string) => view === "home" || view === section;
   const [state, setState] = useState<PortalState>(() => isSupabaseConfigured() ? "loading" : "error");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [portal, setPortal] = useState<PortalData | null>(null);
@@ -180,29 +193,30 @@ export default function PortalGate() {
   const otherDocuments = (portal?.documents ?? []).filter((document) => !complianceDocumentIds.has(document.id));
 
   return <main className="live-portal">
-    <AppHeader current="home" roles={portal?.roles ?? []} title="Family Village" subtitle="Your household’s week, gathered in one place." />
-    <ComplianceBanner items={portal?.compliance ?? []} />
-    {portal?.enrollmentPeriod && <aside className="compliance-banner" role="status">
+    <AppHeader current="home" roles={portal?.roles ?? []} title={VIEW_HEADERS[view].title} subtitle={VIEW_HEADERS[view].subtitle} />
+    {view !== "home" && <a className="portal-back" href="/family-village/home">← Family home</a>}
+    {view === "home" && <ComplianceBanner items={portal?.compliance ?? []} />}
+    {(view === "home" || view === "children") && portal?.enrollmentPeriod && <aside className="compliance-banner" role="status">
       <span className="compliance-banner-count">✓</span>
       <div>
         <b>Enrollment is open</b>
         <span>{portal.enrollmentPeriod.title} closes {new Date(portal.enrollmentPeriod.closesAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} — open a child below to choose classes.</span>
       </div>
-      <a href="#my-children">Choose classes →</a>
+      <a href="/family-village/children">Choose classes →</a>
     </aside>}
-    <div className="portal-grid">
-      <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
+    <div className={`portal-grid${view === "home" ? "" : " portal-single"}`}>
+      {show("children") && <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
-      </section>
-      <section className="portal-module portal-module-full" id="calendar"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>
+      </section>}
+      {show("home") && <section className="portal-module portal-module-full" id="calendar"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>
         <CalendarView />
         {userId && <div className="calendar-subscribe-row"><PersonalSubscribeLink userId={userId} /></div>}
-      </section>
-      <section className="portal-module" id="news"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
+      </section>}
+      {show("news") && <section className="portal-module" id="news"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}</section>}
       {/* Class dates, per class, with anything needing prep called out. This
           replaces the old assignments list -- homework is now a flag on a date
           rather than a separate row, so a parent reads one list instead of two. */}
-      <section className="portal-module"><p className="eyebrow">Learning</p><h2>In your children&rsquo;s classes</h2>{classDates.length
+      {show("classes") && <section className="portal-module"><p className="eyebrow">Learning</p><h2>In your children&rsquo;s classes</h2>{classDates.length
         ? <ol className="portal-list class-event-list">{classDates.map(event => {
             const childIds = (portal?.enrollments ?? []).filter((entry) => entry.class_id === event.class_id).map((entry) => entry.child_id);
             const completedIds = new Set((portal?.completions ?? []).filter((entry) => entry.event_id === event.id).map((entry) => entry.child_id));
@@ -215,14 +229,14 @@ export default function PortalGate() {
               </div>}
             </li>;
           })}</ol>
-        : empty(portal?.classes.length ? "Nothing scheduled in your children's classes yet." : "Classes will appear after enrollment is entered.")}</section>
+        : empty(portal?.classes.length ? "Nothing scheduled in your children's classes yet." : "Classes will appear after enrollment is entered.")}</section>}
       {/* Documents that aren't a requirement -- class handouts and anything an
           administrator has shared with this household. Signed copies are
           excluded because they already appear above, against their requirement. */}
-      <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other documents</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>
-      <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">Family records</p><h2>Paperwork &amp; dues</h2>
+      {show("documents") && <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other documents</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>}
+      {show("paperwork") && <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">Family records</p><h2>Paperwork &amp; dues</h2>
         {portal && <FamilyCompliance familyId={portal.familyId} />}
-      </section>
+      </section>}
     </div>
 
     <footer className="portal-footer">
