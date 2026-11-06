@@ -1,7 +1,7 @@
 /// <reference lib="deno.ns" />
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "jsr:@std/assert@1";
 import {
-  describeCharge, encodeForm, friendlyFailure, loadStripeConfig, signStripePayload, StripeClient, StripeError, STRIPE_API_VERSION, verifyStripeSignature,
+  describeCharge, encodeForm, friendlyFailure, loadStripeConfig, signStripePayload, StripeError, STRIPE_API_VERSION, verifyStripeSignature,
 } from "./stripe.ts";
 import { fakeAdmin, fakeStripe } from "./stripe-fakes.ts";
 
