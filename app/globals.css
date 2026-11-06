@@ -7525,15 +7525,6 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 }
 
 /* ---- Section pages ---------------------------------------------------------- */
-.portal-back {
-  display:inline-block;
-  margin:0 0 14px;
-  color:var(--navy);
-  font-size:14px;
-  font-weight:600;
-  text-decoration:none;
-}
-
 /* A page that holds one section gives it the whole width. */
 .portal-grid.portal-single {
   grid-template-columns:minmax(0,1fr);

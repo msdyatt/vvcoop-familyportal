@@ -44,6 +44,9 @@ export type SitePasswordEnv = {
  * Static assets are exempt so the gate page itself can render, and because they
  * carry no content worth withholding once the HTML is protected.
  */
+/** Apple fetches this without credentials to link the iPhone app to the site (passkeys, saved passwords). */
+export const APPLE_APP_SITE_ASSOCIATION_PATH = "/.well-known/apple-app-site-association";
+
 function isExempt(pathname: string): boolean {
   return (
     pathname === FORM_PATH ||
@@ -52,6 +55,7 @@ function isExempt(pathname: string): boolean {
     pathname === "/terms" ||
     pathname === "/delete-account" ||
     pathname === "/support" ||
+    pathname === APPLE_APP_SITE_ASSOCIATION_PATH ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/_vinext/") ||
     pathname.startsWith("/brand/") ||
