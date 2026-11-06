@@ -1,7 +1,7 @@
 /// <reference lib="deno.ns" />
 import { assert, assertEquals, assertMatch, assertNotEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import { decodePDFRawStream, degrees, PDFDocument, PDFRawStream } from "npm:pdf-lib@1.17.1";
-import { sealRequest, bodyPath, sealedPath, type SealStore } from "./esign-seal.ts";
+import { sealRequest, bodyPath, sealedPath, sealedTokenPath, tokenPath, type SealStore, type TimestampSetup } from "./esign-seal.ts";
 import { encodable, flattenSigned, sha256Hex, visibleToPage, type SealRecord, type SealRequest } from "./esign-pdf.ts";
 
 // A 1x1 PNG, standing in for a signature drawn on screen.
@@ -226,4 +226,70 @@ Deno.test("encodable: replaces what the built-in fonts cannot draw", async () =>
   const doc = await PDFDocument.create();
   const font = await doc.embedFont("Helvetica");
   assertEquals(encodable(font, "Zoë 😀 ok"), "Zoë ? ok");
+});
+
+// --- timestamps ---------------------------------------------------------------------------
+
+function fakeAuthority(opts: { failFirst?: boolean; failSecond?: boolean } = {}) {
+  const stamped: string[] = [];
+  const setup: TimestampSetup = {
+    authority: "http://tsa.example.test",
+    stamp: (hash) => {
+      stamped.push(hash);
+      if ((opts.failFirst && stamped.length === 1) || (opts.failSecond && stamped.length === 2)) return Promise.reject(new Error("authority unreachable"));
+      return Promise.resolve({
+        response: new Uint8Array([0x30, 0x03, 0x02, 0x01, stamped.length]), genTime: "2026-11-06T23:02:50Z",
+        serial: "abc123", policy: "1.2.3", digestAlgorithm: "SHA-256", imprintHex: hash,
+      });
+    },
+  };
+  return { setup, stamped };
+}
+
+Deno.test("timestamp: the signed content is stamped first, the finished file second, both stored, both on the audit trail", async () => {
+  const { store, calls, req } = await fakeStore();
+  const logged: Record<string, unknown>[] = [];
+  const withLog: SealStore = { ...store, logTimestamp: (_id, detail) => { logged.push(detail); return Promise.resolve(); } };
+  const { setup, stamped } = fakeAuthority();
+  const out = await sealRequest(withLog, req.id, setup);
+  assert(out.ok);
+  assertEquals(stamped, [calls.completed[0].body, calls.completed[0].sealed]);
+  assert(calls.uploads.has(tokenPath(req.id)) && calls.uploads.has(sealedTokenPath(req.id)));
+  assertEquals(logged.map((l) => l.covers), ["signed-content", "sealed"]);
+  assertEquals(logged[0].sha256, calls.completed[0].body);
+  assertEquals(logged[1].sha256, calls.completed[0].sealed);
+});
+
+Deno.test("timestamp: the certificate page shows the authority, time, serial and the hash it covers", async () => {
+  const { store, calls, req } = await fakeStore();
+  const { setup } = fakeAuthority();
+  await sealRequest(store, req.id, setup);
+  const sealed = calls.uploads.get(sealedPath(req.id))!;
+  for (const needle of ["TRUSTED TIMESTAMP (RFC 3161)", "http://tsa.example.test", "abc123", calls.completed[0].body.slice(0, 32)]) {
+    assert(await contains(sealed, needle), `certificate should mention ${needle}`);
+  }
+  assertEquals(await contains(sealed, "No independent trusted timestamp"), false);
+});
+
+Deno.test("timestamp: if the authority cannot be reached the seal stops, nothing is completed, and it can be retried", async () => {
+  const { store, calls, req } = await fakeStore();
+  const { setup } = fakeAuthority({ failFirst: true });
+  const out = await sealRequest(store, req.id, setup);
+  assertEquals(out.ok, false);
+  assertEquals(calls.completed.length, 0);
+  assertEquals(calls.uploads.size, 0);
+  assertEquals(calls.failed, ["authority unreachable"]);
+});
+
+Deno.test("timestamp: a failure of the second stamp does not stop the seal, and is recorded", async () => {
+  const { store, calls, req } = await fakeStore();
+  const logged: Record<string, unknown>[] = [];
+  const withLog: SealStore = { ...store, logTimestamp: (_id, detail) => { logged.push(detail); return Promise.resolve(); } };
+  const { setup } = fakeAuthority({ failSecond: true });
+  const out = await sealRequest(withLog, req.id, setup);
+  assert(out.ok);
+  assertEquals(calls.completed.length, 1);
+  assert(calls.uploads.has(tokenPath(req.id)));
+  assertEquals(calls.uploads.has(sealedTokenPath(req.id)), false);
+  assertEquals(logged[1].error, "authority unreachable");
 });

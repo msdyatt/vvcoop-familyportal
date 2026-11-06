@@ -3,7 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
-import { sealRequest, supabaseSealStore } from "../_shared/esign-seal.ts";
+import { sealRequest, supabaseSealStore, type TimestampSetup } from "../_shared/esign-seal.ts";
+import { DEFAULT_TIMESTAMP_URL, requestTimestamp } from "../_shared/rfc3161.ts";
 
 /**
  * Seals a fully signed request: flattens the entries onto the PDF, appends the
@@ -19,6 +20,17 @@ import { sealRequest, supabaseSealStore } from "../_shared/esign-seal.ts";
  * administrator, and only in a session that has reached its second factor.
  * The sealing itself then runs with the service role.
  */
+/**
+ * The time-stamping authority. Set the TIMESTAMP_AUTHORITY_URL secret to use a
+ * different one (Sectigo's is https://timestamp.sectigo.com), or to the word
+ * "disabled" to seal without an independent timestamp.
+ */
+function timestampSetup(): TimestampSetup | undefined {
+  const url = (Deno.env.get("TIMESTAMP_AUTHORITY_URL") ?? DEFAULT_TIMESTAMP_URL).trim();
+  if (!url || url.toLowerCase() === "disabled") return undefined;
+  return { authority: url, stamp: (hash) => requestTimestamp(url, hash) };
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 async function handle(req: Request): Promise<Response> {
@@ -45,7 +57,7 @@ async function handle(req: Request): Promise<Response> {
   if (!visible) return json({ error: "You cannot open that record." }, 403);
 
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const outcome = await sealRequest(supabaseSealStore(admin), requestId);
+  const outcome = await sealRequest(supabaseSealStore(admin), requestId, timestampSetup());
 
   if (outcome.ok) return json({ ok: true, status: outcome.status, alreadySealed: outcome.alreadySealed });
   if (outcome.status === "failed") await logEdgeError(admin, "esign-seal", new Error(outcome.message), { requestId });
