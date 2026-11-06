@@ -4,6 +4,7 @@ import { logEdgeError } from "../_shared/error-log.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
 import { deleteAccount } from "../_shared/account-deletion.ts";
+import { scrubBillingForErasure } from "../_shared/billing-erasure.ts";
 import { getFromAddress, readVaultSecret, sendViaResend } from "../_shared/resend.ts";
 import { escapeHtml, renderEmail } from "../_shared/email-template.ts";
 
@@ -48,6 +49,10 @@ async function handle(req: Request): Promise<Response> {
     ]);
     if (profile?.status !== "active" || !role) return json({ error: "Administrator access is required." }, 403);
   }
+
+  // Payment records are kept; the person's name, email and saved method at Stripe are not.
+  // Best effort: it never stops the erasure, and anything it could not finish is logged for an administrator.
+  await scrubBillingForErasure(admin, targetId).catch((error) => logEdgeError(admin, "delete-account", error, { step: "scrub-billing" }));
 
   const result = await deleteAccount(admin, targetId, Boolean(body.deleteHousehold));
   if (!result.ok) return result.response;
