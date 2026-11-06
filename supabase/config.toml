@@ -506,3 +506,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/deliver-push/deno.json"
 entrypoint = "./functions/deliver-push/index.ts"
+
+# Called with the signed-in person's own session (or an administrator's), so the
+# platform's JWT gate applies. Confirmation and MFA step-up are checked inside.
+[functions.delete-account]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-account/deno.json"
+entrypoint = "./functions/delete-account/index.ts"

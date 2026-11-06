@@ -10,8 +10,12 @@ export default function SignInPanel() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"sign-in" | "request">("sign-in");
+  const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
+    // After deleting an account the app lands here with ?deleted=1.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once on the client
+    if (new URLSearchParams(window.location.search).get("deleted") === "1") setDeleted(true);
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     supabase.auth.getUser().then(({ data }) => {
@@ -49,6 +53,7 @@ export default function SignInPanel() {
   }
 
   return <div className="signin-stack" aria-label="Family Village sign-in">
+    {deleted && <p className="admin-form-status" role="status">Your account has been deleted. A confirmation was sent to your email.</p>}
     <button type="button" className="passkey-button" disabled={!configured || busy} onClick={passkey}><span>🔐</span> Sign in with a passkey</button>
     <div className="signin-divider"><span>or use your invitation email</span></div>
     <form onSubmit={emailSignIn} className="email-signin">
