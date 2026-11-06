@@ -1455,7 +1455,7 @@ $function$;
 
 -- The stripe-admin function starts a Stripe refund here: it validates the
 -- actor and approval, and returns the pending refund row to send to Stripe.
-create or replace function public.billing_begin_refund(p_actor uuid, p_payment uuid, p_amount_cents integer, p_reason text, p_reduce_owed boolean, p_approval uuid default null)
+create or replace function public.billing_begin_refund(p_actor uuid, p_payment uuid, p_amount_cents integer, p_reason text, p_approval uuid default null)
 returns jsonb language plpgsql security definer set search_path to ''
 as $function$
 declare
@@ -1485,25 +1485,28 @@ begin
   values (o.charge_id, o.family_id, 'refund', p_amount_cents, o.method, 'pending', 'admin_manual', o.livemode,
     p_payment, trim(p_reason), p_actor, p_approval)
   returning id into v_id;
-  if p_reduce_owed and o.charge_id is not null then
-    insert into public.dues_adjustments (charge_id, amount_cents, reason, memo, created_by)
-    values (o.charge_id, -p_amount_cents, 'refund_credit', 'Refund of ' || private.money(p_amount_cents) || ' issued', p_actor);
-    update public.dues_charges set adjustment_total_cents = adjustment_total_cents - p_amount_cents where id = o.charge_id;
-    perform private.recompute_charge(o.charge_id);
-  end if;
   return jsonb_build_object('refund_id', v_id, 'payment_intent_id', o.stripe_payment_intent_id, 'amount_cents', p_amount_cents,
     'idempotency_key', 'ref_' || v_id::text, 'livemode', o.livemode);
 end;
 $function$;
 
-create or replace function public.billing_attach_refund(p_refund uuid, p_stripe_refund_id text, p_status text)
+-- Called once Stripe has accepted the refund. Only now does the household's
+-- balance drop, so a refund Stripe refused leaves the books untouched.
+create or replace function public.billing_attach_refund(p_refund uuid, p_stripe_refund_id text, p_status text, p_reduce_owed boolean default false)
 returns void language plpgsql security definer set search_path to ''
 as $function$
 declare r public.dues_payments%rowtype;
 begin
   update public.dues_payments set stripe_refund_id = p_stripe_refund_id where id = p_refund and direction = 'refund' and status = 'pending'
   returning * into r;
-  if found then perform public.billing_apply_refund(p_stripe_refund_id, null, null, r.amount_cents, p_status, null); end if;
+  if not found then return; end if;
+  if p_reduce_owed and p_status <> 'failed' and p_status <> 'canceled' and r.charge_id is not null then
+    insert into public.dues_adjustments (charge_id, amount_cents, reason, memo, created_by)
+    values (r.charge_id, -r.amount_cents, 'refund_credit', 'Refund of ' || private.money(r.amount_cents) || ' issued', r.initiated_by);
+    update public.dues_charges set adjustment_total_cents = adjustment_total_cents - r.amount_cents where id = r.charge_id;
+  end if;
+  perform public.billing_apply_refund(p_stripe_refund_id, null, null, r.amount_cents, p_status, null);
+  if r.charge_id is not null then perform private.recompute_charge(r.charge_id); end if;
 end;
 $function$;
 
@@ -1674,7 +1677,7 @@ begin
     'billing_set_customer(uuid,boolean,text)', 'billing_begin_payment(uuid,uuid,boolean,boolean)',
     'billing_attach_checkout(uuid,text)', 'billing_cancel_payment(uuid,text)',
     'billing_apply_payment_update(uuid,text,text,jsonb)', 'billing_apply_refund(text,text,text,integer,text,text,text)',
-    'billing_begin_refund(uuid,uuid,integer,text,boolean,uuid)', 'billing_attach_refund(uuid,text,text)',
+    'billing_begin_refund(uuid,uuid,integer,text,uuid)', 'billing_attach_refund(uuid,text,text,boolean)',
     'billing_flag_dispute(text,text)', 'billing_due_autopay(date)', 'billing_begin_autopay(uuid,date)',
     'billing_expire_stale()', 'billing_queue_reminders(date)']
   loop

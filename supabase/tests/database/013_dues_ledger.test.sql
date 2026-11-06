@@ -153,10 +153,10 @@ select is((select wallet from public.dues_payments where id = (select (r ->> 'pa
 select is((select status from public.dues_charges where family_id = '00000000-0000-0000-0000-0000000000f1'), 'paid', 'paid again');
 
 set local role service_role;
-select throws_ok($$select public.billing_begin_refund('00000000-0000-0000-0000-0000000000b1', (select (r ->> 'payment_id')::uuid from pay2), 1000, 'x', true)$$, '42501', 'Administrator access is required.', 'a parent cannot start a refund');
-select throws_ok($$select public.billing_begin_refund('00000000-0000-0000-0000-0000000000a1', (select (r ->> 'payment_id')::uuid from pay2), 70000, 'too much', true)$$, 'P0001', null, 'a refund cannot exceed the payment');
-create temp table ref1 as select public.billing_begin_refund('00000000-0000-0000-0000-0000000000a1', (select (r ->> 'payment_id')::uuid from pay2), 10000, 'Withdrew a child', true) as r;
-select public.billing_attach_refund((select (r ->> 'refund_id')::uuid from ref1), 're_1', 'succeeded');
+select throws_ok($$select public.billing_begin_refund('00000000-0000-0000-0000-0000000000b1', (select (r ->> 'payment_id')::uuid from pay2), 1000, 'x')$$, '42501', 'Administrator access is required.', 'a parent cannot start a refund');
+select throws_ok($$select public.billing_begin_refund('00000000-0000-0000-0000-0000000000a1', (select (r ->> 'payment_id')::uuid from pay2), 70000, 'too much')$$, 'P0001', null, 'a refund cannot exceed the payment');
+create temp table ref1 as select public.billing_begin_refund('00000000-0000-0000-0000-0000000000a1', (select (r ->> 'payment_id')::uuid from pay2), 10000, 'Withdrew a child') as r;
+select public.billing_attach_refund((select (r ->> 'refund_id')::uuid from ref1), 're_1', 'succeeded', true);
 reset role;
 select is((select amount_refunded_cents from public.dues_charges where family_id = '00000000-0000-0000-0000-0000000000f1'), 10000, 'the refund is counted once Stripe confirms');
 select is((select amount_due_cents from public.dues_charges where family_id = '00000000-0000-0000-0000-0000000000f1'), 50000, 'and what the family owes drops by the same amount');
