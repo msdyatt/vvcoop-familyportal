@@ -170,6 +170,27 @@ a {
   font-size:14px;
 }
 
+/* Plain (primary) buttons outside the admin and teacher workspaces. The brand
+   button style above lives under `.workspace-preview .workspace-main`, so
+   anywhere else -- Messages, Photos, the first-run tour, dialogs opened from
+   the header -- a plain <button> rendered as the browser's default grey
+   control. Zero specificity (:where) and placed before the ghost/danger rules,
+   so those and every component's own button styles still win. */
+:where(.messages-page, .photos-page, .tour, .photos-upload, .photos-viewer, .messages-new, .messages-thread, dialog.child-detail-panel) :where(button) {
+  padding:10px 14px;
+  background:var(--navy);
+  color:var(--cream);
+  font:600 12px var(--sans);
+  border:0;
+  border-radius:2px;
+  cursor:pointer;
+}
+
+:where(.messages-page, .photos-page, .tour, .photos-upload, .photos-viewer, .messages-new, .messages-thread, dialog.child-detail-panel) :where(button:disabled) {
+  opacity:.55;
+  cursor:default;
+}
+
 /* Same story as the form-control base above, but for buttons: "ghost"
    (secondary/neutral) and "danger" (destructive) are used as class names in
    roughly two dozen places across the admin and family portals, but each
@@ -6457,9 +6478,16 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   flex-wrap:wrap;
 }
 
+.messages-tabs button {
+  background:transparent;
+  color:var(--navy);
+  border:1px solid rgba(var(--navy-rgb),.25);
+}
+
 .messages-tabs button.active {
   background:var(--navy);
   color:var(--cream);
+  border-color:var(--navy);
 }
 
 .messages-people {

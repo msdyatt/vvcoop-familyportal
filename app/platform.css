@@ -1,0 +1,453 @@
+/*
+ * Platform design language for the installed and native apps.
+ *
+ * Applies only when the page is running inside the iOS/Android app or added to
+ * a phone's home screen (the early script in the document head sets
+ * html[data-app], html[data-platform] and html[data-shell]). In an ordinary
+ * browser tab none of this applies and the brand design is untouched.
+ *
+ * The brand (colors, the serif headings) stays; what adapts is how the app is
+ * navigated and how its controls feel, following each system:
+ *
+ *   iOS     Liquid Glass (iOS 26, refined in 27): a floating translucent tab
+ *           bar in the navigation layer, content left opaque, capsule
+ *           controls, concentric large radii, bottom sheets with a grabber.
+ *   Android Material 3 Expressive: a tonal bottom navigation bar with a pill
+ *           indicator, large rounded shapes, extended FAB for the main action,
+ *           springy motion.
+ *
+ * A web view can approximate these, not reproduce them: real Liquid Glass and
+ * Material motion belong to native views. Transparency is used only for the
+ * navigation bar, and is dropped for anyone who asks the system for less of it.
+ */
+
+:root {
+  --tabbar-space: 0px;
+  /* Material 3 tonal roles, derived from the brand */
+  --m3-surface-container: #f1ebe0;
+  --m3-secondary-container: #efd9cd;
+  --m3-on-secondary-container: #4a2417;
+  --ease-spring: cubic-bezier(.2, .9, .25, 1.08);
+  --ease-emphasized: cubic-bezier(.3, 0, 0, 1);
+}
+
+/* --- shared by both platforms ------------------------------------------------ */
+html[data-app] {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: auto;
+}
+
+html[data-app] a,
+html[data-app] button,
+html[data-app] label,
+html[data-app] select,
+html[data-app] summary {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+/* Chrome should not be text you can accidentally select while tapping. */
+html[data-app] .app-header,
+html[data-app] .app-tabbar,
+html[data-app] .messages-row,
+html[data-app] .photos-thumb {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS zooms the page when a field under 16px is focused. */
+html[data-app] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-app] select,
+html[data-app] textarea {
+  font-size: 16px;
+  min-height: 44px;
+}
+
+html[data-app] body:has(.app-tabbar) {
+  padding-bottom: calc(var(--tabbar-space) + env(safe-area-inset-bottom));
+}
+
+/* The tab bar is hidden everywhere except the apps. */
+.app-tabbar { display: none; }
+
+html[data-app] .app-tabbar {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+}
+
+/* The header's own Messages/Photos/switcher links move into the tab bar and its Menu. */
+html[data-app] .app-header .messages-link,
+html[data-app] .app-header .portal-nav {
+  display: none;
+}
+
+/* Like iOS and Android, hide the bar while a conversation is open so the composer has the room. */
+html[data-app] body:has(.messages-shell[data-view="thread"]) .app-tabbar {
+  display: none;
+}
+
+html[data-app] body:has(.messages-shell[data-view="thread"]) {
+  padding-bottom: 0;
+}
+
+.app-tab {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 0;
+  color: rgba(var(--navy-rgb), .66);
+  font: 600 11px/1.1 var(--sans);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.app-tab-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.app-tab-badge {
+  position: absolute;
+  top: -5px;
+  right: -10px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  background: var(--terracotta);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  border-radius: 9px;
+}
+
+.app-menu {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-menu li + li {
+  border-top: 1px solid rgba(var(--navy-rgb), .1);
+}
+
+.app-menu a,
+.app-menu button {
+  display: block;
+  width: 100%;
+  padding: 16px 4px;
+  color: var(--navy);
+  font: 500 17px var(--sans);
+  text-align: left;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+/* Bottom sheets: every dialog in the apps rises from the bottom on a phone. */
+@keyframes sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+html[data-app] dialog.child-detail-panel {
+  inset: auto 0 0 0;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 640px;
+  max-height: 92dvh;
+  padding: 26px 20px calc(24px + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+}
+
+html[data-app] dialog.child-detail-panel[open] {
+  animation: sheet-up .38s var(--ease-spring);
+}
+
+html[data-app] dialog.child-detail-panel::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: -12px auto 16px;
+  background: rgba(var(--navy-rgb), .22);
+  border-radius: 3px;
+}
+
+html[data-app] dialog.child-detail-panel > h2 {
+  margin: 0 56px 12px 0;
+  color: var(--navy);
+  font: 600 26px/1.2 var(--serif);
+}
+
+html[data-app] .child-detail-close {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+html[data-app] .messages-shell {
+  height: calc(100dvh - 190px - var(--tabbar-space) - env(safe-area-inset-bottom));
+}
+
+html[data-app] .messages-shell[data-view="thread"] {
+  height: calc(100dvh - 150px);
+}
+
+/* The main action of Messages as a floating button on Android. */
+.messages-fab { display: none; }
+
+/* ============================ iOS: Liquid Glass ============================== */
+html[data-app][data-platform="ios"] {
+  --sans: -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+  --tabbar-space: 92px;
+}
+
+html[data-app][data-platform="ios"] .app-tabbar {
+  right: 14px;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  left: 14px;
+  height: 64px;
+  gap: 4px;
+  padding: 5px;
+  /* Translucent navigation layer: the page shows through, softly blurred. */
+  background: rgba(250, 247, 241, .82);
+  border: 1px solid rgba(255, 255, 255, .6);
+  border-radius: 32px;
+  box-shadow: 0 10px 32px rgba(11, 42, 61, .18), inset 0 1px 0 rgba(255, 255, 255, .75);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-app][data-platform="ios"] .app-tabbar {
+    background: rgba(250, 247, 241, .58);
+    -webkit-backdrop-filter: blur(26px) saturate(1.9);
+    backdrop-filter: blur(26px) saturate(1.9);
+  }
+}
+
+html[data-app][data-platform="ios"] .app-tab {
+  border-radius: 27px;
+  transition: transform .28s var(--ease-spring), background-color .2s;
+}
+
+html[data-app][data-platform="ios"] .app-tab:active {
+  transform: scale(.93);
+}
+
+/* The selected tab is a lens of glass sitting inside the bar. */
+html[data-app][data-platform="ios"] .app-tab.active {
+  color: var(--terracotta-text);
+  background: rgba(255, 255, 255, .62);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .8), 0 1px 6px rgba(11, 42, 61, .1);
+}
+
+html[data-app][data-platform="ios"] dialog.child-detail-panel {
+  border-radius: 34px 34px 0 0;
+  background: var(--surface);
+}
+
+html[data-app][data-platform="ios"] dialog.child-detail-panel::backdrop {
+  background: rgba(var(--navy-rgb), .38);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+/* Capsule controls with a comfortable touch target. */
+html[data-app][data-platform="ios"] .workspace-preview .workspace-main button,
+html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish),
+html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb),
+html[data-app][data-platform="ios"] dialog button:not(.child-detail-close):not(.app-menu button) {
+  min-height: 44px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+html[data-app][data-platform="ios"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-app][data-platform="ios"] select,
+html[data-app][data-platform="ios"] textarea {
+  border-radius: 14px;
+}
+
+html[data-app][data-platform="ios"] .messages-shell,
+html[data-app][data-platform="ios"] .photos-pending {
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+html[data-app][data-platform="ios"] .messages-bubble {
+  border-radius: 20px 20px 20px 6px;
+}
+
+html[data-app][data-platform="ios"] .messages-bubble.mine {
+  border-radius: 20px 20px 6px 20px;
+}
+
+html[data-app][data-platform="ios"] .photos-thumb {
+  border-radius: 14px;
+}
+
+/* ========================= Android: Material 3 Expressive ===================== */
+html[data-app][data-platform="android"] {
+  --sans: "Roboto Flex", Roboto, "Google Sans", system-ui, sans-serif;
+  --tabbar-space: 96px;
+}
+
+html[data-app][data-platform="android"] .app-tabbar {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: calc(80px + env(safe-area-inset-bottom));
+  padding: 12px 8px calc(16px + env(safe-area-inset-bottom));
+  background: var(--m3-surface-container);
+  box-shadow: 0 -1px 0 rgba(var(--navy-rgb), .06);
+}
+
+html[data-app][data-platform="android"] .app-tab {
+  gap: 4px;
+  color: rgba(var(--navy-rgb), .72);
+  font: 500 12px/1 var(--sans);
+}
+
+/* The active destination gets a pill-shaped indicator behind its icon. */
+html[data-app][data-platform="android"] .app-tab-icon {
+  width: 64px;
+  height: 32px;
+  border-radius: 16px;
+  transition: background-color .28s var(--ease-emphasized), transform .3s var(--ease-spring);
+}
+
+html[data-app][data-platform="android"] .app-tab.active {
+  color: var(--m3-on-secondary-container);
+  font-weight: 700;
+}
+
+html[data-app][data-platform="android"] .app-tab.active .app-tab-icon {
+  background: var(--m3-secondary-container);
+}
+
+html[data-app][data-platform="android"] .app-tab:active .app-tab-icon {
+  transform: scale(.92);
+  background: rgba(var(--navy-rgb), .08);
+}
+
+html[data-app][data-platform="android"] .app-tab-badge {
+  top: -2px;
+  right: 6px;
+}
+
+html[data-app][data-platform="android"] dialog.child-detail-panel {
+  border-radius: 28px 28px 0 0;
+  background: var(--m3-surface-container);
+}
+
+html[data-app][data-platform="android"] dialog.child-detail-panel::before {
+  width: 32px;
+  height: 4px;
+  background: rgba(var(--navy-rgb), .4);
+}
+
+html[data-app][data-platform="android"] .workspace-preview .workspace-main button,
+html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish),
+html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb),
+html[data-app][data-platform="android"] dialog button:not(.child-detail-close):not(.app-menu button) {
+  min-height: 48px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .1px;
+  border-radius: 999px;
+  transition: transform .25s var(--ease-spring), background-color .2s;
+}
+
+html[data-app][data-platform="android"] button:active:not(:disabled) {
+  transform: scale(.97);
+}
+
+html[data-app][data-platform="android"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-app][data-platform="android"] select,
+html[data-app][data-platform="android"] textarea {
+  border-radius: 16px;
+}
+
+html[data-app][data-platform="android"] .messages-shell,
+html[data-app][data-platform="android"] .photos-pending {
+  border-radius: 28px;
+  overflow: hidden;
+}
+
+html[data-app][data-platform="android"] .messages-bubble {
+  border-radius: 20px 20px 20px 6px;
+}
+
+html[data-app][data-platform="android"] .messages-bubble.mine {
+  border-radius: 20px 20px 6px 20px;
+}
+
+html[data-app][data-platform="android"] .photos-thumb {
+  border-radius: 18px;
+}
+
+/* Extended floating action button for "New message". */
+html[data-app][data-platform="android"] .messages-fab {
+  position: fixed;
+  z-index: 35;
+  right: 16px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 0 20px;
+  background: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+  font: 600 15px var(--sans);
+  border: 0;
+  border-radius: 18px;
+  box-shadow: 0 3px 10px rgba(11, 42, 61, .2);
+}
+
+html[data-app][data-platform="android"] .messages-shell[data-view="thread"] ~ .messages-fab,
+html[data-app][data-platform="android"] .messages-page:has(.messages-shell[data-view="thread"]) .messages-fab {
+  display: none;
+}
+
+html[data-app][data-platform="android"] .messages-list-head button {
+  display: none;
+}
+
+/* ============================ accessibility ================================== */
+/* People who ask for less transparency get a solid bar (the same request iOS 27's slider makes). */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-app][data-platform="ios"] .app-tabbar {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  html[data-app][data-platform="ios"] dialog.child-detail-panel::backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-app] dialog.child-detail-panel[open],
+  html[data-app] .app-tab,
+  html[data-app] .app-tab-icon {
+    animation: none;
+    transition: none;
+  }
+}

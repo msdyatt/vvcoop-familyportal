@@ -5,8 +5,8 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 
 const POLL_MS = 60_000;
 
-/** The header's link to Messages, with the number of unread messages. */
-export default function MessagesLink() {
+/** Unread messages for the signed-in person, refreshed once a minute. */
+export function useUnreadCount(): number {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -21,6 +21,12 @@ export default function MessagesLink() {
     return () => clearInterval(timer);
   }, []);
 
+  return unread;
+}
+
+/** The header's link to Messages, with the number of unread messages. */
+export default function MessagesLink() {
+  const unread = useUnreadCount();
   return <a className="messages-link" href="/family-village/messages" aria-label={unread ? `Messages, ${unread} unread` : "Messages"}>
     Messages{unread > 0 && <span className="messages-badge">{unread > 99 ? "99+" : unread}</span>}
   </a>;

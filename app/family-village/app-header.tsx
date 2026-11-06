@@ -12,6 +12,7 @@ import NotificationBell from "./notification-bell";
 import MessagesLink from "./messages/messages-link";
 import { getSignedFileUrl } from "../../lib/storage";
 import { disablePush } from "../../lib/push";
+import AppTabBar from "./app-tab-bar";
 import { TOUR_VERSION, isReturning } from "../../lib/onboarding";
 import OnboardingTour from "./onboarding-tour";
 
@@ -97,6 +98,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
         </div>
       </div>
     </header>
+    <AppTabBar roles={roles} onOpenAccount={() => setAccountOpen(true)} onTour={() => setTourOpen(true)} onSignOut={signOut} />
     {tourOpen && <OnboardingTour roles={roles} returning={returning} onFinish={finishTour} onOpenAccount={() => setAccountOpen(true)} />}
     {accountOpen && <DetailModal title="Account & security" onClose={() => setAccountOpen(false)}>
       <AccountSettings email={email} onSignOut={signOut} onProfileUpdated={loadProfile} />
