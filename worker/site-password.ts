@@ -36,9 +36,10 @@ export type SitePasswordEnv = {
  * entering two credentials to reach their own records. The gate exists to keep
  * the public marketing site private, which is what it does.
  *
- * `/privacy` and `/terms` are exempt on purpose -- a privacy policy or terms
- * page that requires a password to even read defeats the point of having
- * one; both are expected to be freely readable by anyone, not just members.
+ * `/privacy`, `/terms` and `/delete-account` are exempt on purpose -- a privacy
+ * policy, terms page, or account-deletion page that requires a password to even
+ * read defeats the point of having one. The app stores require all of them to
+ * be freely readable by anyone, not just members.
  *
  * Static assets are exempt so the gate page itself can render, and because they
  * carry no content worth withholding once the HTML is protected.
@@ -49,9 +50,11 @@ function isExempt(pathname: string): boolean {
     pathname.startsWith("/family-village") ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
+    pathname === "/delete-account" ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/_vinext/") ||
     pathname.startsWith("/brand/") ||
+    pathname.startsWith("/fonts/") ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt"
   );
@@ -125,10 +128,9 @@ function gatePage(returnTo: string, error: boolean, status: number): Response {
 <meta name="robots" content="noindex, nofollow">
 <title>Veritas Village</title>
 <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600&display=swap">
 <style>
+  @font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url("/fonts/inter-latin-wght-normal.woff2") format("woff2")}
+  @font-face{font-family:"Playfair Display";font-style:normal;font-weight:400 900;font-display:swap;src:url("/fonts/playfair-display-latin-wght-normal.woff2") format("woff2")}
   :root{--navy:#0b2a3d;--cream:#faf7f1;--terracotta:#bb6141;--terracotta-text:#a85539;--sage-text:#5f6b61}
   *{box-sizing:border-box}
   body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;

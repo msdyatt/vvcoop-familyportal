@@ -57,7 +57,6 @@ export default function PrivacyPolicy() { return <>
       <li><strong>OpenSign</strong> — handles e-signatures for required forms.</li>
       <li><strong>Resend</strong> — sends invitation and reminder emails, so it sees the recipient&rsquo;s name and email address and the message.</li>
       <li><strong>Apple and Google (Firebase Cloud Messaging)</strong> — carry notifications to phones. They see the notification&rsquo;s title and text.</li>
-      <li><strong>Google Fonts</strong> — the site&rsquo;s typefaces are loaded from Google, which means Google receives a visitor&rsquo;s IP address. <em>[We plan to host the fonts ourselves so this stops.]</em></li>
     </ul>
 
     <h2>Notifications</h2>
