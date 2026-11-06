@@ -4,24 +4,36 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { PRIVATE_BUCKET, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { resizeImage } from "../../../lib/image-resize";
-import { MESSAGE_COLUMNS, conversationTitle, dayLabel, shortTime, type ConversationRow, type MessageRow, type Person } from "../../../lib/messages";
+import { MESSAGE_COLUMNS, conversationTitle, dayLabel, isChannel, postingBlock, shortTime, type ConversationRow, type MessageRow, type Person } from "../../../lib/messages";
+import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
+import ChannelDetails from "./channel-details";
 
 const PAGE = 50;
 
-/** Pairs each message with its day label and whether it is the first of that day. */
+/**
+ * Pairs each message with its day label, and whether it starts a run: the
+ * first of a day, or a different sender, or a gap of ten minutes. Only the
+ * first message of a run shows a name and a photo, as in a text conversation.
+ */
 function withDaySeparators(messages: MessageRow[]) {
-  let previous = "";
+  let previousDay = "";
+  let previous: MessageRow | null = null;
   return messages.map((message) => {
     const day = dayLabel(message.created_at);
-    const showDay = day !== previous;
-    previous = day;
-    return { message, day, showDay };
+    const showDay = day !== previousDay;
+    const startsRun = showDay || !previous || previous.sender_id !== message.sender_id || previous.post_id !== message.post_id
+      || new Date(message.created_at).getTime() - new Date(previous.created_at).getTime() > RUN_MS;
+    previousDay = day;
+    previous = message;
+    return { message, day, showDay, startsRun };
   });
 }
 
-export default function Thread({ conversation, userId, tick, onBack, onChanged }: {
-  conversation: ConversationRow; userId: string; tick: number; onBack: () => void; onChanged: () => void | Promise<void>;
+const RUN_MS = 10 * 60_000;
+
+export default function Thread({ conversation, userId, roles, tick, onBack, onChanged }: {
+  conversation: ConversationRow; userId: string; roles: string[]; tick: number; onBack: () => void; onChanged: () => void | Promise<void>;
 }) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -36,11 +48,14 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
   const [reason, setReason] = useState("");
   const [viewing, setViewing] = useState<string | null>(null);
   const [showMembers, setShowMembers] = useState(false);
+  const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const title = conversationTitle(conversation);
+  const channel = isChannel(conversation);
+  const blocked = postingBlock(conversation, roles);
 
   const fetchLatest = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
@@ -98,6 +113,15 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
     if (document.visibilityState === "visible") void markRead();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to the tick only
   }, [tick]);
+
+  // Profile photos of the people in this conversation, for the bubbles.
+  useEffect(() => {
+    const paths = [...people.values()].map((person) => person.avatar_path).filter((path): path is string => !!path);
+    if (!paths.length) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    void getSignedFileUrls(supabase, paths).then(setAvatarUrls);
+  }, [people]);
 
   // Photos: fetch a signed link for any that do not have one yet.
   useEffect(() => {
@@ -213,13 +237,16 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
     <header className="messages-thread-head">
       <button type="button" className="ghost messages-back" onClick={onBack} aria-label="Back to conversations">← Back</button>
       <div className="messages-thread-title">
-        <b>{title}</b>
-        {conversation.kind !== "direct" && <button type="button" className="messages-linkish" onClick={() => setShowMembers(true)}>{conversation.member_count} people</button>}
+        <b>{channel ? `# ${title}` : title}</b>
+        {channel && conversation.topic
+          ? <span className="messages-topic">{conversation.topic}</span>
+          : conversation.kind !== "direct" && <button type="button" className="messages-linkish" onClick={() => setShowMembers(true)}>{conversation.member_count} people</button>}
       </div>
       <div className="messages-thread-actions">
         <button type="button" className="ghost" onClick={toggleMute}>{conversation.muted ? "Unmute" : "Mute"}</button>
         {conversation.kind === "direct" && <button type="button" className="ghost" onClick={blockOther}>Block</button>}
         {conversation.kind === "group" && <button type="button" className="ghost" onClick={leave}>Leave</button>}
+        {channel && <button type="button" className="ghost" onClick={() => setShowMembers(true)}>Details</button>}
       </div>
     </header>
 
@@ -229,15 +256,21 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
     }}>
       {hasMore && <button type="button" className="ghost messages-earlier" onClick={loadEarlier}>Earlier messages</button>}
       {!messages.length && <p className="portal-empty">Say hello.</p>}
-      {rows.map(({ message, day, showDay }) => {
+      {rows.map(({ message, day, showDay, startsRun }) => {
         const mine = message.sender_id === userId;
         const sender = message.sender_id ? people.get(message.sender_id) : undefined;
         const url = message.image_path ? imageUrls.get(message.image_path) : undefined;
+        const group = conversation.kind !== "direct";
+        const announcement = !!message.post_id && !message.deleted_at;
+        const [headline, ...rest] = (message.body ?? "").split("\n");
         return <div key={message.id}>
           {showDay && <div className="messages-day"><span>{day}</span></div>}
-          <div className={`messages-bubble-row${mine ? " mine" : ""}`}>
-            <div className={`messages-bubble${mine ? " mine" : ""}${message.deleted_at ? " removed" : ""}`}>
-              {!mine && conversation.kind !== "direct" && <span className="messages-sender">
+          <div className={`messages-bubble-row${mine ? " mine" : ""}${startsRun ? " run-start" : ""}`}>
+            {group && !mine && (startsRun
+              ? <Avatar url={sender?.avatar_path ? avatarUrls.get(sender.avatar_path) ?? null : null} label={(sender?.display_name ?? "?").slice(0, 1)} size="md" />
+              : <span className="messages-avatar-gap" aria-hidden="true" />)}
+            <div className={`messages-bubble${mine ? " mine" : ""}${message.deleted_at ? " removed" : ""}${announcement ? " announcement" : ""}`}>
+              {!mine && group && startsRun && <span className="messages-sender">
                 {sender?.display_name ?? "Former member"}
                 {sender?.is_teacher && <i>Teacher</i>}{sender?.is_admin && <i>Admin</i>}
               </span>}
@@ -249,7 +282,14 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
                       <img src={url} alt="Attachment" loading="lazy" />
                     </button>}
                     {message.image_path && !url && <span className="messages-photo-loading">Loading photo…</span>}
-                    {message.body && <p>{message.body}</p>}
+                    {announcement
+                      ? <>
+                          <span className="messages-announce-tag">News</span>
+                          <p><b>{headline}</b></p>
+                          {rest.length > 0 && <p>{rest.join("\n")}</p>}
+                          <a className="messages-announce-link" href="/family-village/home#news">Read in News</a>
+                        </>
+                      : message.body && <p>{message.body}</p>}
                   </>}
               <span className="messages-meta">
                 <time>{shortTime(message.created_at)}</time>
@@ -270,7 +310,7 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
       <button type="button" className="ghost" onClick={clearPhoto}>Remove photo</button>
     </div>}
 
-    <form className="messages-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}>
+    {blocked ? <p className="messages-readonly" role="note">{blocked}</p> : <form className="messages-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => chooseFile(event.target.files?.[0])} />
       <button type="button" className="ghost messages-attach-button" onClick={() => fileRef.current?.click()} disabled={busy} aria-label="Add a photo">Photo</button>
       <textarea
@@ -280,7 +320,7 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
         aria-label="Message" disabled={busy}
       />
       <button type="submit" disabled={busy || (!draft.trim() && !photo)}>{busy ? "Sending…" : "Send"}</button>
-    </form>
+    </form>}
 
     {reporting && <DetailModal title="Report this message" onClose={() => setReporting(null)}>
       <div className="portal-form">
@@ -300,7 +340,20 @@ export default function Thread({ conversation, userId, tick, onBack, onChanged }
       <img className="messages-lightbox" src={viewing} alt="Attachment, full size" />
     </DetailModal>}
 
-    {showMembers && <DetailModal title={`${title}: members`} onClose={() => setShowMembers(false)}>
+    {showMembers && channel && <DetailModal title={`# ${title}`} onClose={() => setShowMembers(false)}>
+      <ChannelDetails conversation={conversation} userId={userId} roles={roles} people={[...people.values()]}
+        onChanged={async () => {
+          const supabase = getSupabaseBrowserClient();
+          if (supabase) {
+            const { data } = await supabase.rpc("conversation_people", { p_conversation_id: conversation.id });
+            setPeople(new Map(((data ?? []) as Person[]).map((person) => [person.user_id, person])));
+          }
+          await onChanged();
+        }}
+        onLeft={() => { setShowMembers(false); onBack(); }} onClose={() => setShowMembers(false)} />
+    </DetailModal>}
+
+    {showMembers && !channel && <DetailModal title={`${title}: members`} onClose={() => setShowMembers(false)}>
       <ul className="messages-members">
         {[...people.values()].map((person) => <li key={person.user_id}>{person.display_name}{person.is_teacher && <i>Teacher</i>}{person.is_admin && <i>Admin</i>}</li>)}
       </ul>

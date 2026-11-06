@@ -71,7 +71,7 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="compliance">Compliance</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Flagged messages</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="compliance">Compliance</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
@@ -83,7 +83,7 @@ export default function AdminWorkspace() {
       <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News &amp; calendar</button>
       <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
       <button className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}>Activity</button>
-      <button className={tab === "message-reports" ? "active" : ""} onClick={() => setTab("message-reports")}>Flagged messages</button>
+      <button className={tab === "message-reports" ? "active" : ""} onClick={() => setTab("message-reports")}>Messaging</button>
       <button className={tab === "integrations" ? "active" : ""} onClick={() => setTab("integrations")}>Integrations</button>
     </nav>
     <div className="admin-workspace-main">
