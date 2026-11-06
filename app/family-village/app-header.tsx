@@ -67,6 +67,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
       <div className="app-header-title"><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
       <div className="app-header-actions">
         <PortalNav current={current} roles={roles} />
+        <a className="messages-link" href="/family-village/photos">Photos</a>
         <MessagesLink />
         <NotificationBell />
         <div className="account-menu" ref={menuRef}>
