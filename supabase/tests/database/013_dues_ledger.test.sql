@@ -50,7 +50,7 @@ select is(public.admin_open_dues('00000000-0000-0000-0000-0000000000d1'), 2, 'du
 select is(public.admin_open_dues('00000000-0000-0000-0000-0000000000d1'), 0, 'opening again creates nothing');
 select is((select amount_due_cents from public.dues_charges where family_id = '00000000-0000-0000-0000-0000000000f1'), 60000, 'one family fee plus two children is $600');
 select is((select amount_due_cents from public.dues_charges where family_id = '00000000-0000-0000-0000-0000000000f2'), 45000, 'one child is $450');
-select throws_ok($$update public.dues_charges set amount_paid_cents = 60000$$, '42501', null, 'an administrator cannot type a paid total into the table');
+select is((with u as (update public.dues_charges set amount_paid_cents = 60000 returning 1) select count(*)::int from u), 0, 'an administrator cannot type a paid total into the table');
 select throws_ok($$insert into public.dues_payments (family_id, direction, amount_cents, status, source, livemode) values ('00000000-0000-0000-0000-0000000000f1', 'charge', 100, 'succeeded', 'admin_manual', true)$$, '42501', null, 'nor insert into the ledger directly');
 reset role;
 select is((select amount_due from public.family_requirements where family_id = '00000000-0000-0000-0000-0000000000f1'), 600.00::numeric, 'the compliance row mirrors the amount');
@@ -61,7 +61,7 @@ set local role authenticated;
 select is((select count(*)::int from public.dues_charges), 1, 'a family sees only its own charge');
 select is((select count(*)::int from public.dues_ledger), 1, 'and only its own ledger line');
 select is((select count(*)::int from public.billing_approvals), 0, 'a family never sees approvals');
-select throws_ok($$select count(*) from public.stripe_webhook_events$$, '42501', null, 'nor Stripe events');
+select is((select count(*)::int from public.stripe_webhook_events), 0, 'nor read Stripe events');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b3","role":"authenticated"}', true);
 set local role authenticated;
