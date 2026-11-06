@@ -36,9 +36,10 @@ export type SitePasswordEnv = {
  * entering two credentials to reach their own records. The gate exists to keep
  * the public marketing site private, which is what it does.
  *
- * `/privacy` and `/terms` are exempt on purpose -- a privacy policy or terms
- * page that requires a password to even read defeats the point of having
- * one; both are expected to be freely readable by anyone, not just members.
+ * `/privacy`, `/terms` and `/delete-account` are exempt on purpose -- a privacy
+ * policy, terms page, or account-deletion page that requires a password to even
+ * read defeats the point of having one. The app stores require all of them to
+ * be freely readable by anyone, not just members.
  *
  * Static assets are exempt so the gate page itself can render, and because they
  * carry no content worth withholding once the HTML is protected.
@@ -49,6 +50,7 @@ function isExempt(pathname: string): boolean {
     pathname.startsWith("/family-village") ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
+    pathname === "/delete-account" ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/_vinext/") ||
     pathname.startsWith("/brand/") ||
