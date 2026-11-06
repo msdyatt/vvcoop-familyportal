@@ -26,7 +26,7 @@ export function ComplianceBanner({ items }: { items: ComplianceItem[] }) {
       <b>{outstanding === 1 ? "One thing needs your attention" : `${outstanding} things need your attention`}</b>
       <span>{names.join(" · ")}</span>
     </div>
-    <a href="#paperwork">Take care of it →</a>
+    <a href="/family-village/paperwork">Take care of it →</a>
   </aside>;
 }
 

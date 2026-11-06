@@ -20,7 +20,11 @@ export const metadata: Metadata = {
   title: "Veritas Village | Central Texas Homeschool Co-op",
   description: "A shared place for Central Texas homeschool families to learn with intention and grow in community.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Veritas Village", statusBarStyle: "default" },
+  // "black-translucent" makes the installed iPhone app's status bar fully
+  // transparent, so the page draws under it. With "default", iOS paints its own
+  // frosted-glass strip there, which showed as a haze above the header. The
+  // page supplies a solid navy strip instead (see platform.css).
+  appleWebApp: { capable: true, title: "Veritas Village", statusBarStyle: "black-translucent" },
   icons: {
     icon: [
       { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },

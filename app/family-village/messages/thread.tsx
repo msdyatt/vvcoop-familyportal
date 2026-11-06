@@ -344,7 +344,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
                           <span className="messages-announce-tag">News</span>
                           <p><b>{headline}</b></p>
                           {rest.length > 0 && <p>{rest.join("\n")}</p>}
-                          <a className="messages-announce-link" href="/family-village/home#news">Read in News</a>
+                          <a className="messages-announce-link" href="/family-village/news">Read in News</a>
                         </>
                       : message.body && <p>{splitMentions(message.body, mentionNames).map((part, index) => part.mention
                           ? <span key={index} className={`messages-mention${part.text === `@${myName}` ? " me" : ""}`}>{part.text}</span>

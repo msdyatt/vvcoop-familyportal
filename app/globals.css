@@ -4590,6 +4590,11 @@ footer nav a:hover {
   position:relative;
   width:40px;
   height:40px;
+  /* Its own padding, never a page's default for buttons: Messages, Photos and
+     the admin pages each give plain buttons 10px 14px, which pushed the bell
+     icon several pixels right of centre on those pages only. */
+  padding:0;
+  box-sizing:border-box;
   display:grid;
   place-items:center;
   border-radius:50%;
@@ -4598,6 +4603,11 @@ footer nav a:hover {
   color:var(--portal-band-fg);
   cursor:pointer;
   flex-shrink:0;
+}
+
+/* Wins over any page-level button rule (the admin and teacher workspaces use a more specific one). */
+.app-header .notification-bell .notification-bell-button {
+  padding:0;
 }
 
 .notification-bell-button:hover {
@@ -7512,4 +7522,24 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   .cal-item time {
     flex-basis:84px;
   }
+}
+
+/* ---- Section pages ---------------------------------------------------------- */
+.portal-back {
+  display:inline-block;
+  margin:0 0 14px;
+  color:var(--navy);
+  font-size:14px;
+  font-weight:600;
+  text-decoration:none;
+}
+
+/* A page that holds one section gives it the whole width. */
+.portal-grid.portal-single {
+  grid-template-columns:minmax(0,1fr);
+}
+
+.portal-grid.portal-single .portal-module {
+  grid-column:1/-1;
+  min-height:0;
 }

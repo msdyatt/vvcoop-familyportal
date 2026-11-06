@@ -564,3 +564,25 @@ html[data-app][data-platform="android"] .messages-list-head button {
   justify-content: flex-end;
   margin-top: 18px;
 }
+
+/* ---- Status bar strip on the installed iPhone app --------------------------
+   The status bar is transparent there (see appleWebApp in layout.tsx), so the
+   page paints a solid navy strip behind the clock and battery. The system
+   draws the clock in white, which this keeps readable on every page. */
+html[data-shell="standalone"][data-platform="ios"]::before {
+  content: "";
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: env(safe-area-inset-top);
+  background: #0b2a3d;
+  pointer-events: none;
+}
+
+.app-menu a.app-menu-sub {
+  padding-left: 20px;
+  color: rgba(var(--navy-rgb), .8);
+  font-size: 16px;
+}
