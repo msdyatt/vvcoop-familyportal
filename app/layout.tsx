@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ErrorReporter from "./error-reporter";
 import GlobalErrorBoundary from "./global-error-boundary";
+import NativePushRouter from "./native-push-router";
 
 export const viewport: Viewport = {
   themeColor: "#0b2a3d",
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </head>
     <body>
       <ErrorReporter />
+      <NativePushRouter />
       <GlobalErrorBoundary>{children}</GlobalErrorBoundary>
     </body>
   </html>;
