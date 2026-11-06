@@ -6,6 +6,7 @@ import { getSignedFileUrl, getSignedFileUrls } from "../../../lib/storage";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
+import CalendarView from "../calendar-view";
 import AppHeader from "../app-header";
 import RichText, { stripRichText } from "../../../lib/rich-text";
 import MfaChallengeScreen from "../mfa-challenge";
@@ -171,7 +172,6 @@ export default function PortalGate() {
   // Class dates belong to one class and are shown against it. Keeping them out
   // of the Village calendar stops a shoebox reminder for one elective sitting
   // between two co-op-wide dates every family needs to read.
-  const coopEvents = (portal?.events ?? []).filter((event) => event.audience !== "class");
   const classDates = (portal?.events ?? []).filter((event) => event.audience === "class");
 
   const complianceDocumentIds = new Set(
@@ -194,7 +194,8 @@ export default function PortalGate() {
       <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
         {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
       </section>
-      <section className="portal-module" id="calendar"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>{coopEvents.length ? <ol className="portal-list clickable-list">{coopEvents.map(event => <li key={event.id}><div role="button" tabIndex={0} onClick={() => setOpenEventId(event.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenEventId(event.id); } }} style={{ display: "contents" }}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric", timeZone: event.all_day ? "UTC" : undefined})}</time><div><b>{event.title}</b><span>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</span></div></div></li>)}</ol> : empty("No co-op dates have been published yet.")}
+      <section className="portal-module portal-module-full" id="calendar"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>
+        <CalendarView />
         {userId && <div className="calendar-subscribe-row"><PersonalSubscribeLink userId={userId} /></div>}
       </section>
       <section className="portal-module" id="news"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}</section>
