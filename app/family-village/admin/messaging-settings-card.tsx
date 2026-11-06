@@ -41,7 +41,8 @@ export default function MessagingSettingsCard() {
       <legend className="sr-only">Who can create channels</legend>
       {OPTIONS.map((option) => <label key={option.value} className="messaging-creator-option">
         <input type="radio" name="channel-creators" checked={value === option.value} onChange={() => void choose(option.value)} />
-        <span><b>{option.label}</b><small>{option.note}</small></span>
+        <span className="messaging-creator-label">{option.label}</span>
+        <small>{option.note}</small>
       </label>)}
     </fieldset>
     {status && <p className="admin-form-status" role="status">{status}</p>}

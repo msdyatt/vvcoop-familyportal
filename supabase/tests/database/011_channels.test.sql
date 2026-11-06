@@ -153,10 +153,12 @@ select lives_ok($$select public.archive_channel((select id from public.conversat
 select throws_ok($$select public.send_message((select id from public.conversations where title = 'Carpools'), 'still there?')$$, 'P0001', 'This channel is archived, so it is read-only.', 'an archived channel is read-only');
 select ok((select archived_at is not null from public.my_conversations() where title = 'Carpools'), 'and shows as archived in the list');
 reset role;
+-- The administrator is not a member of this channel, so look its id up before switching roles.
+select set_config('test.carpools', (select id::text from public.conversations where title = 'Carpools'), true);
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
 select throws_ok($$select public.archive_channel((select id from public.conversations where system_key = 'general'), true)$$, 'P0001', 'The built-in channels can''t be archived.', 'the built-in channels cannot be archived');
-select lives_ok($$select public.archive_channel((select id from public.conversations where title = 'Carpools'), false)$$, 'an administrator can restore an archived channel');
+select lives_ok($$select public.archive_channel(current_setting('test.carpools')::uuid, false)$$, 'an administrator can restore an archived channel');
 reset role;
 
 select * from finish();

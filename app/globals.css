@@ -6928,16 +6928,18 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 }
 
 .messaging-creator-option {
-  display:flex;
-  gap:10px;
-  align-items:flex-start;
+  display:grid;
+  grid-template-columns:auto 1fr;
+  column-gap:10px;
+  row-gap:2px;
+  align-items:start;
 }
 
-.messaging-creator-option span {
-  display:grid;
-  gap:2px;
+.messaging-creator-label {
+  font-weight:700;
 }
 
 .messaging-creator-option small {
+  grid-column:2;
   color:var(--sage-text);
 }
