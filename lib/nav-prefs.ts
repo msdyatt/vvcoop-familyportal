@@ -30,7 +30,7 @@ const ADMIN = "/family-village/admin";
 export const DESTINATIONS: Destination[] = [
   { id: "home", label: "Home", href: FAMILY, icon: "home", group: "Family" },
   { id: "news", label: "News", href: `${FAMILY}#news`, icon: "news", group: "Family" },
-  { id: "calendar", label: "Calendar", href: `${FAMILY}#calendar`, icon: "calendar", group: "Family" },
+  { id: "calendar", label: "Calendar", href: "/family-village/calendar", icon: "calendar", group: "Everywhere" },
   { id: "children", label: "Children", href: `${FAMILY}#my-children`, icon: "children", group: "Family" },
   { id: "paperwork", label: "Paperwork", href: `${FAMILY}#paperwork`, icon: "paperwork", group: "Family" },
   { id: "photos", label: "Photos", href: "/family-village/photos", icon: "photos", group: "Everywhere" },
