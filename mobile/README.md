@@ -67,8 +67,9 @@ things only you can do, both in consoles, neither in git or chat:
    then in the Supabase dashboard open Vault and add a secret named
    `FCM_SERVICE_ACCOUNT` containing that JSON. This is how our server sends.
 
-Then in Xcode (`npx cap open ios`): Signing and Capabilities, pick your team (this adds
-the Push Notifications capability to the App ID), and run on a real iPhone. The iOS
+Then in Xcode (`npx cap open ios`): the team (`VQUCJB5C7M`) is already set; if Xcode asks, choose it
+under Signing and Capabilities, which also adds the Push Notifications capability to the App ID. Run
+on a real iPhone. The iOS
 simulator cannot receive push. Turn notifications on in Account Settings, then use
 "Send a test".
 
