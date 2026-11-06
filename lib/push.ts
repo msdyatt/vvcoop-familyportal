@@ -1,4 +1,10 @@
 import { getSupabaseBrowserClient, functionErrorMessage } from "./supabase";
+import { messagingPlugin, nativePlatform } from "./native";
+
+// The phone token this install last registered, so the settings screen can say "on" without asking the server.
+const NATIVE_TOKEN_KEY = "vv-native-push-token";
+function readNativeToken(): string | null { try { return localStorage.getItem(NATIVE_TOKEN_KEY); } catch { return null; } }
+function writeNativeToken(token: string | null) { try { token ? localStorage.setItem(NATIVE_TOKEN_KEY, token) : localStorage.removeItem(NATIVE_TOKEN_KEY); } catch { /* storage unavailable */ } }
 
 /**
  * Browser side of web push. The service worker (public/sw.js) shows the
@@ -36,6 +42,13 @@ async function registration(): Promise<ServiceWorkerRegistration | null> {
 }
 
 export async function getPushState(): Promise<PushState> {
+  if (nativePlatform()) {
+    const plugin = messagingPlugin();
+    if (!plugin) return "unsupported";
+    const { receive } = await plugin.checkPermissions();
+    if (receive === "denied") return "denied";
+    return receive === "granted" && readNativeToken() ? "on" : "off";
+  }
   if (!pushApisPresent()) return isIosDevice() && !isInstalledApp() ? "needs-install" : "unsupported";
   if (Notification.permission === "denied") return "denied";
   const reg = await navigator.serviceWorker.getRegistration("/");
@@ -54,7 +67,32 @@ function bytesToBase64Url(buffer: ArrayBuffer | null): string {
   return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/** Registers this phone's Firebase token with the server (inside the iOS/Android app). */
+async function enableNativePush(platform: "ios" | "android"): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseBrowserClient();
+  const plugin = messagingPlugin();
+  if (!supabase || !plugin) return { ok: false, error: "Notifications are not available right now." };
+  const { receive } = await plugin.requestPermissions();
+  if (receive !== "granted") return { ok: false, error: "Notifications were not allowed. You can change this in your phone's Settings." };
+  const { token } = await plugin.getToken();
+  const { error } = await supabase.rpc("register_device_token", { p_token: token, p_platform: platform, p_user_agent: "Veritas Village app" });
+  if (error) return { ok: false, error: error.message };
+  writeNativeToken(token);
+  return { ok: true };
+}
+
+/** Re-registers the saved token (Firebase rotates tokens now and then). A no-op unless this install had notifications on. */
+export async function refreshNativeToken(token: string): Promise<void> {
+  const platform = nativePlatform();
+  const supabase = getSupabaseBrowserClient();
+  if (!platform || !supabase || !readNativeToken()) return;
+  const { error } = await supabase.rpc("register_device_token", { p_token: token, p_platform: platform, p_user_agent: "Veritas Village app" });
+  if (!error) writeNativeToken(token);
+}
+
 export async function enablePush(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const native = nativePlatform();
+  if (native) return enableNativePush(native);
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return { ok: false, error: "Notifications are not available right now." };
   const reg = await registration();
@@ -84,6 +122,15 @@ export async function enablePush(): Promise<{ ok: true } | { ok: false; error: s
 
 /** Stops pushes to this device. Safe to call when nothing is subscribed. */
 export async function disablePush(): Promise<void> {
+  if (nativePlatform()) {
+    const token = readNativeToken();
+    const supabase = getSupabaseBrowserClient();
+    // Server record first, while the session still exists; then Firebase's.
+    if (token) await supabase?.rpc("unregister_device_token", { p_token: token });
+    await messagingPlugin()?.deleteToken().catch(() => {});
+    writeNativeToken(null);
+    return;
+  }
   if (!pushApisPresent()) return;
   const reg = await navigator.serviceWorker.getRegistration("/");
   const sub = await reg?.pushManager.getSubscription();

@@ -5,6 +5,7 @@ import { logEdgeError } from "../_shared/error-log.ts";
 import { readVaultSecret } from "../_shared/resend.ts";
 import { safeEqual } from "../_shared/crypto.ts";
 import { safePath } from "../_shared/paths.ts";
+import { sendFcm, type ServiceAccount } from "../_shared/fcm.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
 
 /**
@@ -37,14 +38,36 @@ async function getVapidKeys(admin: SupabaseClient): Promise<VapidKeys> {
   return JSON.parse(stored) as VapidKeys;
 }
 
-type Subscription = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
+type Subscription = {
+  id: string; user_id: string; platform: "web" | "ios" | "android";
+  endpoint: string | null; p256dh: string | null; auth: string | null; device_token: string | null;
+};
 type Payload = { title: string; body: string; url: string; tag: string };
 
+const SUB_COLUMNS = "id,user_id,platform,endpoint,p256dh,auth,device_token";
+
+/** The Firebase key for the iOS and Android apps, from Vault. Null until it has been added. */
+async function getFcmAccount(admin: SupabaseClient): Promise<ServiceAccount | null> {
+  const raw = await readVaultSecret(admin, "FCM_SERVICE_ACCOUNT");
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as ServiceAccount;
+    return parsed.project_id && parsed.client_email && parsed.private_key ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Sends one payload to one device. Returns "gone" when the device has unsubscribed for good. */
-async function sendOne(sub: Subscription, payload: Payload): Promise<"sent" | "gone" | "failed"> {
+async function sendOne(sub: Subscription, payload: Payload, fcm: ServiceAccount | null): Promise<"sent" | "gone" | "failed"> {
+  if (sub.platform !== "web") {
+    // Not set up yet is a failure for this send, not an error: the web side must keep working.
+    if (!fcm || !sub.device_token) return "failed";
+    return await sendFcm(fcm, sub.device_token, payload);
+  }
   try {
     await webpush.sendNotification(
-      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+      { endpoint: sub.endpoint!, keys: { p256dh: sub.p256dh!, auth: sub.auth! } },
       JSON.stringify(payload),
       { TTL: 60 * 60 * 24, urgency: "normal" },
     );
@@ -81,9 +104,10 @@ async function handle(req: Request): Promise<Response> {
 
     const keys = await getVapidKeys(admin);
     webpush.setVapidDetails(VAPID_SUBJECT, keys.publicKey, keys.privateKey);
-    const { data: subs } = await admin.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").eq("user_id", user.id);
+    const fcm = await getFcmAccount(admin);
+    const { data: subs } = await admin.from("push_subscriptions").select(SUB_COLUMNS).eq("user_id", user.id);
     const results = await Promise.all(((subs ?? []) as Subscription[]).map(async (sub) => ({
-      sub, result: await sendOne(sub, { title: "Veritas Village", body: "Notifications are working on this device.", url: "/family-village/home", tag: "test" }),
+      sub, result: await sendOne(sub, { title: "Veritas Village", body: "Notifications are working on this device.", url: "/family-village/home", tag: "test" }, fcm),
     })));
     const gone = results.filter((r) => r.result === "gone").map((r) => r.sub.id);
     if (gone.length) await admin.from("push_subscriptions").delete().in("id", gone);
@@ -114,12 +138,13 @@ async function handle(req: Request): Promise<Response> {
     if (!work.length) return json({ ok: true, sent: 0 });
 
     const userIds = [...new Set(work.map((n) => n.recipient_user_id))];
-    const { data: subRows } = await admin.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", userIds);
+    const { data: subRows } = await admin.from("push_subscriptions").select(SUB_COLUMNS).in("user_id", userIds);
     const subsByUser = new Map<string, Subscription[]>();
     for (const sub of (subRows ?? []) as Subscription[]) subsByUser.set(sub.user_id, [...(subsByUser.get(sub.user_id) ?? []), sub]);
 
     const keys = await getVapidKeys(admin);
     webpush.setVapidDetails(VAPID_SUBJECT, keys.publicKey, keys.privateKey);
+    const fcm = await getFcmAccount(admin);
 
     const gone = new Set<string>();
     let sent = 0;
@@ -129,7 +154,7 @@ async function handle(req: Request): Promise<Response> {
     const perNotification = new Map<string, { sent: number; failed: number }>();
     for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
       await Promise.all(jobs.slice(i, i + BATCH_SIZE).map(async ({ n, sub }) => {
-        const result = await sendOne(sub, { title: n.title, body: n.body ?? "", url: safePath(n.link_path), tag: n.id });
+        const result = await sendOne(sub, { title: n.title, body: n.body ?? "", url: safePath(n.link_path), tag: n.id }, fcm);
         const tally = perNotification.get(n.id) ?? { sent: 0, failed: 0 };
         if (result === "sent") { sent += 1; tally.sent += 1; } else { failed += 1; tally.failed += 1; }
         if (result === "gone") gone.add(sub.id);

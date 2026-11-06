@@ -34,7 +34,21 @@ const config: CapacitorConfig = {
     // status bar on iOS 26 anyway.
     contentInset: "never",
   },
+  // Avoids a Swift Package Manager name clash between the Firebase plugins.
+  experimental: {
+    ios: {
+      spm: {
+        packageOptions: {
+          "@capacitor-firebase/messaging": { symlink: true },
+        },
+      },
+    },
+  },
   plugins: {
+    // Show the notification banner and play the sound even while the app is open.
+    FirebaseMessaging: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
     SplashScreen: {
       backgroundColor: "#0b2a3d",
       launchShowDuration: 0,
