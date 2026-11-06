@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 
 type AuditRow = {
-  id: number; actor_user_id: string; action: string; subject_type: string;
+  id: number; actor_user_id: string | null; action: string; subject_type: string;
   subject_id: string; detail: Record<string, unknown> | null; created_at: string; actor_name: string;
 };
 
@@ -143,12 +143,12 @@ function AccessActivity() {
       .select("id,actor_user_id,action,subject_type,subject_id,detail,created_at")
       .order("created_at", { ascending: false }).limit(400);
     const base = (data ?? []) as Omit<AuditRow, "actor_name">[];
-    const actorIds = [...new Set(base.map((row) => row.actor_user_id))];
+    const actorIds = [...new Set(base.map((row) => row.actor_user_id).filter((id): id is string => !!id))];
     const { data: profileRows } = actorIds.length
       ? await supabase.from("profiles").select("id,display_name,email").in("id", actorIds)
       : { data: [] };
     const nameMap = new Map((profileRows ?? []).map((row) => [row.id, row.display_name || row.email]));
-    setRows(base.map((row) => ({ ...row, actor_name: nameMap.get(row.actor_user_id) ?? "Someone" })));
+    setRows(base.map((row) => ({ ...row, actor_name: (row.actor_user_id && nameMap.get(row.actor_user_id)) || "Former member" })));
     setLoadedAt(Date.now());
     setLoading(false);
   }
@@ -157,7 +157,7 @@ function AccessActivity() {
   useEffect(() => { load(); }, []);
 
   const people = useMemo(
-    () => [...new Map(rows.map((row) => [row.actor_user_id, row.actor_name])).entries()]
+    () => [...new Map(rows.filter((row) => row.actor_user_id).map((row) => [row.actor_user_id as string, row.actor_name])).entries()]
       .sort((a, b) => a[1].localeCompare(b[1])),
     [rows],
   );

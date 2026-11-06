@@ -58,7 +58,7 @@ export async function sendAndLog(
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }
 
-async function getFromAddress(admin: SupabaseClient): Promise<string | null> {
+export async function getFromAddress(admin: SupabaseClient): Promise<string | null> {
   const { data } = await admin.from("integration_settings").select("from_address").eq("id", "resend").maybeSingle();
   return (data as { from_address: string | null } | null)?.from_address?.trim() || null;
 }

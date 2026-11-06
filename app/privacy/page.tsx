@@ -74,11 +74,11 @@ export default function PrivacyPolicy() { return <>
       <li>You can see and change your own details in Account Settings.</li>
       <li>You can remove messages you sent and photos you added, mute a conversation, block a member, and report a message or photo.</li>
       <li>You can turn notifications on or off for each device.</li>
-      <li>To ask for your personal information to be deleted, email <a href="mailto:admin@veritasvillage.org">admin@veritasvillage.org</a>. Today, &ldquo;Delete my account&rdquo; in the app removes your access but leaves household records in place for the co-op. <em>[Flag for legal review and a code change: the app should offer true deletion, and this section should state what is erased, what the co-op must keep, and how quickly we respond.]</em></li>
+      <li>You can permanently delete your account in Account Settings, or by email to <a href="mailto:admin@veritasvillage.org">admin@veritasvillage.org</a>; see <a href="/delete-account">how to delete your account</a>. That erases your sign-in, contact details, photo, devices and messages. Notes, news posts and library photos you added stay without your name, and your household&rsquo;s records stay if another adult is in it. <em>[Flag for legal review: the response time for email requests, and which records the co-op must keep.]</em></li>
     </ul>
 
     <h2>How long we keep it</h2>
-    <p>Messages and photos stay until the person who added them or an administrator removes them. Removing a message or photo erases its content and its files. <em>[Flag for legal review: the co-op should decide and state a real retention policy here — for example, how long records are kept after a family leaves, and when messages are deleted automatically.]</em></p>
+    <p>Messages and photos stay until the person who added them or an administrator removes them. Removing a message or photo erases its content and its files, and deleting an account erases the messages that person sent. <em>[Flag for legal review: the co-op should decide and state a real retention policy here — for example, how long records are kept after a family leaves, and when messages are deleted automatically.]</em></p>
 
     <h2>How we protect it</h2>
     <p>The app uses encrypted connections. Signing in is required, access is limited by role, and photos and files are kept in private storage that requires a signed-in account with permission to see them. Passkeys and two-factor sign-in are available. No system is perfectly secure, so please use a strong password or a passkey and keep your sign-in private.</p>

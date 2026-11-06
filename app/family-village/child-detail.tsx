@@ -10,7 +10,7 @@ import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/sche
 
 type ClassInfo = { id: string; title: string; schedule: string; teachers: string[] };
 type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string; completed: boolean };
-type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
+type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string | null; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
 
 type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null; age_band_override: boolean; birthdate: string | null; avatar_path: string | null };
 
@@ -62,7 +62,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     setClasses(classInfos);
 
     const noteBaseRows = (noteRows ?? []) as Omit<NoteInfo, "author_name" | "class_title" | "read_count" | "read_by_me">[];
-    const authorIds = [...new Set(noteBaseRows.map((row) => row.author_user_id))];
+    const authorIds = [...new Set(noteBaseRows.map((row) => row.author_user_id).filter((id): id is string => !!id))];
     const noteClassIds = [...new Set(noteBaseRows.map((row) => row.class_id))];
     const noteIds = noteBaseRows.map((row) => row.id);
     const [{ data: authorRows }, { data: classRows }, { data: readRows }] = await Promise.all([
@@ -80,7 +80,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     });
     setNotes(noteBaseRows.map((row) => ({
       ...row,
-      author_name: authorMap.get(row.author_user_id) ?? "Teacher",
+      author_name: (row.author_user_id && authorMap.get(row.author_user_id)) || "Former teacher",
       class_title: classMap.get(row.class_id) ?? "",
       read_count: readCounts.get(row.id) ?? 0,
       read_by_me: readByMe.has(row.id),

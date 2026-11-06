@@ -16,7 +16,7 @@ type ClassRow = { id: string; title: string; description: string | null } & Clas
 type Assignment = { class_id: string; assignment_role: string; classes: ClassRow };
 type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string; avatar_path: string | null };
 type NoteRead = { name: string; read_at: string };
-type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string; author_name: string; reads: NoteRead[] };
+type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string | null; author_name: string; reads: NoteRead[] };
 type Handout = { id: string; title: string; kind: string; storage_path: string; class_id: string | null; created_at: string };
 type PrintRequest = { id: string; title: string; quantity: number; status: string; storage_path: string; created_at: string; class_id: string | null };
 type ClassEvent = { id: string; class_id: string | null; title: string; description: string | null; starts_at: string; location: string | null; requires_prework: boolean; audience: string };
@@ -86,7 +86,7 @@ export default function TeacherWorkspace() {
     if (avatarPaths.length) setAvatarUrls(await getSignedFileUrls(supabase, avatarPaths));
 
     const noteBase = (noteRows ?? []) as Omit<Note, "author_name" | "reads">[];
-    const authorIds = [...new Set(noteBase.map((row) => row.author_user_id))];
+    const authorIds = [...new Set(noteBase.map((row) => row.author_user_id).filter((id): id is string => !!id))];
     const noteIds = noteBase.map((row) => row.id);
     const [{ data: authorRows }, { data: readRows }] = await Promise.all([
       authorIds.length ? supabase.from("profiles").select("id,display_name,email").in("id", authorIds) : Promise.resolve({ data: [] }),
@@ -103,7 +103,7 @@ export default function TeacherWorkspace() {
         reads.set(row.note_id, [...(reads.get(row.note_id) ?? []), { name, read_at: row.read_at }]);
       });
     setNotes(noteBase.map((row) => ({
-      ...row, author_name: authorMap.get(row.author_user_id) ?? "Teacher",
+      ...row, author_name: (row.author_user_id && authorMap.get(row.author_user_id)) || "Former teacher",
       reads: (reads.get(row.id) ?? []).sort((a, b) => a.read_at.localeCompare(b.read_at)),
     })));
 

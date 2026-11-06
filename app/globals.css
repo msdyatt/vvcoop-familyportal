@@ -6673,3 +6673,15 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 .portal-legal-links a {
   color:inherit;
 }
+
+.danger-choice {
+  display:grid;
+  gap:6px;
+  margin-top:14px;
+  padding:12px;
+  background:var(--panel);
+}
+
+.danger-choice small {
+  color:var(--sage-text);
+}

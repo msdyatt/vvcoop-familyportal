@@ -309,6 +309,17 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
    * at all. This is the direct path: available on every household, not
    * gated behind an adult-removal step.
    */
+  /** Permanently deletes someone else's account (a deletion request, or an account that was only ever "removed"). */
+  async function deleteAccount(userId: string, displayName: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { data, error } = await supabase.functions.invoke("delete-account", { body: { confirm: "DELETE", targetUserId: userId, deleteHousehold: false } });
+    if (error || data?.error) { setStatus(await functionErrorMessage(error, data, `Could not delete ${displayName}'s account.`)); return; }
+    await log("account_deleted_by_admin", "profile", userId, { households_without_adults: (data?.householdsWithoutAdults ?? []).length });
+    setStatus(`Deleted ${displayName}'s account.${(data?.householdsWithoutAdults ?? []).length ? ` No adults are left in ${data.householdsWithoutAdults.join(", ")}; delete the household when its records are no longer needed.` : ""}`);
+    await load();
+  }
+
   async function deleteHousehold(familyId: string, familyName: string, childCount: number, adultCount: number) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
@@ -355,13 +366,13 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
       <p className="compliance-summary">{visibleFamilies.length} shown</p>
     </div>
     <div className="family-manage-list">
-      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} allFamilies={families} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onDeleteChild={deleteChild} onMoveChild={moveChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onDeleteHousehold={deleteHousehold} onGrantRole={grantRole} onRevokeRole={revokeRole} onInviteAdult={inviteAdult} />)}
+      {visibleFamilies.map((family) => <FamilyCard key={family.id} family={family} allFamilies={families} roleMap={roleMap} compliance={compliance.filter((row) => row.family_id === family.id)} metrics={metricsByFamily.get(family.id)!} avatarUrls={avatarUrls} onSaveFamily={saveFamily} onSaveChild={saveChild} onAddChild={addChild} onDeleteChild={deleteChild} onMoveChild={moveChild} onUploadAvatar={uploadChildAvatar} onRemoveUser={removeUser} onDeleteAccount={deleteAccount} onDeleteHousehold={deleteHousehold} onGrantRole={grantRole} onRevokeRole={revokeRole} onInviteAdult={inviteAdult} />)}
       {!visibleFamilies.length && <p className="portal-empty">No households match those filters.</p>}
     </div>
   </section>;
 }
 
-function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onDeleteChild, onMoveChild, onUploadAvatar, onRemoveUser, onDeleteHousehold, onGrantRole, onRevokeRole, onInviteAdult }: {
+function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarUrls, onSaveFamily, onSaveChild, onAddChild, onDeleteChild, onMoveChild, onUploadAvatar, onRemoveUser, onDeleteAccount, onDeleteHousehold, onGrantRole, onRevokeRole, onInviteAdult }: {
   family: Family;
   allFamilies: Family[];
   roleMap: Record<string, string[]>;
@@ -375,6 +386,7 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
   onMoveChild: (childId: string, childName: string, fromFamilyId: string, toFamilyId: string) => void;
   onUploadAvatar: (childId: string, file: File) => void;
   onRemoveUser: (familyId: string, userId: string, displayName: string) => void;
+  onDeleteAccount: (userId: string, displayName: string) => Promise<void>;
   onDeleteHousehold: (familyId: string, familyName: string, childCount: number, adultCount: number) => Promise<void>;
   onGrantRole: (userId: string, role: string) => void;
   onRevokeRole: (userId: string, role: string) => void;
@@ -384,6 +396,7 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
   const [children, setChildren] = useState(family.children ?? []);
   const [viewingChildId, setViewingChildId] = useState<string | null>(null);
   const [deletingChild, setDeletingChild] = useState<Child | null>(null);
+  const [deletingPerson, setDeletingPerson] = useState<{ userId: string; name: string } | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deletingHousehold, setDeletingHousehold] = useState(false);
   const [deleteHouseholdBusy, setDeleteHouseholdBusy] = useState(false);
@@ -449,6 +462,7 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
           </div>
           <div className="row-actions">
             <button className="danger" onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
+            <button className="danger" onClick={() => setDeletingPerson({ userId: member.user_id, name: member.profiles?.display_name || member.profiles?.email || "this person" })}>Delete account</button>
           </div>
         </div>;
       })}
@@ -522,6 +536,13 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
     <FamilyDocuments familyId={family.id} familyName={name} />
 
     {viewingChildId && <ChildDetail childId={viewingChildId} onClose={() => setViewingChildId(null)} />}
+    {deletingPerson && <ConfirmDeleteModal
+      title={`Permanently delete ${deletingPerson.name}'s account?`}
+      description={<>This erases their sign-in, contact details, photo and messages, and cannot be undone. Notes, news posts and library photos they added stay without their name. If they are the only adult in this household, the household and its children stay until you delete them. This is different from Remove access, which only blocks sign-in.</>}
+      confirmLabel="Delete account permanently"
+      onConfirm={async () => { await onDeleteAccount(deletingPerson.userId, deletingPerson.name); setDeletingPerson(null); }}
+      onCancel={() => setDeletingPerson(null)}
+    />}
     {deletingChild && <ConfirmDeleteModal
       title={`Delete ${deletingChild.first_name}?`}
       description={<>This permanently removes {deletingChild.first_name}&rsquo;s record, including their class enrollments, teacher notes, documents, and photo consents. This is different from the Active checkbox — a withdrawn or graduated child should stay Active: false instead, so their history is kept. This cannot be undone.</>}

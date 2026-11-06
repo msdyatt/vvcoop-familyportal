@@ -1,14 +1,16 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "../../lib/supabase";
+import { functionErrorMessage, getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
 import SubscribeLink from "./subscribe-link";
 import Avatar from "./avatar";
 import AvatarCropper from "./avatar-cropper";
 import PushSection from "./push-section";
+import { ConfirmDeleteModal } from "./admin/admin-ui";
+import { disablePush } from "../../lib/push";
 
-export default function AccountSettings({ email, onSignOut, onProfileUpdated }: { email: string; onSignOut: () => void; onProfileUpdated?: () => void }) {
+export default function AccountSettings({ email, onProfileUpdated }: { email: string; onSignOut?: () => void; onProfileUpdated?: () => void }) {
   return <div className="account-settings">
     <ContactSection onProfileUpdated={onProfileUpdated} />
     <PasswordSection email={email} />
@@ -16,7 +18,7 @@ export default function AccountSettings({ email, onSignOut, onProfileUpdated }: 
     <TwoFactorSection />
     <PushSection />
     <CalendarSection />
-    <DangerZone onSignOut={onSignOut} />
+    <DangerZone />
     <p className="portal-legal-links"><a href="/privacy">Privacy policy</a> · <a href="/terms">Terms</a></p>
   </div>;
 }
@@ -350,27 +352,74 @@ function TwoFactorSection() {
   </div>;
 }
 
-function DangerZone({ onSignOut }: { onSignOut: () => void }) {
+function DangerZone() {
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [soleAdultOf, setSoleAdultOf] = useState<string[]>([]);
+  const [alsoHousehold, setAlsoHousehold] = useState(false);
 
-  async function deleteAccount() {
-    if (!confirm("Delete your account? You will lose access immediately. This cannot be undone by you — contact a Village administrator to restore access.")) return;
+  // Households where this person is the only adult: deleting them is a separate choice.
+  useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    setBusy(true);
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) { setBusy(false); return; }
-    const { error } = await supabase.from("profiles").update({ status: "removed" }).eq("id", data.user.id);
-    setBusy(false);
-    if (error) { setStatus(error.message); return; }
-    onSignOut();
+    void (async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return;
+      const { data } = await supabase.from("family_members").select("family_id,user_id,families(display_name)");
+      const byFamily = new Map<string, { name: string; others: number }>();
+      for (const row of (data ?? []) as unknown as { family_id: string; user_id: string; families: { display_name: string } | null }[]) {
+        const entry = byFamily.get(row.family_id) ?? { name: row.families?.display_name ?? "your household", others: 0 };
+        if (row.user_id !== user.user.id) entry.others += 1;
+        byFamily.set(row.family_id, entry);
+      }
+      const mine = new Set(((data ?? []) as { family_id: string; user_id: string }[]).filter((row) => row.user_id === user.user!.id).map((row) => row.family_id));
+      setSoleAdultOf([...byFamily].filter(([id, info]) => mine.has(id) && info.others === 0).map(([, info]) => info.name));
+    })();
+  }, []);
+
+  async function deleteAccount() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusy(true); setStatus("");
+    const { data, error } = await supabase.functions.invoke("delete-account", { body: { confirm: "DELETE", deleteHousehold: alsoHousehold && soleAdultOf.length > 0 } });
+    if (error || data?.error) {
+      setStatus(await functionErrorMessage(error, data, "Your account could not be deleted."));
+      setBusy(false); setOpen(false);
+      return;
+    }
+    await disablePush().catch(() => {});
+    await supabase.auth.signOut().catch(() => {});
+    window.location.assign("/family-village?deleted=1");
   }
 
   return <div className="settings-block danger-zone">
     <p className="card-kicker">Delete account</p>
-    <p className="portal-empty">This removes your access to Family Village. Your household and children’s records stay intact for the co-op; an administrator can restore your access later if needed.</p>
-    <button className="danger" onClick={deleteAccount} disabled={busy}>Delete my account</button>
+    <p className="portal-empty">This permanently deletes your account. It can&rsquo;t be undone.</p>
+    <ul className="portal-empty">
+      <li><b>Erased:</b> your sign-in and passkeys, your name, phone and emergency contact, your photo, your notification devices, and every message you sent.</li>
+      <li><b>Stays, without your name:</b> notes, news posts and library photos you added, and records of forms you sent or signed for your household.</li>
+      <li><b>Your household:</b> if another adult is in it, it stays for them. {soleAdultOf.length ? `You are the only adult in ${soleAdultOf.join(" and ")}; you can choose to delete it too.` : ""}</li>
+    </ul>
+    <button className="danger" onClick={() => setOpen(true)} disabled={busy}>Delete my account</button>
     <p className="admin-form-status" role="status">{status}</p>
+
+    {open && <ConfirmDeleteModal
+      title="Delete your account?"
+      description={<>
+        This permanently deletes your account and the personal information listed above, and signs you out. You will get an email confirming it.
+        {soleAdultOf.length > 0 && <span className="danger-choice">
+          <label>
+            <input type="checkbox" checked={alsoHousehold} onChange={(event) => setAlsoHousehold(event.target.checked)} />
+            {" "}Also delete {soleAdultOf.join(" and ")}: its children, enrollments, forms and documents.
+          </label>
+          <small>If you leave this unticked, an administrator is told the household has no adults and closes it out once the co-op&rsquo;s record-keeping needs are met.</small>
+        </span>}
+      </>}
+      confirmLabel="Delete my account permanently"
+      busy={busy}
+      onConfirm={deleteAccount}
+      onCancel={() => setOpen(false)}
+    />}
   </div>;
 }
