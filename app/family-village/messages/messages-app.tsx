@@ -59,6 +59,7 @@ export default function MessagesApp() {
         setTick((n) => n + 1);
         void loadConversations();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, () => setTick((n) => n + 1))
       .subscribe();
     // The poll is the safety net for a dropped connection.
     const timer = setInterval(() => { setTick((n) => n + 1); void loadConversations(); }, POLL_MS);

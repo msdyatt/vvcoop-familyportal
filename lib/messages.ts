@@ -14,10 +14,17 @@ export type Person = { user_id: string; display_name: string; avatar_path: strin
 export type MessageRow = {
   id: string; conversation_id: string; sender_id: string | null;
   body: string | null; image_path: string | null; created_at: string; deleted_at: string | null;
-  post_id: string | null;
+  post_id: string | null; reply_to: string | null;
+  /** The message this one answers, embedded by the select below. */
+  reply: { id: string; sender_id: string | null; body: string | null; image_path: string | null; deleted_at: string | null } | null;
 };
 
-export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,post_id";
+export type Reaction = { message_id: string; user_id: string; emoji: string };
+
+/** The reactions on offer. The same list is enforced in the database. */
+export const REACTIONS = ["👍", "❤️", "😂", "🎉", "🙏", "😮"] as const;
+
+export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,post_id,reply_to,reply:messages!reply_to(id,sender_id,body,image_path,deleted_at)";
 
 export function conversationTitle(c: Pick<ConversationRow, "kind" | "title" | "other_name">): string {
   if (c.kind === "direct") return c.other_name ?? "Conversation";
@@ -57,4 +64,25 @@ export function dayLabel(iso: string, now = new Date()): string {
   const yesterday = new Date(now.getTime() - 86_400_000);
   if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
   return date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Splits a message into plain text and @mentions of people in the conversation,
+ * longest names first so "@Sam Dyatt" wins over "@Sam".
+ */
+export function splitMentions(body: string, names: string[]): { text: string; mention: boolean }[] {
+  const usable = [...new Set(names.filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (!usable.length || !body.includes("@")) return [{ text: body, mention: false }];
+  const pattern = new RegExp(`(@(?:${usable.map(escapeRegExp).join("|")}))(?![\\p{L}\\p{N}])`, "u");
+  // With one capture group, split() puts every match at an odd index.
+  return body.split(pattern).map((text, index) => ({ text, mention: index % 2 === 1 })).filter((part) => part.text !== "");
+}
+
+/** A short plain-text stand-in for a message, for reply quotes. */
+export function snippet(message: { body: string | null; image_path: string | null; deleted_at: string | null }, max = 80): string {
+  if (message.deleted_at) return "Message removed";
+  if (message.body) return message.body.length > max ? `${message.body.slice(0, max)}…` : message.body;
+  return message.image_path ? "Photo" : "";
 }
