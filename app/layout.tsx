@@ -44,16 +44,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <head>
       {/* Playfair Display carries the high-contrast display serif the brand
           guide specifies for headings. Inter is the body face; the CSS stack
-          falls through to the platform UI sans, which the guide allows. */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-      {/* eslint-disable-next-line @next/next/no-page-custom-font -- that rule targets the
-          pages router, where a per-page <link> would load for one route only. This is the
-          app-router root layout, so the stylesheet applies to every page. */}
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
-      />
+          falls through to the platform UI sans, which the guide allows. Both
+          are hosted here (see the @font-face rules at the top of globals.css),
+          and the two Latin files are fetched early because every page uses them. */}
+      <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="" />
+      <link rel="preload" href="/fonts/playfair-display-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="" />
     </head>
     <body>
       <ErrorReporter />
