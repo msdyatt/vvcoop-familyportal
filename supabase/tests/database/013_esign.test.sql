@@ -118,17 +118,18 @@ select is((select count(*)::int from public.sign_signers where request_id in (se
 select is((select user_id::text from public.sign_signers s join public.sign_requests r on r.id = s.request_id
            where r.family_id = '00000000-0000-0000-0000-0000000000f1' and s.slot = 1), '00000000-0000-0000-0000-0000000000b1',
           'slot 1 is the adult who joined first');
+select is((select r -> 'skipped' -> 0 ->> 'reason' from (select public.sign_send('00000000-0000-0000-0000-0000000000d1', array['00000000-0000-0000-0000-0000000000f1']::uuid[]) as r) x),
+  'already_sent', 'sending the same document to the same household twice is refused');
+select throws_ok($$select public.sign_save_fields('00000000-0000-0000-0000-0000000000d1', null, '[]'::jsonb)$$,
+  'P0001', 'This document has been sent, so its fields are locked. Make a copy to change them.', 'once sent, the fields are frozen');
+reset role;
+
 select is((select count(*)::int from public.notifications where kind = 'sign_request'), 4, 'every signer is notified in the app');
 select is((select count(*)::int from public.email_outbox where kind = 'sign_request' and html_body like '%Liability%'), 4, 'and by email');
 select is((select count(*)::int from public.email_outbox where kind = 'sign_request' and html_body like '%http%' and html_body not like '%family.veritasvillage.org/family-village/paperwork%'), 0, 'the only link is to the portal''s own paperwork page');
 select is((select count(*)::int from public.sign_events where action in ('created', 'sent')), 4, 'creating and sending are in the audit trail');
 select is((select count(*)::int from public.audit_log where action = 'sign_request_sent'), 2, 'and in the administrators'' activity log');
 
-select is((select r -> 'skipped' -> 0 ->> 'reason' from (select public.sign_send('00000000-0000-0000-0000-0000000000d1', array['00000000-0000-0000-0000-0000000000f1']::uuid[]) as r) x),
-  'already_sent', 'sending the same document to the same household twice is refused');
-select throws_ok($$select public.sign_save_fields('00000000-0000-0000-0000-0000000000d1', null, '[]'::jsonb)$$,
-  'P0001', 'This document has been sent, so its fields are locked. Make a copy to change them.', 'once sent, the fields are frozen');
-reset role;
 
 select throws_ok($$update public.sign_templates set sha256 = repeat('c', 64) where id = '00000000-0000-0000-0000-0000000000d1'$$,
   'P0001', 'This document has been sent, so its file is locked.', 'and so is the file, by its hash');
