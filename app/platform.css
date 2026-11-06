@@ -199,8 +199,46 @@ html[data-app] .child-detail-close {
   min-height: 44px;
 }
 
+/* A compact header: logo and the bell and profile on one row, the page title under it. */
+html[data-app] .app-header {
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 14px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  padding-bottom: 12px;
+}
+
+html[data-app] .app-header-brand {
+  flex: 1;
+}
+
+html[data-app] .app-header-actions {
+  flex-wrap: nowrap;
+  gap: 10px;
+  width: auto;
+}
+
+html[data-app] .app-header-title {
+  flex: 1 1 100%;
+  order: 3;
+  min-width: 0;
+}
+
+html[data-app] .app-header-title h1 {
+  font-size: 22px;
+}
+
+html[data-app] .app-header-title p {
+  display: none;
+}
+
+/* Messages fills the screen between the header and the bar, edge to edge, like a messaging app. */
 html[data-app] .messages-shell {
-  height: calc(100dvh - 190px - var(--tabbar-space) - env(safe-area-inset-bottom));
+  height: calc(100dvh - 142px - env(safe-area-inset-top) - var(--tabbar-space) - env(safe-area-inset-bottom));
+  margin: 0 calc(-1 * var(--portal-pad));
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
 }
 
 /* The bar already covers the home-indicator area, so the composer needs no extra inset. */
@@ -267,9 +305,9 @@ html[data-app][data-platform="ios"] dialog.child-detail-panel::backdrop {
 }
 
 /* Capsule controls with a comfortable touch target. */
-html[data-app][data-platform="ios"] .workspace-preview .workspace-main button:not(.account-avatar-button):not(.app-tab),
-html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.account-avatar-button):not(.app-tab),
-html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb):not(.account-avatar-button):not(.app-tab),
+html[data-app][data-platform="ios"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab),
+html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.app-header button):not(.app-tab),
+html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab),
 html[data-app][data-platform="ios"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn) {
   min-height: 44px;
   padding: 10px 20px;
@@ -284,7 +322,6 @@ html[data-app][data-platform="ios"] textarea {
   border-radius: 14px;
 }
 
-html[data-app][data-platform="ios"] .messages-shell,
 html[data-app][data-platform="ios"] .photos-pending {
   border-radius: 22px;
   overflow: hidden;
@@ -362,9 +399,9 @@ html[data-app][data-platform="android"] dialog.child-detail-panel::before {
   background: rgba(var(--navy-rgb), .4);
 }
 
-html[data-app][data-platform="android"] .workspace-preview .workspace-main button:not(.account-avatar-button):not(.app-tab),
-html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.account-avatar-button):not(.app-tab),
-html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb):not(.account-avatar-button):not(.app-tab),
+html[data-app][data-platform="android"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab),
+html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.app-header button):not(.app-tab),
+html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab),
 html[data-app][data-platform="android"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn) {
   min-height: 48px;
   padding: 10px 24px;

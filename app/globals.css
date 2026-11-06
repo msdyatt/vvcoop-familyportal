@@ -6296,7 +6296,7 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   gap:8px;
 }
 
-.messages-back {
+.messages-icon-btn.messages-back {
   display:none;
 }
 
@@ -6546,8 +6546,8 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   .messages-list {
     border-right:0;
   }
-  .messages-back {
-    display:inline-block;
+  .messages-icon-btn.messages-back {
+    display:grid;
   }
   .messages-thread-actions .ghost {
     padding:8px 10px;
@@ -6942,4 +6942,38 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 .messaging-creator-option small {
   grid-column:2;
   color:var(--sage-text);
+}
+
+/* ---- Conversation header and composer: icon buttons ----------------------- */
+.messages-icon-btn {
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  width:40px;
+  height:40px;
+  padding:0;
+  color:var(--navy);
+  background:transparent;
+  border:0;
+  border-radius:50%;
+  cursor:pointer;
+}
+
+.messages-icon-btn:hover {
+  background:var(--panel);
+}
+
+.messages-icon-btn.send {
+  color:var(--cream);
+  background:var(--navy);
+}
+
+.messages-icon-btn.send:disabled {
+  opacity:.35;
+}
+
+.messages-thread-title b {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
