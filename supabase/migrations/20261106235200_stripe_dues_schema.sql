@@ -1280,6 +1280,7 @@ declare
   v_inst uuid;
   v_exist record;
   v_id uuid;
+  v_saved boolean;
 begin
   if v_provider = 'off' then raise exception 'online_payments_off'; end if;
   select * into c from public.dues_charges where id = p_charge for update;
@@ -1313,14 +1314,16 @@ begin
     v_amount := least(coalesce(v_amount, v_balance), v_balance);
   end if;
 
+  -- Automatic payments only make sense with a plan to collect against.
+  v_saved := coalesce(p_autopay, false) and pl.id is not null;
   insert into public.dues_payments (charge_id, family_id, installment_id, direction, amount_cents, status, source, livemode,
     saved_for_autopay, initiated_by)
-  values (p_charge, c.family_id, v_inst, 'charge', v_amount, 'pending', 'portal', v_provider = 'stripe_live',
-    coalesce(p_autopay, false) and pl.id is not null, p_user)
+  values (p_charge, c.family_id, v_inst, 'charge', v_amount, 'pending', 'portal', v_provider = 'stripe_live', v_saved, p_user)
   returning id into v_id;
 
   return jsonb_build_object('payment_id', v_id, 'amount_cents', v_amount, 'existing', false, 'status', 'pending',
-    'checkout_session_id', null, 'family_id', c.family_id);
+    'checkout_session_id', null, 'family_id', c.family_id, 'saved_for_autopay', v_saved, 'installment_id', v_inst,
+    'livemode', v_provider = 'stripe_live');
 end;
 $function$;
 
