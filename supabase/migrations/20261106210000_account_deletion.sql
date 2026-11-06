@@ -16,49 +16,49 @@
 
 -- --- records that keep going without the person --------------------------------
 alter table public.audit_log alter column actor_user_id drop not null;
-alter table public.audit_log drop constraint audit_log_actor_user_id_fkey,
+alter table public.audit_log drop constraint if exists audit_log_actor_user_id_fkey,
   add constraint audit_log_actor_user_id_fkey foreign key (actor_user_id) references public.profiles(id) on delete set null;
 
-alter table public.documents drop constraint documents_uploaded_by_user_id_fkey,
+alter table public.documents drop constraint if exists documents_uploaded_by_user_id_fkey,
   add constraint documents_uploaded_by_user_id_fkey foreign key (uploaded_by_user_id) references public.profiles(id) on delete set null;
 
 alter table public.enrollment_requests alter column requested_by drop not null;
-alter table public.enrollment_requests drop constraint enrollment_requests_requested_by_fkey,
+alter table public.enrollment_requests drop constraint if exists enrollment_requests_requested_by_fkey,
   add constraint enrollment_requests_requested_by_fkey foreign key (requested_by) references public.profiles(id) on delete set null;
 
-alter table public.family_requirements drop constraint family_requirements_signed_by_user_id_fkey,
+alter table public.family_requirements drop constraint if exists family_requirements_signed_by_user_id_fkey,
   add constraint family_requirements_signed_by_user_id_fkey foreign key (signed_by_user_id) references public.profiles(id) on delete set null;
-alter table public.family_requirements drop constraint family_requirements_updated_by_fkey,
+alter table public.family_requirements drop constraint if exists family_requirements_updated_by_fkey,
   add constraint family_requirements_updated_by_fkey foreign key (updated_by) references public.profiles(id) on delete set null;
 
-alter table public.integration_settings drop constraint integration_settings_updated_by_fkey,
+alter table public.integration_settings drop constraint if exists integration_settings_updated_by_fkey,
   add constraint integration_settings_updated_by_fkey foreign key (updated_by) references public.profiles(id) on delete set null;
 
 alter table public.invitations alter column invited_by_user_id drop not null;
-alter table public.invitations drop constraint invitations_invited_by_user_id_fkey,
+alter table public.invitations drop constraint if exists invitations_invited_by_user_id_fkey,
   add constraint invitations_invited_by_user_id_fkey foreign key (invited_by_user_id) references public.profiles(id) on delete set null;
 
 alter table public.media alter column uploaded_by_user_id drop not null;
-alter table public.media drop constraint media_uploaded_by_user_id_fkey,
+alter table public.media drop constraint if exists media_uploaded_by_user_id_fkey,
   add constraint media_uploaded_by_user_id_fkey foreign key (uploaded_by_user_id) references public.profiles(id) on delete set null;
-alter table public.media_consents drop constraint media_consents_approved_by_user_id_fkey,
+alter table public.media_consents drop constraint if exists media_consents_approved_by_user_id_fkey,
   add constraint media_consents_approved_by_user_id_fkey foreign key (approved_by_user_id) references public.profiles(id) on delete set null;
 
 alter table public.posts alter column author_user_id drop not null;
-alter table public.posts drop constraint posts_author_user_id_fkey,
+alter table public.posts drop constraint if exists posts_author_user_id_fkey,
   add constraint posts_author_user_id_fkey foreign key (author_user_id) references public.profiles(id) on delete set null;
 
-alter table public.signature_requests drop constraint signature_requests_requested_by_user_id_fkey,
+alter table public.signature_requests drop constraint if exists signature_requests_requested_by_user_id_fkey,
   add constraint signature_requests_requested_by_user_id_fkey foreign key (requested_by_user_id) references public.profiles(id) on delete set null;
 
 alter table public.teacher_notes alter column author_user_id drop not null;
-alter table public.teacher_notes drop constraint teacher_notes_author_user_id_fkey,
+alter table public.teacher_notes drop constraint if exists teacher_notes_author_user_id_fkey,
   add constraint teacher_notes_author_user_id_fkey foreign key (author_user_id) references public.profiles(id) on delete set null;
 
 -- --- things that are only the person's own go with them ----------------------------
-alter table public.print_requests drop constraint print_requests_requested_by_user_id_fkey,
+alter table public.print_requests drop constraint if exists print_requests_requested_by_user_id_fkey,
   add constraint print_requests_requested_by_user_id_fkey foreign key (requested_by_user_id) references public.profiles(id) on delete cascade;
-alter table public.teacher_note_reads drop constraint teacher_note_reads_user_id_fkey,
+alter table public.teacher_note_reads drop constraint if exists teacher_note_reads_user_id_fkey,
   add constraint teacher_note_reads_user_id_fkey foreign key (user_id) references public.profiles(id) on delete cascade;
 
 -- --- erasing a person's data ----------------------------------------------------------
