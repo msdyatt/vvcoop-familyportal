@@ -19,7 +19,7 @@ export default function AccountSettings({ email, onProfileUpdated }: { email: st
     <PushSection />
     <CalendarSection />
     <DangerZone />
-    <p className="portal-legal-links"><a href="/privacy">Privacy policy</a> · <a href="/terms">Terms</a></p>
+    <p className="portal-legal-links"><a href="/privacy">Privacy policy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></p>
   </div>;
 }
 
