@@ -182,6 +182,8 @@ select throws_ok($$select public.sign_give_consent((select id from public.sign_r
 reset role;
 
 -- Each other way an account can be unfinished, one at a time (P3 stands in).
+-- No signed-in identity here: the profile guards treat any other caller as self-service.
+select set_config('request.jwt.claims', '', true);
 update public.profiles set status = 'pending' where id = '00000000-0000-0000-0000-0000000000b3';
 select is(private.signing_blockers('00000000-0000-0000-0000-0000000000b3'), array['account_not_active'], 'an inactive profile cannot sign');
 update public.profiles set status = 'active' where id = '00000000-0000-0000-0000-0000000000b3';
