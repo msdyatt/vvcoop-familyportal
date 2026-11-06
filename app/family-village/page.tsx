@@ -16,6 +16,7 @@ export default function FamilyVillageSignIn() {
       <p className="portal-entry-copy">Family Village brings classes, teacher notes, announcements, calendars, photographs, and signed documents together in one private place.</p>
       <SignInPanel />
       <a className="preview-link" href="/family-village/preview">Preview the family experience →</a>
+      <p className="portal-legal-links"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
     </section>
   </main>;
 }
