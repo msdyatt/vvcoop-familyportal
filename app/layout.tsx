@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./platform.css";
+import { PLATFORM_SCRIPT } from "../lib/platform";
 import ErrorReporter from "./error-reporter";
 import GlobalErrorBoundary from "./global-error-boundary";
 
@@ -40,8 +42,10 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en">
+  return <html lang="en" suppressHydrationWarning>
     <head>
+      {/* Marks the page as iOS/Android and app/installed/browser before it paints, so platform styling never flashes in. */}
+      <script dangerouslySetInnerHTML={{ __html: PLATFORM_SCRIPT }} />
       {/* Playfair Display carries the high-contrast display serif the brand
           guide specifies for headings. Inter is the body face; the CSS stack
           falls through to the platform UI sans, which the guide allows. */}

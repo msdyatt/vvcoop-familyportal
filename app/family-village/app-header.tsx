@@ -12,6 +12,7 @@ import NotificationBell from "./notification-bell";
 import MessagesLink from "./messages/messages-link";
 import { getSignedFileUrl } from "../../lib/storage";
 import { disablePush } from "../../lib/push";
+import AppTabBar from "./app-tab-bar";
 
 type PortalKey = "home" | "admin" | "teacher";
 
@@ -82,6 +83,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
         </div>
       </div>
     </header>
+    <AppTabBar roles={roles} onOpenAccount={() => setAccountOpen(true)} onTour={() => {}} onSignOut={signOut} />
     {accountOpen && <DetailModal title="Account & security" onClose={() => setAccountOpen(false)}>
       <AccountSettings email={email} onSignOut={signOut} onProfileUpdated={loadProfile} />
     </DetailModal>}
