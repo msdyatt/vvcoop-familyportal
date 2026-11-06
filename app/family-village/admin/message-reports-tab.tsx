@@ -11,6 +11,10 @@ type Report = {
   reporter_name: string; sender_name: string; conversation_title: string; conversation_kind: string;
   body: string | null; image_path: string | null; message_deleted: boolean;
 };
+type PhotoReport = {
+  id: string; photo_id: string; status: "open" | "actioned" | "dismissed"; reason: string; created_at: string;
+  reporter_name: string; uploader_name: string; caption: string | null; class_title: string | null; thumb_path: string; storage_path: string;
+};
 type ContextRow = { id: string; sender_name: string; body: string | null; image_path: string | null; created_at: string; is_reported: boolean; deleted: boolean };
 
 const STATUS_LABEL = { open: "Needs review", actioned: "Message removed", dismissed: "Dismissed" } as const;
@@ -27,10 +31,18 @@ export default function MessageReportsTab() {
   const [images, setImages] = useState<Map<string, string>>(new Map());
   const [context, setContext] = useState<{ report: Report; rows: ContextRow[] } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [photoReports, setPhotoReports] = useState<PhotoReport[]>([]);
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+    const photoResult = await supabase.rpc("admin_photo_reports");
+    const photoRows = (photoResult.data ?? []) as PhotoReport[];
+    setPhotoReports(photoRows);
+    if (photoRows.length) {
+      const urls = await getSignedFileUrls(supabase, photoRows.map((row) => row.thumb_path));
+      setImages((previous) => new Map([...previous, ...urls]));
+    }
     const { data, error } = await supabase.rpc("admin_message_reports");
     if (error) { setStatus(error.message); setLoaded(true); return; }
     const rows = (data ?? []) as Report[];
@@ -70,6 +82,19 @@ export default function MessageReportsTab() {
     await load();
   }
 
+  async function resolvePhoto(report: PhotoReport, action: "remove" | "dismiss") {
+    if (action === "remove" && !confirm("Remove this photo from the library for everyone?")) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusyId(report.id); setStatus("");
+    const { data, error } = await supabase.rpc("resolve_photo_report", { p_report_id: report.id, p_action: action });
+    if (error) { setStatus(error.message); setBusyId(null); return; }
+    if (Array.isArray(data) && data.length) await supabase.storage.from(PRIVATE_BUCKET).remove(data as string[]);
+    setBusyId(null);
+    setStatus(action === "remove" ? "The photo was removed." : "The report was dismissed.");
+    await load();
+  }
+
   const open = reports.filter((report) => report.status === "open");
   const closed = reports.filter((report) => report.status !== "open");
 
@@ -98,7 +123,30 @@ export default function MessageReportsTab() {
     </div>
   </article>;
 
+  const openPhotos = photoReports.filter((report) => report.status === "open");
+  const photoCard = (report: PhotoReport) => <article key={report.id} className="record-card">
+    <div className="record-head">
+      <b>{report.caption ?? "Untitled photo"}</b>
+      <span className="status-pill outstanding">Needs review</span>
+    </div>
+    <p className="portal-empty">{report.class_title ? `Class: ${report.class_title} · ` : ""}added by {report.uploader_name} · reported by {report.reporter_name} · {shortTime(report.created_at)}</p>
+    <p><b>Reason:</b> {report.reason}</p>
+    {images.get(report.thumb_path) && (
+      // eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage
+      <img className="messages-report-photo" src={images.get(report.thumb_path)} alt="Reported library item" />
+    )}
+    <div className="row-actions">
+      <button type="button" className="danger" disabled={busyId === report.id} onClick={() => resolvePhoto(report, "remove")}>Remove photo</button>
+      <button type="button" className="ghost" disabled={busyId === report.id} onClick={() => resolvePhoto(report, "dismiss")}>Dismiss</button>
+    </div>
+  </article>;
+
   return <section className="admin-section">
+    <p className="eyebrow">Photos</p>
+    <h2>Reported photos</h2>
+    {loaded && !openPhotos.length && <p className="portal-empty">No photos are waiting for review.</p>}
+    {openPhotos.map(photoCard)}
+
     <p className="eyebrow">Messages</p>
     <h2>Reported messages</h2>
     <p className="portal-empty">Private conversations are not browsable. You see a message only when a member reports it, and viewing it is recorded in the activity log.</p>
