@@ -23,7 +23,8 @@ const ComplianceTab = dynamic(() => import("./compliance-tab"));
 const ReportsTab = dynamic(() => import("./reports-tab"));
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-type Tab = "dashboard" | "invitations" | "families" | "classes" | "compliance" | "news" | "reports" | "activity" | "message-reports" | "integrations";
+const TABS = ["dashboard", "invitations", "families", "classes", "compliance", "news", "reports", "activity", "message-reports", "integrations"] as const;
+type Tab = (typeof TABS)[number];
 
 async function signOutToEntry() {
   await getSupabaseBrowserClient()?.auth.signOut();
@@ -32,7 +33,18 @@ async function signOutToEntry() {
 
 export default function AdminWorkspace() {
   const { state: access, userId, roles, recheck } = usePortalAccess("admin");
-  const [tab, setTab] = useState<Tab>("dashboard");
+  // The bottom bar links straight to a tab with ?tab=, so read it once on load.
+  const [tab, setTabState] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const wanted = new URLSearchParams(window.location.search).get("tab");
+    return (TABS as readonly string[]).includes(wanted ?? "") ? (wanted as Tab) : "dashboard";
+  });
+  function setTab(next: Tab) {
+    setTabState(next);
+    // Keep the address (and the bottom bar's highlight) in step with the tab.
+    window.history.replaceState(null, "", next === "dashboard" ? window.location.pathname : `?tab=${next}`);
+    window.dispatchEvent(new Event("vv-locationchange"));
+  }
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [familyName, setFamilyName] = useState(""); const [adminName, setAdminName] = useState(""); const [email, setEmail] = useState(""); const [note, setNote] = useState("");
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false); const [rowBusy, setRowBusy] = useState<string | null>(null); const [listMessage, setListMessage] = useState("");
@@ -59,7 +71,7 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="compliance">Compliance</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Reports</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="compliance">Compliance</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Flagged messages</option><option value="integrations">Integrations</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
@@ -71,7 +83,7 @@ export default function AdminWorkspace() {
       <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News &amp; calendar</button>
       <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
       <button className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}>Activity</button>
-      <button className={tab === "message-reports" ? "active" : ""} onClick={() => setTab("message-reports")}>Reports</button>
+      <button className={tab === "message-reports" ? "active" : ""} onClick={() => setTab("message-reports")}>Flagged messages</button>
       <button className={tab === "integrations" ? "active" : ""} onClick={() => setTab("integrations")}>Integrations</button>
     </nav>
     <div className="admin-workspace-main">

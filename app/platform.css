@@ -83,13 +83,14 @@ html[data-app] .app-header .portal-nav {
   display: none;
 }
 
-/* Like iOS and Android, hide the bar while a conversation is open so the composer has the room. */
-html[data-app] body:has(.messages-shell[data-view="thread"]) .app-tabbar {
-  display: none;
+/* The bar stays put in a conversation too. Only the on-screen keyboard
+   borrows its space (see AppTabBar, which sets data-kb while a field has focus). */
+html[data-app][data-platform][data-kb] {
+  --tabbar-space: 0px;
 }
 
-html[data-app] body:has(.messages-shell[data-view="thread"]) {
-  padding-bottom: 0;
+html[data-app][data-kb] .app-tabbar {
+  display: none;
 }
 
 .app-tab {
@@ -202,8 +203,9 @@ html[data-app] .messages-shell {
   height: calc(100dvh - 190px - var(--tabbar-space) - env(safe-area-inset-bottom));
 }
 
-html[data-app] .messages-shell[data-view="thread"] {
-  height: calc(100dvh - 150px);
+/* The bar already covers the home-indicator area, so the composer needs no extra inset. */
+html[data-app] .messages-composer {
+  padding-bottom: 10px;
 }
 
 /* The main action of Messages as a floating button on Android. */
@@ -265,10 +267,10 @@ html[data-app][data-platform="ios"] dialog.child-detail-panel::backdrop {
 }
 
 /* Capsule controls with a comfortable touch target. */
-html[data-app][data-platform="ios"] .workspace-preview .workspace-main button,
-html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish),
-html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb),
-html[data-app][data-platform="ios"] dialog button:not(.child-detail-close):not(.app-menu button) {
+html[data-app][data-platform="ios"] .workspace-preview .workspace-main button:not(.account-avatar-button):not(.app-tab),
+html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.account-avatar-button):not(.app-tab),
+html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb):not(.account-avatar-button):not(.app-tab),
+html[data-app][data-platform="ios"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn) {
   min-height: 44px;
   padding: 10px 20px;
   font-size: 15px;
@@ -360,10 +362,10 @@ html[data-app][data-platform="android"] dialog.child-detail-panel::before {
   background: rgba(var(--navy-rgb), .4);
 }
 
-html[data-app][data-platform="android"] .workspace-preview .workspace-main button,
-html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish),
-html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb),
-html[data-app][data-platform="android"] dialog button:not(.child-detail-close):not(.app-menu button) {
+html[data-app][data-platform="android"] .workspace-preview .workspace-main button:not(.account-avatar-button):not(.app-tab),
+html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.account-avatar-button):not(.app-tab),
+html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb):not(.account-avatar-button):not(.app-tab),
+html[data-app][data-platform="android"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn) {
   min-height: 48px;
   padding: 10px 24px;
   font-size: 14px;
@@ -450,4 +452,78 @@ html[data-app][data-platform="android"] .messages-list-head button {
     animation: none;
     transition: none;
   }
+}
+
+/* ---- Bottom-bar editor --------------------------------------------------- */
+.bar-customizer h3 {
+  margin: 18px 0 8px;
+  font-size: 15px;
+}
+
+.bar-sections {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 4px;
+}
+
+.bar-sections button {
+  flex: 1;
+  padding: 8px 10px;
+  color: var(--navy);
+  background: none;
+  border: 1px solid rgba(var(--navy-rgb), .25);
+  border-radius: 999px;
+}
+
+.bar-sections button.active {
+  color: var(--cream);
+  background: var(--navy);
+}
+
+.bar-chosen {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-chosen li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(var(--navy-rgb), .1);
+}
+
+.bar-chosen-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.bar-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.bar-group {
+  margin: 10px 0;
+}
+
+.bar-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bar-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 18px;
 }
