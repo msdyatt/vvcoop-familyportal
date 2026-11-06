@@ -32,7 +32,7 @@ before the first submission.
 ```
 cd mobile
 npm ci
-npx cap sync            # after changing www/ or capacitor.config.ts
+npx cap sync            # after changing www/ or capacitor.config.ts (also run it after a fresh clone: it creates ios/App/CapApp-SPM/symlinks)
 npm run assets          # after changing anything in assets/ (icon, splash)
 npx cap open ios        # Xcode
 npx cap open android    # Android Studio
