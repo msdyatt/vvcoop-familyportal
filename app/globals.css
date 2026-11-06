@@ -5292,6 +5292,101 @@ footer nav a:hover {
   color:var(--sage-text);
 }
 
+/* --- Dues payments ---------------------------------------------------------- */
+.dues-page { display:grid; gap:20px; align-content:start; }
+
+.dues-test-banner,
+.dues-flash,
+.dues-error {
+  margin:0;
+  padding:12px 16px;
+  font-size:14px;
+  border-left:4px solid var(--sage);
+  background:var(--surface);
+  color:var(--navy);
+}
+
+.dues-test-banner { background:var(--warm-tint); border-left-color:var(--terracotta); color:var(--terracotta-deep); }
+.dues-error { background:var(--warm-tint); border-left-color:var(--terracotta); color:var(--terracotta-deep); }
+
+.dues-card {
+  display:grid;
+  gap:16px;
+  padding:22px;
+  background:var(--surface);
+  border:1px solid rgba(var(--navy-rgb),.12);
+  border-left:4px solid var(--terracotta);
+}
+
+.dues-card.settled { border-left-color:var(--sage); }
+
+.dues-card-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  flex-wrap:wrap;
+}
+
+.dues-card h2 { margin:2px 0 0; }
+.dues-card h3 { margin:0 0 8px; font:600 15px var(--sans); color:var(--navy); }
+.dues-due { margin:4px 0 0; color:var(--terracotta-deep); font-size:13px; }
+.dues-note { margin:0; color:var(--sage-text); font-size:13px; line-height:1.5; }
+
+.dues-breakdown { display:grid; gap:6px; margin:0; max-width:520px; }
+.dues-breakdown div { display:flex; justify-content:space-between; gap:16px; font-size:14px; }
+.dues-breakdown dt { color:var(--sage-text); }
+.dues-breakdown dd { margin:0; font-variant-numeric:tabular-nums; color:var(--navy); }
+.dues-breakdown .total { padding-top:8px; border-top:1px solid rgba(var(--navy-rgb),.15); font-weight:600; }
+.dues-breakdown .balance { font:600 18px var(--sans); color:var(--terracotta-deep); }
+.dues-card.settled .dues-breakdown .balance { color:var(--sage-text); }
+
+.dues-schedule ol { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.dues-schedule li {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:8px 12px;
+  background:rgba(var(--navy-rgb),.04);
+  font-size:14px;
+}
+.dues-schedule li span:first-child { flex:1; color:var(--navy); }
+.dues-schedule li b { font-variant-numeric:tabular-nums; }
+.dues-schedule li.paid { opacity:.7; }
+.dues-schedule li.overdue { background:var(--warm-tint); }
+
+.dues-choice { display:grid; gap:10px; margin:0; padding:14px 16px; border:1px solid rgba(var(--navy-rgb),.2); }
+.dues-choice legend { padding:0 6px; font:600 14px var(--sans); color:var(--navy); }
+.dues-choice label,
+.dues-agree { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--navy); cursor:pointer; }
+
+.dues-autopay { margin:0; font-size:13px; color:var(--sage-text); }
+
+.dues-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.dues-card .link {
+  padding:0;
+  background:none;
+  border:0;
+  color:var(--terracotta-deep);
+  font:600 13px var(--sans);
+  text-decoration:underline;
+  cursor:pointer;
+}
+
+.dues-history table { width:100%; border-collapse:collapse; font-size:14px; }
+.dues-history th { text-align:left; padding:6px 8px; color:var(--sage-text); font:600 12px var(--sans); border-bottom:1px solid rgba(var(--navy-rgb),.15); }
+.dues-history td { padding:10px 8px; vertical-align:top; border-bottom:1px solid rgba(var(--navy-rgb),.08); font-variant-numeric:tabular-nums; }
+.dues-history td small { display:block; margin-top:4px; color:var(--terracotta-deep); }
+
+.dues-footnote { margin:0; color:var(--sage-text); font-size:12px; line-height:1.5; }
+
+@media (max-width:640px) {
+  .dues-history thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  .dues-history tr { display:grid; gap:2px; padding:10px 0; border-bottom:1px solid rgba(var(--navy-rgb),.12); }
+  .dues-history td { display:flex; justify-content:space-between; gap:12px; padding:2px 0; border:0; }
+  .dues-history td[data-label]::before { content:attr(data-label); color:var(--sage-text); }
+}
+
 /* --- Admin compliance matrix ---------------------------------------------- */
 .compliance-toolbar {
   display:flex;

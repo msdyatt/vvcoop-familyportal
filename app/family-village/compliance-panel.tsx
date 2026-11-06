@@ -2,6 +2,7 @@
 
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl } from "../../lib/storage";
+import DuesLink from "./dues-link";
 import {
   FamilyRequirement, Requirement, formatDate, formatMoney,
   isSettled, outstandingCount, statusLabel, statusTone,
@@ -80,8 +81,7 @@ function ComplianceRow({ item }: { item: ComplianceItem }) {
     <div className="compliance-item-action">
       {/* Dues outstanding -- straight out to Crowded, which is where the co-op
           actually banks. The portal records receipt, it does not take payment. */}
-      {!settled && isDues && requirement.payment_url &&
-        <a className="compliance-cta" href={requirement.payment_url} target="_blank" rel="noreferrer">Pay now ↗</a>}
+      {isDues && <DuesLink paymentUrl={requirement.payment_url} settled={settled} />}
 
       {/* Two ways a document can be signed. A per-family link from an API send
           takes precedence when one exists, because it is tied to this household;
