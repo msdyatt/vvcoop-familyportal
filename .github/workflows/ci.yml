@@ -185,8 +185,8 @@ jobs:
 
       # supabase/config.toml's [functions.*] verify_jwt values are the
       # authoritative source here -- deploying without them (or with a stale
-      # value) can silently flip a function's platform-level JWT gate. Two of
-      # these (opensign-send, opensign-sync) handle their own CORS preflight
+      # value) can silently flip a function's platform-level JWT gate. Some of
+      # these (esign-seal, for one) handle their own CORS preflight
       # and must stay verify_jwt=false, or their OPTIONS requests -- which
       # carry no Authorization header -- get rejected before the function's
       # own OPTIONS branch ever runs. See config.toml's own note on this.

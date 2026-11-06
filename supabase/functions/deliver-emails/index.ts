@@ -20,12 +20,12 @@ import { corsHeaders, json } from "../_shared/http.ts";
  *   { mode: "process" }        -- drains the pending outbox. No user session
  *                                  (pg_cron has none); gated instead by a
  *                                  shared secret header, also Vault-stored,
- *                                  matching the fail-closed pattern already
- *                                  used by opensign-webhook.
+ *                                  matching the fail-closed pattern used by
+ *                                  printer-dispatch.
  *   { mode: "test", to }       -- one-off send to confirm the connection,
  *                                  gated by a normal admin session like every
  *                                  other admin-invoked function in this
- *                                  project (opensign-send, opensign-sync).
+ *                                  project (delete-account, demo-accounts).
  */
 
 

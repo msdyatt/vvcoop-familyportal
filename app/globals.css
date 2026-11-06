@@ -7638,3 +7638,6 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   .field-editor-layout, .send-panel-grid { grid-template-columns:1fr; }
   .field-editor-side { position:static; max-height:none; }
 }
+
+.sent-verify { display:grid; gap:6px; }
+.sent-verify summary { cursor:pointer; font-size:13px; color:var(--sage-text); }

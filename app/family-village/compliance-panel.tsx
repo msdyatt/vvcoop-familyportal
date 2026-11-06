@@ -96,16 +96,8 @@ function ComplianceRow({ item, signing }: { item: ComplianceItem; signing?: Sign
           {signing.status === "completed" ? "View signed copy" : signing.status === "signed" ? requestStatusLabel(signing.status) : "Review & sign"}
         </a>}
 
-      {/* Two ways a document can be signed. A per-family link from an API send
-          takes precedence when one exists, because it is tied to this household;
-          otherwise the co-op's shared public template link is used. Both open in
-          a new tab -- OpenSign's signing page fetches inside an iframe but
-          renders nothing, so embedding it would show families an empty box. */}
-      {!settled && !isDues && !signing && (row.signing_url || requirement.public_sign_url) &&
-        <a className="compliance-cta" href={(row.signing_url ?? requirement.public_sign_url)!} target="_blank" rel="noreferrer">Sign now ↗</a>}
-
-      {!settled && !isDues && !signing && !row.signing_url && !requirement.public_sign_url &&
-        <span className="compliance-hint">A signing link will appear here shortly.</span>}
+      {!settled && !isDues && !signing &&
+        <span className="compliance-hint">The co-op has not sent this for signing yet. You will be notified when it arrives.</span>}
 
       {settled && !isDues && !signing && row.signed_document_id &&
         <button className="compliance-cta ghost" onClick={openSignedCopy}>Download copy</button>}

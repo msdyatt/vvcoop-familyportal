@@ -57,6 +57,16 @@ export default function SentList({ refreshKey }: { refreshKey: number }) {
     await loadEvents(id);
   }
 
+  /** Downloads one of the files kept beside a sealed record, and logs that it was asked for. */
+  async function downloadFile(row: Row, file: "signed-content.pdf" | "content-timestamp.tsr" | "sealed-timestamp.tsr") {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    await supabase.rpc("sign_log_download", { p_request: row.id, p_what: file.endsWith(".tsr") ? "timestamp" : "sealed" });
+    const url = await getSignedFileUrl(supabase, `sign/requests/${row.id}/${file}`, 300);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    else setMessage("That file is not there. The second timestamp is best effort and may be missing; see History.");
+  }
+
   async function run(row: Row, action: "remind" | "void" | "seal" | "download") {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
@@ -113,6 +123,12 @@ export default function SentList({ refreshKey }: { refreshKey: number }) {
           {(row.status === "sent" || row.status === "in_progress") && <button type="button" className="ghost" disabled={busyId === row.id} onClick={() => run(row, "remind")}>Remind</button>}
           {row.status === "signed" && <button type="button" className="ghost" disabled={busyId === row.id} onClick={() => run(row, "seal")}>{row.seal_error ? "Try sealing again" : "Finish sealing"}</button>}
           {row.status === "completed" && <button type="button" className="ghost" onClick={() => run(row, "download")}>Download signed PDF</button>}
+          {row.status === "completed" && <details className="sent-verify">
+            <summary>Verification files</summary>
+            <button type="button" className="ghost" onClick={() => downloadFile(row, "signed-content.pdf")}>Signed content (PDF)</button>
+            <button type="button" className="ghost" onClick={() => downloadFile(row, "content-timestamp.tsr")}>Its timestamp (.tsr)</button>
+            <button type="button" className="ghost" onClick={() => downloadFile(row, "sealed-timestamp.tsr")}>Sealed PDF timestamp (.tsr)</button>
+          </details>}
           {row.status !== "completed" && row.status !== "voided" && <button type="button" className="danger" disabled={busyId === row.id} onClick={() => run(row, "void")}>Cancel</button>}
           <button type="button" className="ghost" aria-expanded={openId === row.id} onClick={() => toggle(row.id)}>{openId === row.id ? "Hide history" : "History"}</button>
         </div>

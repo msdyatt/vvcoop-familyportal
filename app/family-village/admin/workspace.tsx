@@ -10,7 +10,7 @@ import AdminDashboard from "./dashboard";
 
 // Every tab used to be a static import, so an admin session downloaded all
 // eight tabs' code (and everything they pull in -- rich text, CSV export,
-// OpenSign/Resend integration wiring...) up front, before ever opening one.
+// the PDF viewer, Resend integration wiring...) up front, before ever opening one.
 // AdminDashboard stays eager since it's what actually renders first; the
 // other seven only cost bytes once someone clicks their tab.
 const FamiliesTab = dynamic(() => import("./families-tab"));
