@@ -11,8 +11,8 @@ type ClassChoice = { id: string; title: string };
  * people who run it, its name, description, who may post, the class it
  * follows, and archiving. The server checks every one of these again.
  */
-export default function ChannelDetails({ conversation, userId, roles, people, onChanged, onLeft, onClose }: {
-  conversation: ConversationRow; userId: string; roles: string[]; people: Person[];
+export default function ChannelDetails({ conversation, userId, roles, people, onToggleMute, onChanged, onLeft, onClose }: {
+  conversation: ConversationRow; userId: string; roles: string[]; people: Person[]; onToggleMute: () => void | Promise<void>;
   onChanged: () => void | Promise<void>; onLeft: () => void; onClose: () => void;
 }) {
   const isAdmin = roles.includes("admin");
@@ -124,6 +124,7 @@ export default function ChannelDetails({ conversation, userId, roles, people, on
     </section>}
 
     <div className="bar-footer">
+      <button type="button" className="ghost" disabled={busy} onClick={() => void onToggleMute()}>{conversation.muted ? "Unmute" : "Mute"}</button>
       {inviteOnly && <button type="button" className="ghost" disabled={busy}
         onClick={() => { if (confirm(`Leave ${conversationTitle(conversation)}?`)) void run("", () => supabase.rpc("leave_conversation", { p_conversation_id: conversation.id }), onLeft); }}>Leave channel</button>}
       {manager && !builtIn && <button type="button" className="ghost" disabled={busy}

@@ -235,19 +235,19 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   const rows = withDaySeparators(messages);
   return <div className="messages-thread">
     <header className="messages-thread-head">
-      <button type="button" className="ghost messages-back" onClick={onBack} aria-label="Back to conversations">← Back</button>
+      <button type="button" className="messages-icon-btn messages-back" onClick={onBack} aria-label="Back to conversations">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+      </button>
       <div className="messages-thread-title">
         <b>{channel ? `# ${title}` : title}</b>
-        {channel && conversation.topic
-          ? <span className="messages-topic">{conversation.topic}</span>
-          : conversation.kind !== "direct" && <button type="button" className="messages-linkish" onClick={() => setShowMembers(true)}>{conversation.member_count} people</button>}
+        <span className="messages-topic">
+          {channel ? conversation.topic ?? `${conversation.member_count} people` : conversation.kind === "direct" ? "" : `${conversation.member_count} people`}
+          {conversation.muted ? " · Muted" : ""}
+        </span>
       </div>
-      <div className="messages-thread-actions">
-        <button type="button" className="ghost" onClick={toggleMute}>{conversation.muted ? "Unmute" : "Mute"}</button>
-        {conversation.kind === "direct" && <button type="button" className="ghost" onClick={blockOther}>Block</button>}
-        {conversation.kind === "group" && <button type="button" className="ghost" onClick={leave}>Leave</button>}
-        {channel && <button type="button" className="ghost" onClick={() => setShowMembers(true)}>Details</button>}
-      </div>
+      <button type="button" className="messages-icon-btn" onClick={() => setShowMembers(true)} aria-label="Conversation details">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+      </button>
     </header>
 
     <div className="messages-scroll" ref={listRef} onScroll={(event) => {
@@ -312,14 +312,18 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
 
     {blocked ? <p className="messages-readonly" role="note">{blocked}</p> : <form className="messages-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => chooseFile(event.target.files?.[0])} />
-      <button type="button" className="ghost messages-attach-button" onClick={() => fileRef.current?.click()} disabled={busy} aria-label="Add a photo">Photo</button>
+      <button type="button" className="messages-icon-btn messages-attach-button" onClick={() => fileRef.current?.click()} disabled={busy} aria-label="Add a photo">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="3" /><circle cx="12" cy="12.5" r="3.5" /><path d="M8.5 5 9.7 3h4.6l1.2 2" /></svg>
+      </button>
       <textarea
         value={draft} rows={1} maxLength={4000} placeholder="Write a message"
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && window.matchMedia("(min-width: 761px)").matches) { event.preventDefault(); void send(); } }}
         aria-label="Message" disabled={busy}
       />
-      <button type="submit" disabled={busy || (!draft.trim() && !photo)}>{busy ? "Sending…" : "Send"}</button>
+      <button type="submit" className="messages-icon-btn send" disabled={busy || (!draft.trim() && !photo)} aria-label={busy ? "Sending" : "Send"}>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6" /></svg>
+      </button>
     </form>}
 
     {reporting && <DetailModal title="Report this message" onClose={() => setReporting(null)}>
@@ -341,7 +345,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     </DetailModal>}
 
     {showMembers && channel && <DetailModal title={`# ${title}`} onClose={() => setShowMembers(false)}>
-      <ChannelDetails conversation={conversation} userId={userId} roles={roles} people={[...people.values()]}
+      <ChannelDetails conversation={conversation} userId={userId} roles={roles} people={[...people.values()]} onToggleMute={toggleMute}
         onChanged={async () => {
           const supabase = getSupabaseBrowserClient();
           if (supabase) {
@@ -353,10 +357,16 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
         onLeft={() => { setShowMembers(false); onBack(); }} onClose={() => setShowMembers(false)} />
     </DetailModal>}
 
-    {showMembers && !channel && <DetailModal title={`${title}: members`} onClose={() => setShowMembers(false)}>
-      <ul className="messages-members">
+    {showMembers && !channel && <DetailModal title={title} onClose={() => setShowMembers(false)}>
+      {conversation.kind !== "direct" && <ul className="messages-members">
         {[...people.values()].map((person) => <li key={person.user_id}>{person.display_name}{person.is_teacher && <i>Teacher</i>}{person.is_admin && <i>Admin</i>}</li>)}
-      </ul>
+      </ul>}
+      <div className="bar-footer">
+        <button type="button" className="ghost" onClick={() => { setShowMembers(false); void toggleMute(); }}>{conversation.muted ? "Unmute" : "Mute"}</button>
+        {conversation.kind === "direct" && <button type="button" className="ghost" onClick={() => { setShowMembers(false); void blockOther(); }}>Block</button>}
+        {conversation.kind === "group" && <button type="button" className="ghost" onClick={() => { setShowMembers(false); void leave(); }}>Leave group</button>}
+        <button type="button" onClick={() => setShowMembers(false)}>Done</button>
+      </div>
     </DetailModal>}
   </div>;
 }
