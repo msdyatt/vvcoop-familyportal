@@ -75,7 +75,7 @@ reset role;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a3","role":"authenticated"}', true);
 set local role authenticated;
 select is((select count(*)::int from public.photos where status = 'pending'), 0, 'a teacher of a different class cannot see the pending photo');
-select throws_ok($$select public.approve_photo('00000000-0000-0000-0000-0000000000e3')$$, 'P0001', 'That photo is not waiting for approval.', 'or approve it');
+select throws_ok($$select public.approve_photo('00000000-0000-0000-0000-0000000000e3')$$, 'P0001', 'Only an administrator or a teacher of the class can approve it.', 'or approve it');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a2","role":"authenticated"}', true);
 set local role authenticated;
