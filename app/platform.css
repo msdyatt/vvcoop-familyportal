@@ -565,11 +565,12 @@ html[data-app][data-platform="android"] .messages-list-head button {
   margin-top: 18px;
 }
 
-/* ---- Status bar strip on the installed iPhone app --------------------------
-   The status bar is transparent there (see appleWebApp in layout.tsx), so the
+/* ---- Status bar strip on the iPhone apps (installed PWA and native) ----------
+   The status bar is transparent there (see appleWebApp in layout.tsx, and
+   ViewController in the iOS project), so the
    page paints a solid navy strip behind the clock and battery. The system
    draws the clock in white, which this keeps readable on every page. */
-html[data-shell="standalone"][data-platform="ios"]::before {
+html[data-app][data-platform="ios"]::before {
   content: "";
   position: fixed;
   z-index: 60;
