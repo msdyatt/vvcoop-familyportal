@@ -5387,6 +5387,42 @@ footer nav a:hover {
   .dues-history td[data-label]::before { content:attr(data-label); color:var(--sage-text); }
 }
 
+.dues-admin { display:grid; gap:18px; align-content:start; }
+.dues-admin-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.dues-admin-head h2 { margin:2px 0 0; }
+.dues-admin-nav { display:flex; gap:8px; flex-wrap:wrap; }
+.dues-admin-nav button { padding:8px 14px; background:transparent; color:var(--navy); border:1px solid rgba(var(--navy-rgb),.25); cursor:pointer; font:600 13px var(--sans); }
+.dues-admin-nav button.active { background:var(--navy); color:var(--cream); }
+.dues-setup { display:grid; gap:12px; padding:16px 18px; background:var(--surface); border:1px solid rgba(var(--navy-rgb),.12); }
+.dues-setup h3 { margin:0; font:600 15px var(--sans); }
+.dues-setup-row { display:flex; flex-wrap:wrap; gap:12px 18px; align-items:center; }
+.dues-setup-row > div { display:grid; flex:1; min-width:220px; }
+.dues-setup-row span { color:var(--sage-text); font-size:13px; }
+.dues-totals { display:flex; gap:12px; flex-wrap:wrap; margin:0; }
+.dues-totals div { flex:1; min-width:150px; padding:12px 14px; background:var(--surface); border:1px solid rgba(var(--navy-rgb),.12); }
+.dues-totals dt { color:var(--sage-text); font-size:12px; }
+.dues-totals dd { margin:2px 0 0; font:600 20px var(--sans); font-variant-numeric:tabular-nums; color:var(--navy); }
+.dues-ledger { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.dues-ledger > li { background:var(--surface); border:1px solid rgba(var(--navy-rgb),.12); }
+.dues-ledger-row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; width:100%; padding:12px 14px; background:none; border:0; text-align:left; color:var(--navy); font-size:14px; cursor:pointer; }
+.dues-ledger-row b { flex:1; min-width:140px; }
+.dues-amount { font-variant-numeric:tabular-nums; font-weight:600; }
+.dues-approval { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 14px; }
+.dues-tools { display:grid; gap:12px; padding:14px; border-top:1px solid rgba(var(--navy-rgb),.12); }
+.dues-tools-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px; }
+.dues-tools-grid form { display:grid; gap:8px; align-content:start; }
+.dues-tools h4 { margin:0; font:600 14px var(--sans); }
+.dues-plan-row { display:flex; gap:8px; }
+.dues-settings { display:grid; gap:24px; max-width:640px; }
+.dues-settings form, .dues-settings section { display:grid; gap:10px; }
+.dues-golive { padding:12px 14px; border:1px dashed rgba(var(--navy-rgb),.3); }
+.dues-bycategory { display:grid; gap:4px; margin:0; padding:0; list-style:none; font-size:14px; }
+.dues-bycategory li { display:flex; justify-content:space-between; max-width:420px; }
+.dues-receipts { display:grid; gap:4px; margin:0; padding:0; list-style:none; }
+.dues-receipts li { display:flex; gap:14px; align-items:center; }
+.dues-history-list { display:grid; gap:6px; margin:8px 0 0; padding-left:18px; font-size:13px; }
+.dues-history-list small { display:block; color:var(--sage-text); }
+
 /* --- Admin compliance matrix ---------------------------------------------- */
 .compliance-toolbar {
   display:flex;
