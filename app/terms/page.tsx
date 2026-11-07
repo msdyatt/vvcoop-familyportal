@@ -14,10 +14,10 @@ export default function Terms() { return <>
 
     <div className="legal-draft-notice">
       <strong>This page is a working draft, not a finished legal document.</strong>
-      <p>It describes how Family Village is meant to be used today, in plain language, and was last brought up to date on 6 November 2026 to cover messaging, the photo library and the mobile apps. It has not been reviewed by an attorney and doesn&rsquo;t cover the co-op&rsquo;s own policies (enrollment, tuition, liability, code of conduct) — please have it reviewed and filled in before treating it as the co-op&rsquo;s real, binding terms. Items marked <em>[Flag for legal review]</em> need a lawyer&rsquo;s wording.</p>
+      <p>It describes how Family Village is meant to be used today, in plain language, and was last brought up to date on 7 November 2026 to cover online dues payments, on top of messaging, the photo library and the mobile apps. It has not been reviewed by an attorney and doesn&rsquo;t cover the co-op&rsquo;s own policies (enrollment, tuition, liability, code of conduct) — please have it reviewed and filled in before treating it as the co-op&rsquo;s real, binding terms. Items marked <em>[Flag for legal review]</em> need a lawyer&rsquo;s wording.</p>
     </div>
 
-    <p><em>Last updated: 6 November 2026 (draft).</em></p>
+    <p><em>Last updated: 7 November 2026 (draft).</em></p>
 
     <h2>What this is</h2>
     <p>Family Village is a private, invitation-only app for Veritas Village co-op households, teachers, and administrators, on the web and as an app for iPhone and Android. It handles enrollment, class rosters, schedules, required paperwork, dues status, messages between members, a shared photo library, and notifications. It is not open to the public, and access is by invitation from a co-op administrator.</p>
@@ -51,7 +51,15 @@ export default function Terms() { return <>
 
     <h2>Signed forms and dues</h2>
     <p>Forms signed in the app are signed inside Family Village itself, by an adult who is signed in to their own account and has finished setting it up (confirmed invitation and a name on the account). Before signing you agree to sign electronically, and your typed or drawn signature is treated as the household&rsquo;s real signature on that form. Each signature is recorded with the time, your IP address and browser details, and the signed copy is kept by the co-op. You can ask the co-op for a paper copy or to arrange a paper signature instead. <em>[Flag for legal review: whether an electronic signature from one or both parents is enough for waivers and other forms that involve a minor.]</em></p>
-    <p>Dues and payment status recorded in the app reflect what the co-op has been told was paid, through whatever payment method the co-op actually uses — the app itself does not process payments.</p>
+    <p>Dues can be paid in Family Village by bank transfer, credit or debit card, or Apple Pay or Google Pay. Payments are processed by Stripe, a third-party payment processor; you enter your card or bank details on Stripe&rsquo;s page and they are subject to Stripe&rsquo;s terms. The co-op does not receive or store them. The co-op pays the processing fees, and you pay the dues amount shown.</p>
+    <ul>
+      <li><strong>Your balance</strong> is what the co-op&rsquo;s records show: the dues for your household, less any discount, plus or minus any adjustment (each with a note), less what has been paid. If something looks wrong, message an administrator; corrections are made as new entries and the earlier ones stay in the record.</li>
+      <li><strong>Bank transfers</strong> take 1–4 business days to clear and can still be returned by your bank afterwards; if that happens the payment is reversed and the balance is owed again.</li>
+      <li><strong>Monthly plans and automatic payments.</strong> If you choose a monthly plan and agree on the checkout page, you authorize the co-op to collect each installment from the bank account or card you used, on its due date, until the plan is paid or you stop automatic payments in Family Village. If an automatic payment fails, the co-op will tell you and may try again after a few days; after the set number of attempts it stops and asks you to pay.</li>
+      <li><strong>Refunds</strong> are made by the co-op at its discretion and under its own tuition and refund policy. A refund goes back to the method used where that is possible.</li>
+      <li><strong>Receipts</strong> are available for each payment in Family Village. They record the payment; they are not tax advice.</li>
+    </ul>
+    <p><em>[Flag for legal review: the recurring-debit authorization wording; whether the co-op wants a late-fee or returned-payment fee (none is charged today); and the link between these payment terms and the co-op&rsquo;s tuition and refund policy.]</em></p>
 
     <h2>What we don&rsquo;t cover here</h2>
     <p>These terms are about using the software. The co-op&rsquo;s own policies — enrollment agreements, tuition and refund terms, liability waivers, code of conduct, what happens if a family withdraws mid-year — are separate documents the co-op already has, and some are signed as compliance requirements inside the app. <em>[Flag for legal review: this page should link to those documents rather than restate them, and should add the usual terms: disclaimers of warranty, limits of liability, how an account is ended, and governing law (Texas).]</em></p>
