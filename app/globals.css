@@ -7621,12 +7621,13 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 .editor-handle { position:absolute; right:-6px; bottom:-6px; width:14px; height:14px; background:var(--antique-gold); border:2px solid var(--cream); cursor:nwse-resize; touch-action:none; }
 
 .send-panel { display:grid; gap:14px; }
-.send-panel-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.send-panel-grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:18px; align-items:start; }
+.send-panel-grid > fieldset { min-width:0; }
 .send-families { display:grid; gap:6px; max-height:300px; overflow:auto; }
 .send-assign { display:flex; gap:10px; padding:4px 0 8px 26px; }
 
 @media (max-width:820px) {
-  .field-editor-layout, .send-panel-grid { grid-template-columns:1fr; }
+  .field-editor-layout { grid-template-columns:1fr; }
   .field-editor-side { position:static; max-height:none; }
 }
 
@@ -7653,3 +7654,7 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 .documents-required { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; flex-basis:100%; padding-top:6px; font-size:14px; }
 .documents-required label { display:inline-flex; gap:8px; align-items:center; }
 .documents-required input[type="date"] { width:auto; padding:7px 10px; }
+
+@media (max-width:600px) {
+  .send-panel-grid { grid-template-columns:1fr; }
+}

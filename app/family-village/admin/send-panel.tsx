@@ -24,7 +24,9 @@ const REASONS: Record<string, string> = {
  * the order adults joined the household, and can be changed here.
  */
 export default function SendPanel({ template, requirementId, yearLabel, onClose, onSent }: {
-  template: Template; requirementId: string | null; yearLabel: string; onClose: () => void; onSent: () => void;
+  template: Template; requirementId: string | null; yearLabel: string; onClose: () => void;
+  /** Called after a successful send, with a one-line summary; the list shows it. */
+  onSent: (summary: string) => void;
 }) {
   const [mode, setMode] = useState<"requirement" | "families">(requirementId ? "requirement" : "families");
   const [families, setFamilies] = useState<FamilyChoice[]>([]);
@@ -75,8 +77,14 @@ export default function SendPanel({ template, requirementId, yearLabel, onClose,
     setBusy(false);
     if (rpcError) { setError(friendlyError(rpcError)); return; }
     const r = data as { sent: unknown[]; skipped: { family_id: string; reason: string }[] };
-    setResult({ sent: r.sent.length, skipped: r.skipped.map((s) => ({ name: nameOf(s.family_id), reason: REASONS[s.reason] ?? s.reason })) });
-    if (r.sent.length) onSent();
+    const skipped = r.skipped.map((x) => ({ name: nameOf(x.family_id), reason: REASONS[x.reason] ?? x.reason }));
+    if (r.sent.length) {
+      const sentText = `Sent “${template.title}” to ${r.sent.length} ${r.sent.length === 1 ? "household" : "households"}.`;
+      onSent(skipped.length ? `${sentText} Not sent: ${skipped.map((x) => `${x.name} ${x.reason}`).join("; ")}.` : sentText);
+      return;
+    }
+    // Nothing went out, so stay here and say why.
+    setResult({ sent: 0, skipped });
   }
 
   const ready = mode === "requirement" ? !!requirementId : chosen.size > 0;
@@ -86,17 +94,7 @@ export default function SendPanel({ template, requirementId, yearLabel, onClose,
       <button type="button" className="sign-big secondary compact" onClick={onClose}>← Back to documents</button>
       <h2>Send “{template.title}”</h2>
     </div>
-    <p className="sign-hint">
-      {template.signers_required === 2
-        ? "Two people sign a copy, each in their own session, when the household has two adults (by default the first two to join). A household with one adult gets the same document, and that adult signs signer 1's fields; signer 2's fields are left off."
-        : "One adult signs each copy. By default that is the first adult in the household."} Everyone must have accepted their invitation and have a name on their account before they can sign.
-    </p>
-
-    <p className="sign-hint">
-      {requirementId
-        ? `This is required of every family for ${yearLabel}, so each household's Paperwork status follows the signing on its own: Sent when you send it, Complete once everyone it was sent to has signed and the copy is sealed, and Outstanding again if you cancel it. Next school year, mark it required again and send it to everyone.`
-        : "This document is not marked required, so sending it is not tracked in Compliance. To require it of every family, go back and tick \u201cRequired of every family\u201d on the document."}
-    </p>
+    <p className="sign-hint">{requirementId ? `Tracked in Compliance for ${yearLabel}.` : "Not marked required, so this is not tracked in Compliance."}</p>
 
     <div className="send-panel-grid">
       <fieldset>
@@ -140,7 +138,7 @@ export default function SendPanel({ template, requirementId, yearLabel, onClose,
 
     {error && <p className="admin-form-status" role="alert">{error}</p>}
     {result && <div className="admin-form-status" role="status">
-      <p>{result.sent === 0 ? "Nothing was sent." : `Sent to ${result.sent} ${result.sent === 1 ? "household" : "households"}. Each signer has been notified in the app and by email.`}</p>
+      <p>Nothing was sent.</p>
       {result.skipped.length > 0 && <ul>{result.skipped.map((s, i) => <li key={i}>{s.name} {s.reason}.</li>)}</ul>}
     </div>}
   </section>;
