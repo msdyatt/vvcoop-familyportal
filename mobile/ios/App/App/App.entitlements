@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Ties the app to the website so passkeys and saved passwords for family.veritasvillage.org work inside it.
+	     The matching file is served at /.well-known/apple-app-site-association (worker/index.ts). -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:family.veritasvillage.org</string>
+	</array>
+</dict>
+</plist>

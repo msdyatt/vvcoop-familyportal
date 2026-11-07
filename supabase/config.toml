@@ -488,6 +488,16 @@ verify_jwt = true
 import_map = "./functions/delete-account/deno.json"
 entrypoint = "./functions/delete-account/index.ts"
 
+# Called by a signed-in person's own session (the last signer, or an administrator
+# retrying). Same self-handled-CORS reasoning as the other browser-called
+# functions that are not behind the platform gate: the caller's access is the
+# database's call, via row level security on sign_requests.
+[functions.esign-seal]
+enabled = true
+verify_jwt = false
+import_map = "./functions/esign-seal/deno.json"
+entrypoint = "./functions/esign-seal/index.ts"
+
 # Administrator-only; always called with a real session. Checked inside as well
 # (active administrator, not a demo account, MFA step-up).
 [functions.demo-accounts]

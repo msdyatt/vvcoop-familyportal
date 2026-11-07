@@ -57,8 +57,8 @@ export default function SignInPanel() {
     <button type="button" className="passkey-button" disabled={!configured || busy} onClick={passkey}><span>🔐</span> Sign in with a passkey</button>
     <div className="signin-divider"><span>or use your invitation email</span></div>
     <form onSubmit={emailSignIn} className="email-signin">
-      <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={!configured || busy}/></label>
-      <label>Password<input type="password" minLength={8} autoComplete={mode === "request" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} disabled={!configured || busy}/></label>
+      <label>Email address<input type="email" name="username" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={!configured || busy}/></label>
+      <label>Password<input type="password" name="password" minLength={8} autoComplete={mode === "request" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} disabled={!configured || busy}/></label>
       <button type="submit" disabled={!configured || busy}>{mode === "request" ? "Request family access" : "Sign in"}</button>
     </form>
     <button className="mode-switch" type="button" disabled={!configured || busy} onClick={() => { setMode(mode === "sign-in" ? "request" : "sign-in"); setMessage(""); }}>
