@@ -7525,15 +7525,6 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 }
 
 /* ---- Section pages ---------------------------------------------------------- */
-.portal-back {
-  display:inline-block;
-  margin:0 0 14px;
-  color:var(--navy);
-  font-size:14px;
-  font-weight:600;
-  text-decoration:none;
-}
-
 /* A page that holds one section gives it the whole width. */
 .portal-grid.portal-single {
   grid-template-columns:minmax(0,1fr);
@@ -7542,4 +7533,55 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 .portal-grid.portal-single .portal-module {
   grid-column:1/-1;
   min-height:0;
+}
+
+/* --- Signing in the portal ----------------------------------------------- */
+.compliance-signers { color:var(--sage-text); font-size:12px; }
+
+.sign-page { padding-bottom:48px; }
+.sign-back { color:var(--sage-text); font-size:13px; text-decoration:none; }
+.sign-layout { display:grid; grid-template-columns:minmax(240px,320px) minmax(0,1fr); gap:24px; align-items:start; }
+.sign-side { display:grid; gap:14px; position:sticky; top:12px; padding:18px; background:var(--surface); border:1px solid rgba(var(--navy-rgb),.12); }
+.sign-side h1 { font:600 22px/1.2 var(--serif); }
+.sign-note { padding:10px 12px; background:var(--warm-tint); color:var(--terracotta-deep); font-size:14px; }
+.sign-hint { color:var(--sage-text); font-size:13px; }
+.sign-signers { display:grid; gap:10px; }
+.sign-signers li { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; font-size:14px; }
+.sign-signers small { flex-basis:100%; color:var(--sage-text); font-size:12px; }
+.sign-callout { display:grid; gap:8px; padding:12px; background:var(--warm-tint); border-left:3px solid var(--terracotta); font-size:14px; }
+.sign-callout ul { display:grid; gap:6px; }
+.sign-consent, .sign-finish { display:grid; gap:10px; font-size:14px; }
+.sign-finish small { color:var(--sage-text); font-size:12px; }
+.sign-consent p { font-size:13px; line-height:1.5; max-height:220px; overflow:auto; padding:10px; background:var(--surface-sunken); }
+.sign-side .compliance-cta:disabled { opacity:.45; cursor:not-allowed; }
+
+.pdf-pages { display:grid; gap:18px; margin:0 auto; }
+.pdf-page { position:relative; width:100%; background:var(--surface); box-shadow:0 1px 6px rgba(var(--navy-rgb),.18); container-type:inline-size; }
+.pdf-page canvas { display:block; width:100%; height:100%; }
+.pdf-page-overlay { position:absolute; inset:0; }
+.pdf-page-number { position:absolute; right:8px; bottom:6px; padding:1px 6px; background:rgba(var(--cream-rgb),.85); color:var(--sage-text); font-size:11px; pointer-events:none; }
+
+.sign-field { position:absolute; display:flex; align-items:center; justify-content:center; overflow:hidden; font-size:max(11px,1.5cqw); line-height:1.1; border:1.5px dashed rgba(var(--navy-rgb),.35); background:rgba(var(--cream-rgb),.55); color:var(--navy); }
+.sign-field.other { border-color:rgba(var(--navy-rgb),.2); color:var(--sage-text); font-size:max(10px,1.2cqw); }
+.sign-field.other.filled { border-style:solid; }
+.sign-field.locked { color:var(--sage-text); }
+.sign-field.mine.todo { border-color:var(--terracotta); background:var(--warm-tint); color:var(--terracotta-deep); cursor:pointer; }
+.sign-field.mine.done { border-style:solid; border-color:var(--sage); background:rgba(var(--cream-rgb),.4); }
+.sign-field.mine img { max-width:100%; max-height:100%; object-fit:contain; }
+.sign-field.text input { height:100%; padding:0 4px; border:0; background:transparent; font-size:inherit; }
+.sign-field.check input { width:60%; height:60%; }
+.sign-typed { font-family:"Times New Roman",Times,serif; font-style:italic; font-size:1.6em; white-space:nowrap; }
+.sign-field button, button.sign-field { font:inherit; }
+
+.sign-dialog { display:grid; gap:14px; min-width:min(520px,80vw); }
+.sign-tabs { display:flex; gap:8px; }
+.sign-tabs button { padding:8px 16px; border:1px solid rgba(var(--navy-rgb),.2); background:transparent; font:600 14px var(--sans); cursor:pointer; }
+.sign-tabs button.active { background:var(--navy); color:var(--cream); }
+.sign-preview { padding:18px; background:var(--surface-sunken); text-align:center; font-size:32px; overflow:hidden; }
+.sign-pad { width:100%; height:auto; aspect-ratio:3/1; background:var(--surface-sunken); border:1px dashed rgba(var(--navy-rgb),.3); touch-action:none; cursor:crosshair; }
+.sign-dialog-actions { display:flex; gap:10px; justify-content:flex-end; }
+
+@media (max-width:820px) {
+  .sign-layout { grid-template-columns:1fr; }
+  .sign-side { position:static; }
 }
