@@ -2,6 +2,7 @@
 
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl } from "../../lib/storage";
+import DuesLink from "./dues-link";
 import { SignRequestStatus, SignerStatus, requestStatusLabel } from "../../lib/sign";
 import {
   FamilyRequirement, Requirement, formatDate, formatMoney,
@@ -87,8 +88,7 @@ function ComplianceRow({ item, signing }: { item: ComplianceItem; signing?: Sign
     <div className="compliance-item-action">
       {/* Dues outstanding -- straight out to Crowded, which is where the co-op
           actually banks. The portal records receipt, it does not take payment. */}
-      {!settled && isDues && requirement.payment_url &&
-        <a className="compliance-cta" href={requirement.payment_url} target="_blank" rel="noreferrer">Pay now ↗</a>}
+      {isDues && <DuesLink paymentUrl={requirement.payment_url} settled={settled} />}
 
       {/* Signing happens here, in the portal, for a signed-in person. */}
       {!isDues && signing && signing.status !== "voided" &&
