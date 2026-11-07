@@ -65,9 +65,12 @@ export async function sealRequest(store: SealStore, requestId: string, timestamp
     if (record.signers.length === 0 || record.signers.some((s) => s.status !== "signed")) {
       throw new Error("A signer has not finished.");
     }
-    // Every required field must have its value before anything is drawn.
+    // Every signature, initials and date field must have its value before anything
+    // is drawn. Fields for a slot nobody was asked to sign (a one-adult household
+    // sent a two-signer document) are left off.
     const have = new Set(record.values.map((v) => v.field_id));
-    const missing = record.fields.filter((f) => f.kind !== "text" && f.kind !== "checkbox" ? !have.has(f.id) : false);
+    const slots = new Set(record.signers.map((s) => s.slot));
+    const missing = record.fields.filter((f) => slots.has(f.signer_slot) && f.kind !== "text" && f.kind !== "checkbox" && !have.has(f.id));
     if (missing.length > 0) throw new Error(`${missing.length} field(s) have no recorded value.`);
 
     const body = await flattenSigned(original, record, req.title);

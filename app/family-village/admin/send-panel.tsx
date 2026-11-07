@@ -10,7 +10,6 @@ type FamilyChoice = { id: string; name: string; adults: Adult[] };
 type RequirementChoice = { id: string; title: string; outstanding: number; sign_template_id: string | null };
 
 const REASONS: Record<string, string> = {
-  needs_two_adults: "needs two active adults",
   no_adult: "has no active adult",
   already_sent: "already has this document",
   already_complete: "already complete",
@@ -102,8 +101,8 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
     </div>
     <p className="sign-hint">
       {template.signers_required === 2
-        ? "Two people sign each copy, in their own sessions. By default they are the first two adults in each household."
-        : "One adult signs each copy. By default that is the first adult in the household."} Everyone must have finished setting up their account (including two-step verification) before they can sign.
+        ? "Two people sign a copy, each in their own session, when the household has two adults (by default the first two to join). A household with one adult gets the same document, and that adult signs signer 1's fields; signer 2's fields are left off."
+        : "One adult signs each copy. By default that is the first adult in the household."} Everyone must have accepted their invitation and have a name on their account before they can sign.
     </p>
 
     <div className="send-panel-grid">
