@@ -162,10 +162,10 @@ export default function FieldEditor({ template, locked, onClose, onSaved, pdfByt
 
   return <section className="field-editor" aria-label={`Place fields on ${template.title}`}>
     <div className="field-editor-bar">
-      <button type="button" className="ghost" onClick={onClose}>← Back to documents</button>
+      <button type="button" className="sign-big secondary compact" onClick={onClose}>← Back to documents</button>
       <label className="field-editor-title"><span className="field-caption">Name</span>
         <input value={title} maxLength={200} disabled={locked} onChange={(e) => { setTitle(e.target.value); setDirty(true); }} /></label>
-      {!locked && <button type="button" disabled={busy || !dirty} onClick={save}>{busy ? "Saving…" : "Save fields"}</button>}
+      {!locked && <button type="button" className="sign-big" disabled={busy || !dirty} onClick={save}>{busy ? "Saving…" : "Save fields"}</button>}
     </div>
     {locked && <p className="admin-form-status" role="status">This document has been sent, so its fields are locked. To change them, duplicate it from the document list.</p>}
     {message && <p className="admin-form-status" role="status">{message}</p>}
@@ -184,7 +184,7 @@ export default function FieldEditor({ template, locked, onClose, onSaved, pdfByt
             </select></label>
           <label><span className="field-caption">Page</span>
             <input type="number" min={1} max={pageCount} value={page} onChange={(e) => setPage(clamp(Number(e.target.value) || 1, 1, pageCount))} /></label>
-          <button type="button" className="ghost" onClick={() => add(page, 0.5, 0.5, ratios.current.get(page) ?? 0.77)}>Add to page {page}</button>
+          <button type="button" className="sign-big secondary compact" onClick={() => add(page, 0.5, 0.5, ratios.current.get(page) ?? 0.77)}>Add to page {page}</button>
           <p className="sign-hint">Most documents need only signer 1. Add signer 2 fields only if a second adult should sign too; a household with one adult simply gets signer 1\u2019s fields.</p>
           <p className="sign-hint">Or click anywhere on a page to place one there. Drag to move; drag the corner to resize.</p>
         </fieldset>}
@@ -216,7 +216,7 @@ export default function FieldEditor({ template, locked, onClose, onSaved, pdfByt
           </div>
           <label><span className="field-caption">Page</span>
             <input type="number" min={1} max={pageCount} value={current.page} disabled={locked} onChange={(e) => patch(current.key, { page: clamp(Number(e.target.value) || 1, 1, pageCount) })} /></label>
-          {!locked && <button type="button" className="danger" onClick={() => remove(current.key)}>Delete field</button>}
+          {!locked && <button type="button" className="sign-big danger compact" onClick={() => remove(current.key)}>Delete field</button>}
         </fieldset>}
 
         <div className="field-editor-list">

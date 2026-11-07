@@ -120,17 +120,17 @@ export default function SentList({ refreshKey }: { refreshKey: number }) {
         </div>
         <span className={`status-pill ${statusTone(row.status)}`}>{requestStatusLabel(row.status)}</span>
         <div className="sent-actions">
-          {(row.status === "sent" || row.status === "in_progress") && <button type="button" className="ghost" disabled={busyId === row.id} onClick={() => run(row, "remind")}>Remind</button>}
-          {row.status === "signed" && <button type="button" className="ghost" disabled={busyId === row.id} onClick={() => run(row, "seal")}>{row.seal_error ? "Try sealing again" : "Finish sealing"}</button>}
-          {row.status === "completed" && <button type="button" className="ghost" onClick={() => run(row, "download")}>Download signed PDF</button>}
+          {(row.status === "sent" || row.status === "in_progress") && <button type="button" className="sign-big secondary compact" disabled={busyId === row.id} onClick={() => run(row, "remind")}>Remind</button>}
+          {row.status === "signed" && <button type="button" className="sign-big secondary compact" disabled={busyId === row.id} onClick={() => run(row, "seal")}>{row.seal_error ? "Try sealing again" : "Finish sealing"}</button>}
+          {row.status === "completed" && <button type="button" className="sign-big secondary compact" onClick={() => run(row, "download")}>Download signed PDF</button>}
           {row.status === "completed" && <details className="sent-verify">
             <summary>Verification files</summary>
-            <button type="button" className="ghost" onClick={() => downloadFile(row, "signed-content.pdf")}>Signed content (PDF)</button>
-            <button type="button" className="ghost" onClick={() => downloadFile(row, "content-timestamp.tsr")}>Its timestamp (.tsr)</button>
-            <button type="button" className="ghost" onClick={() => downloadFile(row, "sealed-timestamp.tsr")}>Sealed PDF timestamp (.tsr)</button>
+            <button type="button" className="sign-big secondary compact" onClick={() => downloadFile(row, "signed-content.pdf")}>Signed content (PDF)</button>
+            <button type="button" className="sign-big secondary compact" onClick={() => downloadFile(row, "content-timestamp.tsr")}>Its timestamp (.tsr)</button>
+            <button type="button" className="sign-big secondary compact" onClick={() => downloadFile(row, "sealed-timestamp.tsr")}>Sealed PDF timestamp (.tsr)</button>
           </details>}
-          {row.status !== "completed" && row.status !== "voided" && <button type="button" className="danger" disabled={busyId === row.id} onClick={() => run(row, "void")}>Cancel</button>}
-          <button type="button" className="ghost" aria-expanded={openId === row.id} onClick={() => toggle(row.id)}>{openId === row.id ? "Hide history" : "History"}</button>
+          {row.status !== "completed" && row.status !== "voided" && <button type="button" className="sign-big danger compact" disabled={busyId === row.id} onClick={() => run(row, "void")}>Cancel</button>}
+          <button type="button" className="sign-big secondary compact" aria-expanded={openId === row.id} onClick={() => toggle(row.id)}>{openId === row.id ? "Hide history" : "History"}</button>
         </div>
         {row.seal_error && row.status === "signed" && <p className="sign-hint" role="status">Sealing failed: {row.seal_error}</p>}
         {row.status === "voided" && row.void_reason && <p className="sign-hint">Cancelled: {row.void_reason}</p>}

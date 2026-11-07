@@ -7633,6 +7633,27 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 .sent-verify { display:grid; gap:6px; }
 .sent-verify summary { cursor:pointer; font-size:13px; color:var(--sage-text); }
 
+/* --- Buttons for signing and documents: large, one look everywhere ---------- */
+button.sign-big, a.sign-big {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:52px; padding:14px 30px;
+  background:var(--navy); color:var(--cream);
+  font:700 17px var(--sans); line-height:1.2; text-decoration:none;
+  border:2px solid var(--navy); border-radius:3px; cursor:pointer;
+}
+button.sign-big:hover:not(:disabled), a.sign-big:hover { background:color-mix(in srgb, var(--navy) 86%, var(--cream)); }
+button.sign-big:focus-visible, a.sign-big:focus-visible { outline:3px solid var(--antique-gold); outline-offset:2px; }
+button.sign-big:disabled { opacity:.45; cursor:not-allowed; }
+button.sign-big.secondary, a.sign-big.secondary { background:transparent; color:var(--navy); }
+button.sign-big.secondary:hover:not(:disabled), a.sign-big.secondary:hover { background:var(--panel); }
+button.sign-big.danger { background:transparent; color:var(--terracotta-deep); border-color:var(--terracotta); }
+button.sign-big.danger:hover:not(:disabled) { background:var(--warm-tint); }
+button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px; font-size:15px; }
+.pdf-page-failed { position:absolute; inset:0; display:grid; place-content:center; justify-items:center; gap:12px; background:rgba(var(--cream-rgb),.9); color:var(--navy); text-align:center; }
+.documents-required { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; flex-basis:100%; padding-top:6px; font-size:14px; }
+.documents-required label { display:inline-flex; gap:8px; align-items:center; }
+.documents-required input[type="date"] { width:auto; padding:7px 10px; }
+
 /* ---- Reports ------------------------------------------------------------------ */
 .report-picker {
   display:grid;
