@@ -116,7 +116,7 @@ export default function DocumentsTab() {
         <h2>Documents</h2>
         <div>
           <input ref={fileInput} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
-          <button type="button" disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? "Working…" : "Upload a PDF"}</button>
+          <button type="button" className="sign-big" disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? "Working…" : "Upload a PDF"}</button>
         </div>
       </div>
       <p className="sign-hint">Upload a PDF, place signature and other fields on it, then send it to households. Families sign inside Family Village, never from an emailed link.</p>
@@ -133,10 +133,10 @@ export default function DocumentsTab() {
             </div>
             <span className={`status-pill ${t.status === "ready" ? "signed" : "pending"}`}>{t.status === "ready" ? "Ready to send" : "Draft"}</span>
             <div className="sent-actions">
-              <button type="button" className="ghost" onClick={() => setView({ kind: "edit", template: t })}>{sent ? "View fields" : "Place fields"}</button>
-              <button type="button" disabled={t.status !== "ready"} onClick={() => setView({ kind: "send", template: t })}>Send</button>
-              <button type="button" className="ghost" disabled={busy} onClick={() => duplicate(t)}>Duplicate</button>
-              <button type="button" className="danger" onClick={() => archive(t)}>Remove</button>
+              <button type="button" className="sign-big secondary compact" onClick={() => setView({ kind: "edit", template: t })}>{sent ? "View fields" : "Place fields"}</button>
+              <button type="button" className="sign-big compact" disabled={t.status !== "ready"} onClick={() => setView({ kind: "send", template: t })}>Send</button>
+              <button type="button" className="sign-big secondary compact" disabled={busy} onClick={() => duplicate(t)}>Duplicate</button>
+              <button type="button" className="sign-big danger compact" onClick={() => archive(t)}>Remove</button>
             </div>
           </li>;
         })}

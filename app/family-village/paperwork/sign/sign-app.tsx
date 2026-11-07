@@ -225,7 +225,7 @@ export default function SignApp() {
 
         {!me && <p className="sign-hint">You can read this document, but you are not one of the people asked to sign it.</p>}
 
-        {status === "completed" && <button type="button" className="compliance-cta" onClick={downloadSigned}>Download the signed copy</button>}
+        {status === "completed" && <button type="button" className="sign-big" onClick={downloadSigned}>Download the signed copy</button>}
         {status === "signed" && <p className="sign-hint">Everyone has signed. The signed copy and its certificate are being prepared.{loaded.request.seal_error ? " It has not finished yet; an administrator can try again." : ""}</p>}
         {me?.status === "signed" && status !== "completed" && status !== "voided" && status !== "signed" && <p className="sign-hint">You signed on {formatSignedAt(me.signed_at)}. We are waiting for the other person.</p>}
 
@@ -240,12 +240,12 @@ export default function SignApp() {
             <b>Sign electronically</b>
             <p>{consentText || "Loading…"}</p>
             <label className="checkbox-field"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> I agree to sign electronically.</label>
-            <button type="button" className="compliance-cta" disabled={!agree || busy || !consentText} onClick={giveConsent}>Agree and continue</button>
+            <button type="button" className="sign-big" disabled={!agree || busy || !consentText} onClick={giveConsent}>Agree and continue</button>
           </div>}
           {canFill && <div className="sign-finish">
             <b>{remaining.length ? `${remaining.length} ${remaining.length === 1 ? "thing" : "things"} left to fill in` : "Everything is filled in"}</b>
-            {remaining.length > 0 && <button type="button" className="compliance-cta ghost" onClick={nextField}>Go to next</button>}
-            <button type="button" className="compliance-cta" disabled={remaining.length > 0 || busy} onClick={submit}>{busy ? "Signing…" : "Finish and sign"}</button>
+            {remaining.length > 0 && <button type="button" className="sign-big secondary compact" onClick={nextField}>Go to next</button>}
+            <button type="button" className="sign-big" disabled={remaining.length > 0 || busy} onClick={submit}>{busy ? "Signing…" : "Finish and sign"}</button>
             <small>The date is filled in when you sign. Your name, the time and your device details are recorded.</small>
           </div>}
         </>}

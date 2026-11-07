@@ -100,7 +100,7 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
 
   return <section className="send-panel" aria-label={`Send ${template.title}`}>
     <div className="field-editor-bar">
-      <button type="button" className="ghost" onClick={onClose}>← Back to documents</button>
+      <button type="button" className="sign-big secondary compact" onClick={onClose}>← Back to documents</button>
       <h2>Send “{template.title}”</h2>
     </div>
     <p className="sign-hint">
@@ -159,7 +159,7 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
           <textarea value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} placeholder="Please sign before the first day of class." /></label>
         <label><span className="field-caption">Ask them to sign by <i>optional</i></span>
           <input type="date" value={dueOn} onChange={(e) => setDueOn(e.target.value)} /></label>
-        <button type="button" disabled={!ready || busy} onClick={send}>{busy ? "Sending…" : "Send for signature"}</button>
+        <button type="button" className="sign-big" disabled={!ready || busy} onClick={send}>{busy ? "Sending…" : "Send for signature"}</button>
       </fieldset>
     </div>
 
