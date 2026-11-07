@@ -36,6 +36,8 @@
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "16.4.0",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.9",
     "react-server-dom-webpack": "19.2.6",
     "supabase": "2.115.0",
     "tailwindcss": "4.2.1",
