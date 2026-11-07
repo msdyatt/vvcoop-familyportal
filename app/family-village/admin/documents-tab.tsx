@@ -129,7 +129,7 @@ export default function DocumentsTab() {
           return <li key={t.id} className="sent-row">
             <div className="sent-row-main">
               <b>{t.title}</b>
-              <span>{t.page_count} {t.page_count === 1 ? "page" : "pages"} · {t.status === "ready" ? `${t.signers_required} ${t.signers_required === 1 ? "signer" : "signers"}` : "fields not finished"}{sent ? ` · sent to ${sent} ${sent === 1 ? "household" : "households"}` : ""}</span>
+              <span>{t.page_count} {t.page_count === 1 ? "page" : "pages"} · {t.status === "ready" ? t.signers_required === 1 ? "one signer" : "up to two signers" : "fields not finished"}{sent ? ` · sent to ${sent} ${sent === 1 ? "household" : "households"}` : ""}</span>
             </div>
             <span className={`status-pill ${t.status === "ready" ? "signed" : "pending"}`}>{t.status === "ready" ? "Ready to send" : "Draft"}</span>
             <div className="sent-actions">
