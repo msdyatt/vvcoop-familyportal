@@ -13,7 +13,7 @@ import { corsHeaders, json } from "../_shared/http.ts";
  * builds the API it will call against.
  *
  * No Supabase session exists on that end, so -- same fail-closed pattern as
- * opensign-webhook and deliver-emails's own "process" mode -- this is gated
+ * deliver-emails's own "process" mode -- this is gated
  * by a shared secret (Vault: PRINT_DELIVERY_SECRET), not a user session.
  *
  * Two request shapes:

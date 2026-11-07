@@ -10,7 +10,7 @@ import CalendarView from "../calendar-view";
 import AppHeader from "../app-header";
 import RichText, { stripRichText } from "../../../lib/rich-text";
 import MfaChallengeScreen from "../mfa-challenge";
-import { ComplianceBanner, CompliancePanel, ComplianceItem } from "../compliance-panel";
+import { ComplianceBanner, CompliancePanel, ComplianceItem, SigningInfo } from "../compliance-panel";
 import PostAttachments, { PostThumbnail, usePostAttachments } from "../post-attachments";
 import { FamilyRequirement, Requirement, SchoolYear } from "../../../lib/compliance";
 import { PersonalSubscribeLink } from "../subscribe-link";
@@ -114,7 +114,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
     // never sees last year's handbook sitting unsigned.
     const compliance = await supabase
       .from("family_requirements")
-      .select("id,requirement_id,family_id,status,signed_document_id,signed_at,signing_url,provider_document_id,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,amount_per_family,amount_per_child,payment_url,due_on,school_years!inner(is_current))")
+      .select("id,requirement_id,family_id,status,signed_document_id,signed_at,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,sign_template_id,amount_per_family,amount_per_child,payment_url,due_on,school_years!inner(is_current))")
       .in("family_id", safeFamilyIds)
       .eq("requirements.active", true)
       .eq("requirements.school_years.is_current", true);
@@ -194,7 +194,6 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
 
   return <main className="live-portal">
     <AppHeader current="home" roles={portal?.roles ?? []} title={VIEW_HEADERS[view].title} subtitle={VIEW_HEADERS[view].subtitle} />
-    {view !== "home" && <a className="portal-back" href="/family-village/home">← Family home</a>}
     {view === "home" && <ComplianceBanner items={portal?.compliance ?? []} />}
     {(view === "home" || view === "children") && portal?.enrollmentPeriod && <aside className="compliance-banner" role="status">
       <span className="compliance-banner-count">✓</span>
@@ -275,6 +274,7 @@ function FamilyCompliance({ familyId }: { familyId: string }) {
   const [years, setYears] = useState<SchoolYear[]>([]);
   const [yearId, setYearId] = useState("");
   const [items, setItems] = useState<ComplianceItem[]>([]);
+  const [signing, setSigning] = useState<Record<string, SigningInfo>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -307,12 +307,28 @@ function FamilyCompliance({ familyId }: { familyId: string }) {
       if (!supabase) return;
       const { data } = await supabase
         .from("family_requirements")
-        .select("id,requirement_id,family_id,status,signed_document_id,signed_at,signing_url,provider_document_id,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,amount_per_family,amount_per_child,payment_url,due_on)")
+        .select("id,requirement_id,family_id,status,signed_document_id,signed_at,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,sign_template_id,amount_per_family,amount_per_child,payment_url,due_on)")
         .eq("family_id", familyId)
         .eq("requirements.active", true)
         .eq("requirements.school_year_id", yearId);
       if (cancelled) return;
-      setItems(toComplianceItems(data));
+      const compliance = toComplianceItems(data);
+      setItems(compliance);
+
+      // Documents the co-op has sent for signing in the portal. Row level
+      // security already limits these to this household.
+      const ids = compliance.map((item) => item.row.id);
+      const { data: requests } = ids.length
+        ? await supabase.from("sign_requests")
+            .select("id,status,family_requirement_id,sign_signers(slot,display_name,status)")
+            .in("family_requirement_id", ids).neq("status", "voided")
+        : { data: [] };
+      if (cancelled) return;
+      const bySigning: Record<string, SigningInfo> = {};
+      for (const r of (requests ?? []) as unknown as { id: string; status: SigningInfo["status"]; family_requirement_id: string; sign_signers: SigningInfo["signers"] }[]) {
+        bySigning[r.family_requirement_id] = { id: r.id, status: r.status, signers: [...(r.sign_signers ?? [])].sort((a, b) => a.slot - b.slot) };
+      }
+      setSigning(bySigning);
       setLoading(false);
     }
     loadCompliance();
@@ -325,7 +341,7 @@ function FamilyCompliance({ familyId }: { familyId: string }) {
         {years.map((year) => <option key={year.id} value={year.id}>{year.label}{year.is_current ? " (current)" : ""}</option>)}
       </select>
     </label>}
-    {loading ? <p className="portal-empty">Loading…</p> : <CompliancePanel items={items} />}
+    {loading ? <p className="portal-empty">Loading…</p> : <CompliancePanel items={items} signing={signing} />}
   </>;
 }
 

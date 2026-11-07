@@ -305,9 +305,9 @@ html[data-app][data-platform="ios"] dialog.child-detail-panel::backdrop {
 }
 
 /* Capsule controls with a comfortable touch target. */
-html[data-app][data-platform="ios"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab),
-html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-bubble button):not(.messages-suggest button):not(.app-header button):not(.app-tab),
-html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab),
+html[data-app][data-platform="ios"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab):not(.report-picker button),
+html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-bubble button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
+html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab):not(.report-picker button),
 html[data-app][data-platform="ios"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn) {
   min-height: 44px;
   padding: 10px 20px;
@@ -399,9 +399,9 @@ html[data-app][data-platform="android"] dialog.child-detail-panel::before {
   background: rgba(var(--navy-rgb), .4);
 }
 
-html[data-app][data-platform="android"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab),
-html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-bubble button):not(.messages-suggest button):not(.app-header button):not(.app-tab),
-html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab),
+html[data-app][data-platform="android"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab):not(.report-picker button),
+html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-bubble button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
+html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab):not(.report-picker button),
 html[data-app][data-platform="android"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn) {
   min-height: 48px;
   padding: 10px 24px;
@@ -565,11 +565,12 @@ html[data-app][data-platform="android"] .messages-list-head button {
   margin-top: 18px;
 }
 
-/* ---- Status bar strip on the installed iPhone app --------------------------
-   The status bar is transparent there (see appleWebApp in layout.tsx), so the
+/* ---- Status bar strip on the iPhone apps (installed PWA and native) ----------
+   The status bar is transparent there (see appleWebApp in layout.tsx, and
+   ViewController in the iOS project), so the
    page paints a solid navy strip behind the clock and battery. The system
    draws the clock in white, which this keeps readable on every page. */
-html[data-shell="standalone"][data-platform="ios"]::before {
+html[data-app][data-platform="ios"]::before {
   content: "";
   position: fixed;
   z-index: 60;
@@ -585,4 +586,43 @@ html[data-shell="standalone"][data-platform="ios"]::before {
   padding-left: 20px;
   color: rgba(var(--navy-rgb), .8);
   font-size: 16px;
+}
+
+/* ---- Sign-in screen in the apps ------------------------------------------
+   Just the way in: the logo, "Sign in", the form, and the legal links. The
+   homepage link, the marketing headline and the preview link belong to the
+   website, not to an app a family has already installed. */
+html[data-app] .portal-back,
+html[data-app] .portal-entry .preview-link,
+html[data-app] .portal-entry-copy,
+html[data-app] .portal-entry-card .eyebrow,
+html[data-app] .portal-entry-card h1 {
+  display: none;
+}
+
+html[data-app] .portal-entry-card {
+  justify-content: flex-start;
+  min-height: 100dvh;
+  padding: calc(64px + env(safe-area-inset-top)) 24px calc(32px + env(safe-area-inset-bottom));
+}
+
+html[data-app] .portal-entry-brand {
+  width: 220px;
+}
+
+html[data-app] .portal-entry-card .portal-entry-app-title {
+  display: block;
+  margin: 28px 0 18px;
+  color: var(--navy);
+  font: 700 32px var(--serif);
+}
+
+html[data-app] .portal-entry-card .signin-stack {
+  width: 100%;
+  max-width: 420px;
+}
+
+html[data-app] .portal-entry .portal-legal-links {
+  margin-top: auto;
+  padding-top: 28px;
 }
