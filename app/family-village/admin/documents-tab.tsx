@@ -130,7 +130,7 @@ export default function DocumentsTab() {
   }
   if (view.kind === "send") {
     const req = required[view.template.id];
-    return <SendPanel template={view.template} requirementId={req?.active ? req.id : null} yearLabel={yearLabel} onClose={() => setView({ kind: "list" })} onSent={() => { load(); setRefreshKey((k) => k + 1); }} />;
+    return <SendPanel template={view.template} requirementId={req?.active ? req.id : null} yearLabel={yearLabel} onClose={() => setView({ kind: "list" })} onSent={(summary) => { setMessage(summary); setView({ kind: "list" }); load(); setRefreshKey((k) => k + 1); }} />;
   }
 
   return <div className="documents-tab">
