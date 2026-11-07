@@ -180,11 +180,12 @@ export default function FieldEditor({ template, locked, onClose, onSaved, pdfByt
             </select></label>
           <label><span className="field-caption">For</span>
             <select value={slot} onChange={(e) => setSlot(Number(e.target.value) as 1 | 2)}>
-              <option value={1}>Signer 1</option><option value={2}>Signer 2</option>
+              <option value={1}>Signer 1</option><option value={2}>Signer 2 (only if there is a second adult)</option>
             </select></label>
           <label><span className="field-caption">Page</span>
             <input type="number" min={1} max={pageCount} value={page} onChange={(e) => setPage(clamp(Number(e.target.value) || 1, 1, pageCount))} /></label>
           <button type="button" className="ghost" onClick={() => add(page, 0.5, 0.5, ratios.current.get(page) ?? 0.77)}>Add to page {page}</button>
+          <p className="sign-hint">Most documents need only signer 1. Add signer 2 fields only if a second adult should sign too; a household with one adult simply gets signer 1\u2019s fields.</p>
           <p className="sign-hint">Or click anywhere on a page to place one there. Drag to move; drag the corner to resize.</p>
         </fieldset>}
 
@@ -196,7 +197,7 @@ export default function FieldEditor({ template, locked, onClose, onSaved, pdfByt
             </select></label>
           <label><span className="field-caption">Belongs to</span>
             <select value={current.signer_slot} disabled={locked} onChange={(e) => patch(current.key, { signer_slot: Number(e.target.value) as 1 | 2 })}>
-              <option value={1}>Signer 1</option><option value={2}>Signer 2</option>
+              <option value={1}>Signer 1</option><option value={2}>Signer 2 (only if there is a second adult)</option>
             </select></label>
           {(current.kind === "text" || current.kind === "checkbox") && <label><span className="field-caption">Prompt shown to the signer</span>
             <input value={current.label} maxLength={80} disabled={locked} onChange={(e) => patch(current.key, { label: e.target.value })} /></label>}

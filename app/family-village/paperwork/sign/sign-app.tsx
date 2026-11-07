@@ -167,6 +167,9 @@ export default function SignApp() {
       const filled = loaded.values.find((v) => v.field_id === f.id);
       const mine = !!me && f.signer_slot === me.slot && status !== "completed";
 
+      // A field for a slot nobody was asked to sign (the household has one adult).
+      if (!signer) return null;
+
       if (!mine) {
         // Someone else's field: show it quietly, or show it signed.
         const text = filled ? (f.kind === "signature" || f.kind === "initials" ? "✓ signed" : f.kind === "checkbox" ? (filled.value === "true" ? "☒" : "☐") : filled.value) : nameOf(f.signer_slot);
