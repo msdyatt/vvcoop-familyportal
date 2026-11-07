@@ -114,7 +114,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
     // never sees last year's handbook sitting unsigned.
     const compliance = await supabase
       .from("family_requirements")
-      .select("id,requirement_id,family_id,status,signed_document_id,signed_at,signing_url,provider_document_id,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,amount_per_family,amount_per_child,payment_url,due_on,school_years!inner(is_current))")
+      .select("id,requirement_id,family_id,status,signed_document_id,signed_at,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,sign_template_id,amount_per_family,amount_per_child,payment_url,due_on,school_years!inner(is_current))")
       .in("family_id", safeFamilyIds)
       .eq("requirements.active", true)
       .eq("requirements.school_years.is_current", true);
@@ -307,7 +307,7 @@ function FamilyCompliance({ familyId }: { familyId: string }) {
       if (!supabase) return;
       const { data } = await supabase
         .from("family_requirements")
-        .select("id,requirement_id,family_id,status,signed_document_id,signed_at,signing_url,provider_document_id,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,public_sign_url,amount_per_family,amount_per_child,payment_url,due_on)")
+        .select("id,requirement_id,family_id,status,signed_document_id,signed_at,amount_due,amount_paid,paid_at,payment_method,payment_reference,note,requirements!inner(id,school_year_id,kind,title,description,active,sort_order,document_id,sign_template_id,amount_per_family,amount_per_child,payment_url,due_on)")
         .eq("family_id", familyId)
         .eq("requirements.active", true)
         .eq("requirements.school_year_id", yearId);

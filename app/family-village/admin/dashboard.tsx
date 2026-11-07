@@ -11,7 +11,7 @@ const CARDS: { eyebrow: string; number: string; title: string; description: stri
   { eyebrow: "Publishing", number: "06", title: "Share news and calendar", description: "Publish stories, media, and co-op-wide calendar events for the right audience.", button: "Create or schedule", tab: "news" },
   { eyebrow: "Reports", number: "07", title: "Print what you need", description: "Prepare family-readiness, class, and roster reports from current portal records.", button: "Open reports", tab: "reports" },
   { eyebrow: "Oversight", number: "08", title: "Review activity", description: "Important access and administrative changes are recorded for accountability.", button: "View activity", tab: "activity" },
-  { eyebrow: "Configuration", number: "09", title: "Connect your tools", description: "OpenSign is connected and sending documents. The rest are notes about tools the co-op uses elsewhere.", button: "Manage integrations", tab: "integrations" },
+  { eyebrow: "Configuration", number: "09", title: "Connect your tools", description: "Email delivery, the office printer and the Facebook group link. Signing is built in and lives under Documents.", button: "Manage integrations", tab: "integrations" },
 ];
 
 export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: Tab) => void }) {

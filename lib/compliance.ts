@@ -17,10 +17,8 @@ export type Requirement = {
   active: boolean;
   sort_order: number;
   document_id: string | null;
-  /** OpenSign public template link, shared by every family. */
-  public_sign_url: string | null;
-  /** OpenSign template sent per family. Preferred: it carries the signature field positions. */
-  opensign_template_id: string | null;
+  /** The in-portal signing document this requirement is sent from (Admin, Documents). */
+  sign_template_id: string | null;
   amount_per_family: number | null;
   amount_per_child: number | null;
   payment_url: string | null;
@@ -34,15 +32,15 @@ export type FamilyRequirement = {
   status: ComplianceStatus;
   signed_document_id: string | null;
   signed_at: string | null;
-  signing_url: string | null;
+  /** Left over from the retired e-signature service; kept as history. */
   provider_document_id: string | null;
   amount_due: number | null;
   amount_paid: number;
   paid_at: string | null;
   payment_method: string | null;
   payment_reference: string | null;
+  /** Link to a certificate from the retired e-signature service; kept as history. */
   certificate_url: string | null;
-  last_synced_at: string | null;
   note: string | null;
 };
 

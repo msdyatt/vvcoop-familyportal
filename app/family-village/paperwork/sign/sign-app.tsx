@@ -80,6 +80,17 @@ export default function SignApp() {
     return () => { cancelled = true; };
   }, [access, requestId, load]);
 
+  // A fully signed request that is still waiting for its sealed copy (the timestamp
+  // authority was down, or the last signer closed the tab) is finished by whoever
+  // opens it next. Safe to repeat: the database allows one sealing at a time.
+  const retried = useRef(false);
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !requestId || retried.current || loaded?.request.status !== "signed") return;
+    retried.current = true;
+    requestSeal(supabase, requestId).then((result) => { if (result.ok) load(); });
+  }, [loaded, requestId, load]);
+
   const me = loaded?.signers.find((s) => s.user_id === userId) ?? null;
   const myFields = useMemo(() => loaded?.fields.filter((f) => me && f.signer_slot === me.slot) ?? [], [loaded, me]);
   const status = loaded?.request.status;
