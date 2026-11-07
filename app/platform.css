@@ -626,3 +626,23 @@ html[data-app] .portal-entry .portal-legal-links {
   margin-top: auto;
   padding-top: 28px;
 }
+
+/* ---- Bigger buttons in the apps and on phones ---------------------------------
+   The actions people press to finish something (saving, sending, signing in,
+   printing) get a comfortable, obvious size. Small inline controls (icon
+   buttons, chips, table links) keep theirs. */
+html[data-app] :is(form button[type="submit"], .row-actions button, .portal-form button, .signin-stack button, .report-actions button, .bar-footer button, .email-button, .integration-card button, .add-class-form button, .class-card-head button, .compliance-banner a):not(.messages-icon-btn):not(.bar-icon-btn):not(.grade-chip):not(.mode-switch),
+html[data-app] dialog.child-detail-panel button:not(.child-detail-close):not(.bar-icon-btn) {
+  min-height: 52px;
+  padding: 14px 26px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  :is(form button[type="submit"], .row-actions button, .signin-stack button, .report-actions button, .bar-footer button):not(.messages-icon-btn):not(.bar-icon-btn):not(.grade-chip):not(.mode-switch):not(.cal-today) {
+    min-height: 48px;
+    padding: 12px 22px;
+    font-size: 15px;
+  }
+}

@@ -3,6 +3,7 @@ import "./globals.css";
 import "./platform.css";
 import { PLATFORM_SCRIPT } from "../lib/platform";
 import ErrorReporter from "./error-reporter";
+import Toaster from "./toaster";
 import GlobalErrorBoundary from "./global-error-boundary";
 
 export const viewport: Viewport = {
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </head>
     <body>
       <ErrorReporter />
+      <Toaster />
       <GlobalErrorBoundary>{children}</GlobalErrorBoundary>
     </body>
   </html>;
