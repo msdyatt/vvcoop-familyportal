@@ -29,7 +29,7 @@ export default function PrivacyPolicy() { return <>
       <li><strong>Contact details</strong> — display name, phone number, and an emergency contact, if provided.</li>
       <li><strong>Household and children</strong> — a household name, and for each child: first and last name, birthdate or grade, and an optional photo.</li>
       <li><strong>Class and enrollment records</strong> — which classes and electives each child is enrolled in, and related schedule information.</li>
-      <li><strong>Compliance records</strong> — signed forms (through our e-signature provider, OpenSign) and dues/payment status. We record that a payment was made and how, not full card or bank numbers.</li>
+      <li><strong>Compliance records</strong> — signed forms (signed inside Family Village, see Electronic signatures below) and dues/payment status. We record that a payment was made and how, not full card or bank numbers.</li>
       <li><strong>Teacher notes</strong> — notes teachers write about a student&rsquo;s progress, visible to the people the note says it&rsquo;s for (family, the teaching team, or administrators).</li>
       <li><strong>Messages</strong> — the text and photos you send to other members, who they went to, and when. We also keep whether you have read a conversation, so we can show unread counts.</li>
       <li><strong>Photo library</strong> — photos you add, with any caption, date, class, and album you give them, and who added them. Photos are not tagged with children&rsquo;s names.</li>
@@ -54,10 +54,20 @@ export default function PrivacyPolicy() { return <>
     <ul>
       <li><strong>Supabase</strong> — hosts our database, sign-in, file storage (including photos), and live updates.</li>
       <li><strong>Cloudflare</strong> — hosts the web application and provides page-visit counts.</li>
-      <li><strong>OpenSign</strong> — handles e-signatures for required forms.</li>
+      <li><strong>A time-stamping authority</strong> (DigiCert, unless the co-op changes it) — when a form is finished, it is sent a short fingerprint (a SHA-256 hash) of the signed document and returns a signed time. It never receives the document, a name, or any other detail.</li>
       <li><strong>Resend</strong> — sends invitation and reminder emails, so it sees the recipient&rsquo;s name and email address and the message.</li>
       <li><strong>Apple and Google (Firebase Cloud Messaging)</strong> — carry notifications to phones. They see the notification&rsquo;s title and text.</li>
     </ul>
+
+    <h2>Electronic signatures</h2>
+    <p>Forms the co-op asks you to sign are signed inside Family Village, while you are signed in to your own account. There is no public signing link and no outside signing service.</p>
+    <ul>
+      <li><strong>What is recorded</strong> — the document you were sent; that you agreed to sign electronically and the wording you agreed to; your typed or drawn signature and initials and anything you typed into the form; your account name and email; the time; and the IP address and browser details your device used when you opened, agreed and signed. A history of each step (sent, opened, agreed, signed, reminded, sealed, downloaded) is kept, and it cannot be edited or deleted.</li>
+      <li><strong>Where it is kept</strong> — in the co-op&rsquo;s own Family Village storage with Supabase, the same private storage as the rest of your records. When everyone has signed, the co-op&rsquo;s system produces one signed PDF with a certificate page listing the signers, times and IP addresses, and stores it there.</li>
+      <li><strong>Who can see it</strong> — the adults in your household, the people who signed it, and administrators.</li>
+      <li><strong>If you delete your account</strong> — signed forms are records the co-op may need later, so they stay. Your email address is removed from the signing record and your account is deleted, but your name, the times and the IP address stay on the signed form and its history. Signed forms are also not deleted when a household is deleted.</li>
+    </ul>
+    <p><em>[Flag for legal review: how long signed forms and their history are kept, and whether a parent&rsquo;s electronic signature is enough for liability waivers and other forms that involve a minor.]</em></p>
 
     <h2>Notifications</h2>
     <p>Notifications are optional and off until you turn them on in Account Settings. A message notification shows who sent it and the start of the message, so whether that appears on a locked screen depends on your phone&rsquo;s own notification settings. You can turn notifications off in Account Settings or in your phone or browser settings at any time, and you can mute any single conversation.</p>

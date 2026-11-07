@@ -416,14 +416,14 @@ enabled = true
 # This section was reconciled against the actual deployed verify_jwt value for
 # every function (list_edge_functions, 27 Aug) rather than trusted as-is: four
 # functions (calendar-feed, deliver-emails, send-family-reminder,
-# printer-dispatch) were missing entirely, and opensign-send/opensign-sync were
+# printer-dispatch) were missing entirely, and two functions since removed were
 # recorded here as verify_jwt=true while actually deployed as false. That
 # mismatch matters now that CI runs `supabase functions deploy` on every push
 # to main -- a deploy driven by the stale `true` would have silently flipped
 # both back to requiring a platform-level JWT check, which rejects their own
 # CORS preflight (OPTIONS carries no Authorization header) before the
 # function's own `if (req.method === "OPTIONS")` handler ever runs. That is
-# almost certainly what VV-17's intermittent OpenSign 502/503s actually were.
+# almost certainly what VV-17's intermittent 502/503s actually were.
 
 [functions.invite-family-admin]
 enabled = true
@@ -435,33 +435,6 @@ entrypoint = "./functions/invite-family-admin/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/invite-family-admin/*.html" ]
-
-# Handles its own CORS preflight (an OPTIONS request carries no Authorization
-# header, so verify_jwt=true would reject it before this function's own
-# OPTIONS branch ever runs) -- see the section note above.
-[functions.opensign-send]
-enabled = true
-verify_jwt = false
-import_map = "./functions/opensign-send/deno.json"
-entrypoint = "./functions/opensign-send/index.ts"
-
-# Called by OpenSign itself, which has no Supabase session, so JWT verification
-# is off. The function authenticates the caller with a shared secret instead --
-# OPENSIGN_WEBHOOK_SECRET, presented as ?token= or the
-# x-opensign-webhook-secret header -- and refuses everything if that secret is
-# not set.
-[functions.opensign-webhook]
-enabled = true
-verify_jwt = false
-import_map = "./functions/opensign-webhook/deno.json"
-entrypoint = "./functions/opensign-webhook/index.ts"
-
-# Same self-handled-CORS reasoning as opensign-send above.
-[functions.opensign-sync]
-enabled = true
-verify_jwt = false
-import_map = "./functions/opensign-sync/deno.json"
-entrypoint = "./functions/opensign-sync/index.ts"
 
 # Unauthenticated (no Supabase session) subscription feed, gated instead by the
 # per-class/per-family calendar_token in the URL itself (VV-08).
@@ -514,6 +487,16 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/delete-account/deno.json"
 entrypoint = "./functions/delete-account/index.ts"
+
+# Called by a signed-in person's own session (the last signer, or an administrator
+# retrying). Same self-handled-CORS reasoning as the other browser-called
+# functions that are not behind the platform gate: the caller's access is the
+# database's call, via row level security on sign_requests.
+[functions.esign-seal]
+enabled = true
+verify_jwt = false
+import_map = "./functions/esign-seal/deno.json"
+entrypoint = "./functions/esign-seal/index.ts"
 
 # Administrator-only; always called with a real session. Checked inside as well
 # (active administrator, not a demo account, MFA step-up).

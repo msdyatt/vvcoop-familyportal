@@ -7,8 +7,8 @@ import DemoAccountsCard from "./demo-accounts-card";
 type Integration = { id: string; display_name: string; status: string; public_note: string | null; external_url: string | null; api_base_url: string | null; from_address: string | null; last_checked_at: string | null };
 
 /**
- * Every row here is real -- both OpenSign and the Facebook group link are
- * actually read by the app. This page used to list six services, five of
+ * Every row here is real -- the Facebook group link, Resend and the printer
+ * queue are actually read by the app. This page used to list six services, five of
  * which nothing was wired to; a page that implies five connections exist
  * when one does is worse than a short one that's telling the truth. If a new
  * service gets genuinely integrated later, it earns a row here then.
@@ -41,27 +41,9 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
   }
 
   /**
-   * Asks the server whether OpenSign accepts the stored API token.
-   *
-   * The token lives in a server secret, so the browser cannot check it and an
-   * administrator otherwise has no way to tell a wrong token from a quiet one.
-   * That ambiguity is exactly what let this integration sit broken.
-   */
-  async function testOpenSign() {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setStatus("Testing the OpenSign connection…");
-    const { data, error } = await supabase.functions.invoke("opensign-sync", { body: { mode: "test" } });
-    if (error) { setStatus(`Could not run the test: ${await functionErrorMessage(error, data, error.message)}`); return; }
-    setStatus(data?.detail ?? (data?.ok ? "OpenSign accepted the API token." : "OpenSign rejected the API token."));
-    await load();
-  }
-
-  /**
    * Sends a real test email through Resend to the admin's own address.
    *
-   * Same reasoning as testOpenSign: the API key lives in Vault, not the
-   * browser, so there is no way to confirm the connection works short of
+   * The API key lives in Vault, not the browser, so there is no way to confirm the connection works short of
    * actually sending something and watching it arrive.
    */
   async function testResend() {
@@ -80,8 +62,8 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
   /**
    * Queues a one-page test job -- no printer script exists yet to actually
    * print it, so this only confirms the queue itself (RLS, grants, the row
-   * shape) is wired correctly, the same way testOpenSign/testResend confirm
-   * their own connection before the real thing is trusted.
+   * shape) is wired correctly, the same way testResend confirms its own
+   * connection before the real thing is trusted.
    */
   async function testPrint() {
     const supabase = getSupabaseBrowserClient();
@@ -100,16 +82,6 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
 
   return <section className="integrations-manage">
     <p className="admin-form-status" role="status">{status || "Everything on this page is a real, working connection."}</p>
-    <aside className="integration-help">
-      <p className="card-kicker">OpenSign setup</p>
-      <ol>
-        <li><b>API base URL</b> — <code>https://app.opensignlabs.com/api/v1.2</code> for the hosted service, <code>https://eu-app.opensignlabs.com/api/v1.2</code> in the EU, or your own origin plus <code>/api/v1.2</code> if you self-host. Set it in the OpenSign row below.</li>
-        <li><b>API token</b> — OpenSign → Settings → API Token. Set it as the <code>OPENSIGN_API_TOKEN</code> server secret. It is never stored in this database and never reaches the browser.</li>
-        <li><b>Webhook, last</b> — OpenSign only issues a signing key once a live webhook URL is registered, so this step comes after the functions are deployed. In OpenSign → Settings → Webhook, add the deployed <code>opensign-webhook</code> URL, enable authentication, generate the key, then set it as <code>OPENSIGN_WEBHOOK_SECRET</code>.</li>
-      </ol>
-      <p>Sending works as soon as the base URL and API token are set. Until the webhook secret is in place, signature completions will not flow back on their own and statuses stay at <b>sent</b>.</p>
-      <p>Once the base URL is set, the Compliance tab can open OpenSign in a new tab to build a template with real field placement -- paste the template&rsquo;s id back onto the requirement there when it&rsquo;s ready.</p>
-    </aside>
     <aside className="integration-help">
       <p className="card-kicker">Resend setup</p>
       <ol>
@@ -131,10 +103,9 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
     <div className="integrations-list">
       {integrations.map((row) => <IntegrationCard
         key={row.id} row={row} onSave={save}
-        live={row.id === "opensign" || row.id === "resend"}
-        onTest={row.id === "opensign" ? testOpenSign : row.id === "resend" ? testResend : row.id === "printer" ? testPrint : undefined}
+        live={row.id === "resend"}
+        onTest={row.id === "resend" ? testResend : row.id === "printer" ? testPrint : undefined}
         testLabel={row.id === "resend" ? "Send test email" : row.id === "printer" ? "Queue a test page" : "Test connection"}
-        showApiBase={row.id === "opensign"}
         showFromAddress={row.id === "resend"}
       />)}
     </div>
@@ -192,8 +163,8 @@ function RecentPrintJobs() {
   </div>;
 }
 
-function IntegrationCard({ row, onSave, live = false, onTest, testLabel = "Test connection", showApiBase = false, showFromAddress = false }: {
-  row: Integration; onSave: (row: Integration) => void; live?: boolean; onTest?: () => void; testLabel?: string; showApiBase?: boolean; showFromAddress?: boolean;
+function IntegrationCard({ row, onSave, live = false, onTest, testLabel = "Test connection", showFromAddress = false }: {
+  row: Integration; onSave: (row: Integration) => void; live?: boolean; onTest?: () => void; testLabel?: string; showFromAddress?: boolean;
 }) {
   const [local, setLocal] = useState(row);
 
@@ -223,12 +194,8 @@ function IntegrationCard({ row, onSave, live = false, onTest, testLabel = "Test 
       <label>{row.id === "facebook" ? "Group URL — shown on the site" : "External URL"}
         <input value={local.external_url ?? ""} onChange={(event) => setLocal({ ...local, external_url: event.target.value })} placeholder="https://…" />
       </label>
-      {showApiBase && <label>API base URL<input value={local.api_base_url ?? ""} onChange={(event) => setLocal({ ...local, api_base_url: event.target.value })} placeholder="https://api…" /></label>}
       {showFromAddress && <label>From address<input value={local.from_address ?? ""} onChange={(event) => setLocal({ ...local, from_address: event.target.value })} placeholder="Veritas Village <noreply@yourdomain.org>" /></label>}
     </div>
-    {row.id === "opensign" && <p className="field-note">
-      This base URL is read by the signing function every time a document is sent — changing it changes real behaviour.
-    </p>}
     {row.id === "resend" && <p className="field-note">
       Read by the compliance-reminder emails every time they go out — changing it changes real behaviour.
     </p>}
