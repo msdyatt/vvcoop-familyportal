@@ -27,7 +27,7 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
   const [requirements, setRequirements] = useState<RequirementChoice[]>([]);
   const [requirementId, setRequirementId] = useState("");
   // When households are picked by hand, the document can still be tied to a
-  // required document so each household's Paperwork status follows the signing.
+  // required document so each household&rsquo;s Paperwork status follows the signing.
   const [trackId, setTrackId] = useState("");
   const [families, setFamilies] = useState<FamilyChoice[]>([]);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
@@ -110,7 +110,7 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
     </p>
 
     <p className="sign-hint">
-      When this is tied to a required document, each household's Paperwork status follows the signing on its own: it shows Sent when you send it, Complete once everyone it was sent to has signed and the signed copy is sealed, and goes back to Outstanding if you cancel it. Reminders and the compliance matrix use that status.
+      When this is tied to a required document, each household&rsquo;s Paperwork status follows the signing on its own: it shows Sent when you send it, Complete once everyone it was sent to has signed and the signed copy is sealed, and goes back to Outstanding if you cancel it. Reminders and the compliance matrix use that status.
     </p>
 
     <div className="send-panel-grid">
@@ -126,7 +126,7 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
         {mode === "families" && <>
           <label><span className="field-caption">Keep track of it as <i>optional</i></span>
             <select value={trackId} onChange={(e) => setTrackId(e.target.value)}>
-              <option value="">Don't track it as a required document</option>
+              <option value="">Do not track it as a required document</option>
               {requirements.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
             </select></label>
           <input type="search" placeholder="Filter households" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter households" />
