@@ -110,7 +110,7 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
     </p>
 
     <p className="sign-hint">
-      When this is tied to a required document, each household&rsquo;s Paperwork status follows the signing on its own: it shows Sent when you send it, Complete once everyone it was sent to has signed and the signed copy is sealed, and goes back to Outstanding if you cancel it. Reminders and the compliance matrix use that status.
+      When this is tied to a required document, each household&rsquo;s Paperwork status follows the signing on its own: it shows Sent when you send it, Complete once everyone it was sent to has signed and the signed copy is sealed, and goes back to Outstanding if you cancel it. Reminders and the compliance matrix use that status. Each school year has its own requirements, so next year, create that year's requirement and send the same document again: households that signed this year are included.
     </p>
 
     <div className="send-panel-grid">
