@@ -33,6 +33,7 @@ Deno.test("checkout: the amount comes from the database, bank transfer is offere
   assertEquals(session.params["payment_method_types[0]"], "us_bank_account");
   assertEquals(session.params["payment_method_types[1]"], "card");
   assertEquals(session.params["mode"], "payment");
+  assertEquals(session.params["adaptive_pricing[enabled]"], "false", "no currency conversion");
   assertEquals(session.params["customer"], "cus_1");
   assertEquals(session.params["payment_intent_data[metadata][payment_id]"], "pay-1");
   assertEquals(session.params["payment_intent_data[setup_future_usage]"], undefined, "no card is saved unless the household agreed to automatic payments");
