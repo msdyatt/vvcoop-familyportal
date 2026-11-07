@@ -1,7 +1,7 @@
 -- In-house e-signing: who may sign, in what order, what is recorded, and what
 -- can never be changed afterwards.
 begin;
-select plan(103);
+select plan(106);
 
 -- A1 administrator. Household F1: P1 and P2, both fully set up. F2: P3 alone.
 -- F3: P4 (no second factor yet) and P5 (set up). O is an outsider.
@@ -22,6 +22,7 @@ insert into public.user_roles (user_id, role) values
 insert into public.families (id, display_name) values
   ('00000000-0000-0000-0000-0000000000f1', 'One'), ('00000000-0000-0000-0000-0000000000f2', 'Two'),
   ('00000000-0000-0000-0000-0000000000f3', 'Three'), ('00000000-0000-0000-0000-0000000000f4', 'Four');
+insert into public.families (id, display_name) values ('00000000-0000-0000-0000-0000000000f5', 'Empty');
 insert into public.family_members (family_id, user_id, relationship, created_at) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b1', 'Parent', now() - interval '2 days'),
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b2', 'Parent', now() - interval '1 day'),
@@ -111,24 +112,26 @@ select is((select status from public.sign_templates where id = '00000000-0000-00
 insert into sent select public.sign_send(
   '00000000-0000-0000-0000-0000000000d1', array['00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000f2',
     '00000000-0000-0000-0000-0000000000f3']::uuid[], '00000000-0000-0000-0000-0000000000c2', false, 'Please sign by Friday', null);
-select is((select jsonb_array_length(r -> 'sent') from sent), 2, 'sent to the two households that have two adults');
-select is((select r -> 'skipped' -> 0 ->> 'reason' from sent), 'needs_two_adults', 'a single-adult household is skipped, with the reason');
+select is((select jsonb_array_length(r -> 'sent') from sent), 3, 'sent to all three households, including the one with a single adult');
+select is((select count(*)::int from public.sign_signers s join public.sign_requests r on r.id = s.request_id where r.family_id = '00000000-0000-0000-0000-0000000000f2'), 1, 'a one-adult household gets one signer, even though the document has two slots');
 select is((select status from public.family_requirements where family_id = '00000000-0000-0000-0000-0000000000f1'), 'sent', 'the household''s requirement is marked sent');
-select is((select count(*)::int from public.sign_signers where request_id in (select (e ->> 'request_id')::uuid from sent, jsonb_array_elements(r -> 'sent') e)), 4, 'two signers per request');
+select is((select count(*)::int from public.sign_signers where request_id in (select (e ->> 'request_id')::uuid from sent, jsonb_array_elements(r -> 'sent') e)), 5, 'two signers for the two-adult households, one for the other');
 select is((select user_id::text from public.sign_signers s join public.sign_requests r on r.id = s.request_id
            where r.family_id = '00000000-0000-0000-0000-0000000000f1' and s.slot = 1), '00000000-0000-0000-0000-0000000000b1',
           'slot 1 is the adult who joined first');
 select is((select r -> 'skipped' -> 0 ->> 'reason' from (select public.sign_send('00000000-0000-0000-0000-0000000000d1', array['00000000-0000-0000-0000-0000000000f1']::uuid[]) as r) x),
   'already_sent', 'sending the same document to the same household twice is refused');
+select is((select r -> 'skipped' -> 0 ->> 'reason' from (select public.sign_send('00000000-0000-0000-0000-0000000000d1', array['00000000-0000-0000-0000-0000000000f5']::uuid[]) as r) x),
+  'no_adult', 'a household with no adult at all is skipped');
 select throws_ok($$select public.sign_save_fields('00000000-0000-0000-0000-0000000000d1', null, '[]'::jsonb)$$,
   'P0001', 'This document has been sent, so its fields are locked. Make a copy to change them.', 'once sent, the fields are frozen');
 reset role;
 
-select is((select count(*)::int from public.notifications where kind = 'sign_request'), 4, 'every signer is notified in the app');
-select is((select count(*)::int from public.email_outbox where kind = 'sign_request' and html_body like '%Liability%'), 4, 'and by email');
+select is((select count(*)::int from public.notifications where kind = 'sign_request'), 5, 'every signer is notified in the app');
+select is((select count(*)::int from public.email_outbox where kind = 'sign_request' and html_body like '%Liability%'), 5, 'and by email');
 select is((select count(*)::int from public.email_outbox where kind = 'sign_request' and html_body like '%http%' and html_body not like '%family.veritasvillage.org/family-village/paperwork%'), 0, 'the only link is to the portal''s own paperwork page');
-select is((select count(*)::int from public.sign_events where action in ('created', 'sent')), 4, 'creating and sending are in the audit trail');
-select is((select count(*)::int from public.audit_log where action = 'sign_request_sent'), 2, 'and in the administrators'' activity log');
+select is((select count(*)::int from public.sign_events where action in ('created', 'sent')), 6, 'creating and sending are in the audit trail');
+select is((select count(*)::int from public.audit_log where action = 'sign_request_sent'), 3, 'and in the administrators'' activity log');
 
 
 select throws_ok($$update public.sign_templates set sha256 = repeat('c', 64) where id = '00000000-0000-0000-0000-0000000000d1'$$,
@@ -171,14 +174,14 @@ reset role;
 
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}', true);
 set local role authenticated;
-select is((select public.sign_eligibility() -> 'blockers' ->> 0), 'mfa_not_verified', 'a session at the first factor only is told to verify');
+select is((select public.sign_eligibility() ->> 'eligible'), 'true', 'a second factor is not a condition of signing, so a session that has not stepped up is not blocked by the signing rules (the rest of the portal still asks)');
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b4","role":"authenticated","aal":"aal1"}', true);
 set local role authenticated;
-select is((select public.sign_eligibility() -> 'blockers' ->> 0), 'mfa_not_enrolled', 'someone with no second factor is told to set one up');
-select throws_ok($$select public.sign_give_consent((select id from public.sign_requests where family_id = '00000000-0000-0000-0000-0000000000f3'))$$,
-  'P0001', 'Finish setting up your account before signing.', 'and cannot consent');
+select is((select public.sign_eligibility() ->> 'eligible'), 'true', 'someone with no second factor set up can sign');
+select lives_ok($$select public.sign_give_consent((select id from public.sign_requests where family_id = '00000000-0000-0000-0000-0000000000f3'))$$,
+  'and can agree to sign electronically');
 reset role;
 
 -- Each other way an account can be unfinished, one at a time (P3 stands in).
@@ -255,6 +258,15 @@ reset role;
 select is((select status from public.sign_requests where id = (select id from req)), 'signed', 'the request waits to be sealed');
 select ok(public.sign_claim_seal((select id from req)), 'the sealing service claims it');
 select ok(not public.sign_claim_seal((select id from req)), 'and nobody else can at the same time');
+
+-- a one-adult household signs alone and the request completes
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b3","role":"authenticated","aal":"aal2"}', true);
+set local role authenticated;
+select lives_ok($$select public.sign_give_consent((select id from public.sign_requests where family_id = '00000000-0000-0000-0000-0000000000f2'))$$, 'the only adult in a household consents');
+select is((select public.sign_submit((select id from public.sign_requests where family_id = '00000000-0000-0000-0000-0000000000f2'),
+  '{"kind":"typed","text":"P3"}'::jsonb, null, jsonb_build_object((select id::text from public.sign_fields where kind = 'text'), '555-0199')) ->> 'all_signed'),
+  'true', 'and signing alone completes the request, with no second signer to wait for');
+reset role;
 
 -- ---- sequential order ---------------------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal2"}', true);

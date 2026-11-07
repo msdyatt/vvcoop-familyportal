@@ -74,8 +74,6 @@ export const BLOCKER_TEXT: Record<string, string> = {
   account_not_active: "Your account is not active yet. An administrator needs to finish setting it up.",
   invitation_not_accepted: "Your invitation has not been accepted yet. Open the invitation email and finish setting up your account.",
   profile_incomplete: "Your profile needs your name. Add it under Account & Security.",
-  mfa_not_enrolled: "Set up two-step verification under Account & Security. Signing needs it.",
-  mfa_not_verified: "Verify your second factor for this session, then come back.",
 };
 
 export function blockerSentences(codes: string[]): string[] {

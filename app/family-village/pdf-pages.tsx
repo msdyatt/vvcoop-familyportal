@@ -28,7 +28,8 @@ type PdfPage = {
 export default function PdfPages({ data, renderOverlay, onPageClick, onLoaded, maxWidth = 900 }: {
   data: Uint8Array | null;
   renderOverlay?: (page: number) => ReactNode;
-  onPageClick?: (page: number, xFraction: number, yFraction: number) => void;
+  /** A click on empty page: where, as fractions from the top-left, and the page's width / height. */
+  onPageClick?: (page: number, xFraction: number, yFraction: number, ratio: number) => void;
   onLoaded?: (pageCount: number) => void;
   maxWidth?: number;
 }) {
@@ -116,7 +117,7 @@ export default function PdfPages({ data, renderOverlay, onPageClick, onLoaded, m
         onClick={onPageClick ? (event) => {
           if (event.target !== event.currentTarget) return;
           const rect = event.currentTarget.getBoundingClientRect();
-          onPageClick(n, (event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height);
+          onPageClick(n, (event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height, rect.width / rect.height);
         } : undefined}
       >
         {renderOverlay?.(n)}
@@ -124,4 +125,16 @@ export default function PdfPages({ data, renderOverlay, onPageClick, onLoaded, m
       <span className="pdf-page-number">Page {n} of {pages.length}</span>
     </div>)}
   </div>;
+}
+
+/** SHA-256 and page count of a PDF the browser has just been handed, before it is uploaded. */
+export async function readPdfInfo(bytes: Uint8Array): Promise<{ sha256: string; pages: number }> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes.slice().buffer);
+  const sha256 = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  const doc = await pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
+  const pages = doc.numPages;
+  await doc.destroy();
+  return { sha256, pages };
 }

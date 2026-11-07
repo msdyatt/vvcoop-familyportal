@@ -292,4 +292,23 @@ Deno.test("timestamp: a failure of the second stamp does not stop the seal, and 
   assert(calls.uploads.has(tokenPath(req.id)));
   assertEquals(calls.uploads.has(sealedTokenPath(req.id)), false);
   assertEquals(logged[1].error, "authority unreachable");
+
+Deno.test("seal: a one-adult household signs alone; fields for the unused second slot are left off", async () => {
+  const { store, calls, req } = await fakeStore();
+  const oneSigner: SealStore = {
+    ...store,
+    loadRecord: () => {
+      const r = record();
+      r.signers = r.signers.filter((s) => s.slot === 1);
+      r.values = r.values.filter((v) => v.signer_id === "s1");
+      r.events = r.events.filter((e) => e.signer_id !== "s2");
+      return Promise.resolve(r);
+    },
+  };
+  const out = await sealRequest(oneSigner, req.id);
+  assert(out.ok, out.ok ? "" : out.message);
+  assertEquals(calls.failed, []);
+  const sealed = calls.uploads.get(sealedPath(req.id))!;
+  assert(await contains(sealed, "Parent One"));
+  assertEquals(await contains(sealed, "Parent Two"), false);
 });
