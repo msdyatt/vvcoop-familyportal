@@ -269,7 +269,7 @@ function Payments({ payments, provider, approvals, busy, run, callAdmin, onMessa
 }
 
 function Approvals({ approvals, actorUserId, busy, run }: { approvals: Approval[]; actorUserId: string; busy: boolean; run: Run }) {
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
   return <>
     <p className="dues-note">Live billing actions need a second administrator. A request lasts 30 minutes and can be used once. Test mode never needs one.</p>
     <ul className="dues-ledger">
