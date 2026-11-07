@@ -42,3 +42,32 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return config
     }
 }
+
+/// The app's one screen: Capacitor's web view, with the top of the screen kept clean.
+///
+/// iOS 26 and later draws a blurred "scroll edge" effect where content slides
+/// under the status bar. On this app's header that read as a haze above the
+/// page. The page paints its own solid navy strip behind the status bar (see
+/// platform.css), so the system effect is switched off and the status bar text
+/// is light, to read on that navy.
+class ViewController: CAPBridgeViewController {
+
+    override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        removeTopEdgeEffect()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        removeTopEdgeEffect()
+    }
+
+    private func removeTopEdgeEffect() {
+        guard let scrollView = webView?.scrollView else { return }
+        if #available(iOS 26.0, *) {
+            scrollView.topEdgeEffect.isHidden = true
+        }
+    }
+}

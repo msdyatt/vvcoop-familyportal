@@ -194,7 +194,6 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
 
   return <main className="live-portal">
     <AppHeader current="home" roles={portal?.roles ?? []} title={VIEW_HEADERS[view].title} subtitle={VIEW_HEADERS[view].subtitle} />
-    {view !== "home" && <a className="portal-back" href="/family-village/home">← Family home</a>}
     {view === "home" && <ComplianceBanner items={portal?.compliance ?? []} />}
     {(view === "home" || view === "children") && portal?.enrollmentPeriod && <aside className="compliance-banner" role="status">
       <span className="compliance-banner-count">✓</span>
