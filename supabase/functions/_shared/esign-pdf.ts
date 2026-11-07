@@ -367,7 +367,7 @@ export async function appendCertificate(
 
   w.heading("What this certificate does and does not prove");
   w.text(
-    "Each signer was signed in to their own Family Village account, with a second factor, when they agreed to sign electronically and when they signed. " +
+    "Each signer was signed in to their own Family Village account when they agreed to sign electronically and when they signed. " +
     "The time, IP address and browser above were recorded by the server, not reported by the signer. " +
     "The two SHA-256 values identify the file that was sent and the signed content exactly; changing a single byte changes them.",
     { size: 8.5, gap: 3 },
