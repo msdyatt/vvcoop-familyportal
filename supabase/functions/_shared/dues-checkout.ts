@@ -101,6 +101,8 @@ async function openSession(deps: Deps, input: CheckoutInput, started: any, origi
     const session = await stripe.post("/v1/checkout/sessions", {
       mode: "payment",
       customer: customerId,
+      // Families pay exactly the dues amount in dollars; no currency conversion.
+      adaptive_pricing: { enabled: false },
       client_reference_id: paymentId,
       // Bank transfer first: it is the cheapest way for the co-op to be paid.
       // Apple Pay and Google Pay appear under the card option when the device supports them.
