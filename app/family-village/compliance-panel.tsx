@@ -2,12 +2,16 @@
 
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { getSignedFileUrl } from "../../lib/storage";
+import { SignRequestStatus, SignerStatus, requestStatusLabel } from "../../lib/sign";
 import {
   FamilyRequirement, Requirement, formatDate, formatMoney,
   isSettled, outstandingCount, statusLabel, statusTone,
 } from "../../lib/compliance";
 
 export type ComplianceItem = { row: FamilyRequirement; requirement: Requirement };
+
+/** The in-portal signing request behind a required document, with who has signed. */
+export type SigningInfo = { id: string; status: SignRequestStatus; signers: { slot: number; display_name: string; status: SignerStatus }[] };
 
 /**
  * Sits directly under the header and says, in one line, whether this family has
@@ -31,7 +35,7 @@ export function ComplianceBanner({ items }: { items: ComplianceItem[] }) {
 }
 
 /** The full list: every requirement for the year, settled or not. */
-export function CompliancePanel({ items }: { items: ComplianceItem[] }) {
+export function CompliancePanel({ items, signing = {} }: { items: ComplianceItem[]; signing?: Record<string, SigningInfo> }) {
   if (!items.length) {
     return <p className="portal-empty">Nothing is required of your family right now. Forms and dues will appear here when the Village sets them for the year.</p>;
   }
@@ -45,11 +49,11 @@ export function CompliancePanel({ items }: { items: ComplianceItem[] }) {
   });
 
   return <ul className="compliance-list">
-    {ordered.map((item) => <ComplianceRow key={item.row.id} item={item} />)}
+    {ordered.map((item) => <ComplianceRow key={item.row.id} item={item} signing={signing[item.row.id]} />)}
   </ul>;
 }
 
-function ComplianceRow({ item }: { item: ComplianceItem }) {
+function ComplianceRow({ item, signing }: { item: ComplianceItem; signing?: SigningInfo }) {
   const { row, requirement } = item;
   const settled = isSettled(row.status);
   const isDues = requirement.kind === "dues";
@@ -73,6 +77,9 @@ function ComplianceRow({ item }: { item: ComplianceItem }) {
       </span>}
       {!settled && requirement.due_on && <span className="compliance-due">Due {formatDate(requirement.due_on)}</span>}
       {row.note && <span className="compliance-note">{row.note}</span>}
+      {signing && signing.signers.length > 0 && <span className="compliance-signers">
+        {signing.signers.map((s) => `${s.display_name}: ${s.status === "signed" ? "signed" : "not yet"}`).join(" · ")}
+      </span>}
     </div>
 
     <span className={`status-pill ${statusTone(row.status)}`}>{statusLabel(requirement.kind, row)}</span>
@@ -83,18 +90,16 @@ function ComplianceRow({ item }: { item: ComplianceItem }) {
       {!settled && isDues && requirement.payment_url &&
         <a className="compliance-cta" href={requirement.payment_url} target="_blank" rel="noreferrer">Pay now ↗</a>}
 
-      {/* Two ways a document can be signed. A per-family link from an API send
-          takes precedence when one exists, because it is tied to this household;
-          otherwise the co-op's shared public template link is used. Both open in
-          a new tab -- OpenSign's signing page fetches inside an iframe but
-          renders nothing, so embedding it would show families an empty box. */}
-      {!settled && !isDues && (row.signing_url || requirement.public_sign_url) &&
-        <a className="compliance-cta" href={(row.signing_url ?? requirement.public_sign_url)!} target="_blank" rel="noreferrer">Sign now ↗</a>}
+      {/* Signing happens here, in the portal, for a signed-in person. */}
+      {!isDues && signing && signing.status !== "voided" &&
+        <a className="compliance-cta" href={`/family-village/paperwork/sign?request=${signing.id}`}>
+          {signing.status === "completed" ? "View signed copy" : signing.status === "signed" ? requestStatusLabel(signing.status) : "Review & sign"}
+        </a>}
 
-      {!settled && !isDues && !row.signing_url && !requirement.public_sign_url &&
-        <span className="compliance-hint">A signing link will appear here shortly.</span>}
+      {!settled && !isDues && !signing &&
+        <span className="compliance-hint">The co-op has not sent this for signing yet. You will be notified when it arrives.</span>}
 
-      {settled && !isDues && row.signed_document_id &&
+      {settled && !isDues && !signing && row.signed_document_id &&
         <button className="compliance-cta ghost" onClick={openSignedCopy}>Download copy</button>}
     </div>
   </li>;

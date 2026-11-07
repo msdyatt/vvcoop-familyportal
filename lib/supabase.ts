@@ -18,7 +18,7 @@ export function isSupabaseConfigured() {
  * caller has to fetch and parse itself. Every call site that skipped this and
  * just read `error?.message` showed that generic sentence instead of, say,
  * "Please purchase or renew your subscription" -- which reads as "erroring
- * out for no reason" instead of "OpenSign needs your attention."
+ * out for no reason" instead of "this service needs your attention."
  */
 export async function functionErrorMessage(error: unknown, data: { error?: string } | null | undefined, fallback: string): Promise<string> {
   if (data?.error) return data.error;
