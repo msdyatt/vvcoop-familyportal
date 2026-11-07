@@ -93,12 +93,12 @@ export default function SignatureDialog({ kind, defaultName, onAdopt, onCancel }
         <canvas ref={canvas} className="sign-pad" width={600} height={kind === "signature" ? 200 : 160}
           onPointerDown={start} onPointerMove={move} onPointerUp={() => { drawing.current = false; }} onPointerCancel={() => { drawing.current = false; }}
           aria-label={`Draw your ${noun} here`} />
-        <button type="button" className="compliance-cta ghost" onClick={clear}>Clear</button>
+        <button type="button" className="sign-big secondary compact" onClick={clear}>Clear</button>
       </>}
       <p className="sign-hint">By adopting this, you accept it as your legal {noun} on this document.</p>
       <div className="sign-dialog-actions">
-        <button type="button" className="compliance-cta ghost" onClick={onCancel}>Cancel</button>
-        <button type="button" className="compliance-cta" onClick={adopt} disabled={mode === "type" ? !text.trim() : !hasInk}>Adopt {noun}</button>
+        <button type="button" className="sign-big secondary compact" onClick={onCancel}>Cancel</button>
+        <button type="button" className="sign-big" onClick={adopt} disabled={mode === "type" ? !text.trim() : !hasInk}>Adopt {noun}</button>
       </div>
     </div>
   </DetailModal>;

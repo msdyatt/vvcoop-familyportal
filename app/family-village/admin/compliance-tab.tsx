@@ -199,7 +199,7 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
       </p>}
     </div>
 
-    <p className="admin-form-status" role="status">{status || "Add what families must sign or pay this year, then open each requirement to every household. School years live in Classes."}</p>
+    <p className="admin-form-status" role="status">{status || "Dues are added here. Documents families must sign are added under Documents and show up here. Open each requirement to every household. School years live in Classes."}</p>
 
     {yearId && <RequirementForm yearId={yearId} onSaved={load} onStatus={setStatus} />}
 
@@ -288,7 +288,8 @@ export default function ComplianceTab({ actorUserId }: { actorUserId: string }) 
 }
 
 function RequirementForm({ yearId, onSaved, onStatus }: { yearId: string; onSaved: () => void; onStatus: (message: string) => void }) {
-  const [kind, setKind] = useState<"document" | "dues">("document");
+  // Documents families sign are added under Documents ("Required of every family"). Compliance adds dues.
+  const kind = "dues" as const;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [perFamily, setPerFamily] = useState("300");
@@ -319,14 +320,9 @@ function RequirementForm({ yearId, onSaved, onStatus }: { yearId: string; onSave
   }
 
   return <form onSubmit={submit} className="portal-form compliance-form">
-    <label><span className="field-caption">Type</span>
-      <select value={kind} onChange={(event) => setKind(event.target.value as "document" | "dues")}>
-        <option value="document">Document to sign</option>
-        <option value="dues">Dues to pay</option>
-      </select>
-    </label>
+    <p className="field-note">Add dues here. To require a document that families sign, add it under <a href="?tab=documents">Documents</a> and tick &ldquo;Required of every family&rdquo;; it will appear in this list by itself.</p>
     <label><span className="field-caption">Title</span>
-      <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={kind === "dues" ? "Annual dues" : "Family handbook"} disabled={busy} />
+      <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Annual dues" disabled={busy} />
     </label>
     <label><span className="field-caption">Description <i>optional</i></span>
       <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Shown to families" disabled={busy} />
@@ -334,8 +330,7 @@ function RequirementForm({ yearId, onSaved, onStatus }: { yearId: string; onSave
     <label><span className="field-caption">Due date <i>optional</i></span>
       <input type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} disabled={busy} />
     </label>
-    {kind === "document" && <p className="field-note">After adding it, open Documents to upload the PDF, place the signature fields and send it.</p>}
-    {kind === "dues" && <>
+        {<>
       <label><span className="field-caption">Per family</span>
         <input type="number" min={0} step="0.01" value={perFamily} onChange={(event) => setPerFamily(event.target.value)} disabled={busy} />
       </label>
