@@ -7814,3 +7814,8 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
     break-inside:avoid-page;
   }
 }
+
+/* Shown only inside the apps, in place of the marketing headline (see platform.css). */
+.portal-entry-app-title {
+  display:none;
+}
