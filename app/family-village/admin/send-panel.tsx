@@ -26,6 +26,9 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
   const [mode, setMode] = useState<"requirement" | "families">("requirement");
   const [requirements, setRequirements] = useState<RequirementChoice[]>([]);
   const [requirementId, setRequirementId] = useState("");
+  // When households are picked by hand, the document can still be tied to a
+  // required document so each household's Paperwork status follows the signing.
+  const [trackId, setTrackId] = useState("");
   const [families, setFamilies] = useState<FamilyChoice[]>([]);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
@@ -79,6 +82,7 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
     if (mode === "requirement") {
       args.p_requirement = requirementId || null;
     } else {
+      args.p_requirement = trackId || null;
       args.p_family_ids = [...chosen];
       const override: Record<string, string[]> = {};
       for (const id of chosen) if (assignments[id]?.length === template.signers_required) override[id] = assignments[id];
@@ -105,6 +109,10 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
         : "One adult signs each copy. By default that is the first adult in the household."} Everyone must have accepted their invitation and have a name on their account before they can sign.
     </p>
 
+    <p className="sign-hint">
+      When this is tied to a required document, each household's Paperwork status follows the signing on its own: it shows Sent when you send it, Complete once everyone it was sent to has signed and the signed copy is sealed, and goes back to Outstanding if you cancel it. Reminders and the compliance matrix use that status.
+    </p>
+
     <div className="send-panel-grid">
       <fieldset>
         <legend>Who gets it</legend>
@@ -116,6 +124,11 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
           </select></label>}
         <label className="checkbox-field"><input type="radio" name="mode" checked={mode === "families"} onChange={() => setMode("families")} /> Households I pick</label>
         {mode === "families" && <>
+          <label><span className="field-caption">Keep track of it as <i>optional</i></span>
+            <select value={trackId} onChange={(e) => setTrackId(e.target.value)}>
+              <option value="">Don't track it as a required document</option>
+              {requirements.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
+            </select></label>
           <input type="search" placeholder="Filter households" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter households" />
           <ul className="send-families">
             {visible.map((f) => <li key={f.id}>
