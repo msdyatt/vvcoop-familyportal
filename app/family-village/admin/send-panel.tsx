@@ -7,7 +7,6 @@ import type { Template } from "./field-editor";
 
 type Adult = { user_id: string; name: string; active: boolean };
 type FamilyChoice = { id: string; name: string; adults: Adult[] };
-type RequirementChoice = { id: string; title: string; outstanding: number; sign_template_id: string | null };
 
 const REASONS: Record<string, string> = {
   no_adult: "has no active adult",
@@ -18,17 +17,16 @@ const REASONS: Record<string, string> = {
 };
 
 /**
- * Sends a document to households: either every household that still owes a
- * required document, or households picked by hand. Who signs in which slot is
- * decided by the order adults joined the household, and can be changed here.
+ * Sends a document to households. If the document is marked required for this
+ * school year (on the Documents list), sending is tracked in Compliance
+ * automatically, and it can go to every household that still owes it. Otherwise
+ * it goes to households picked by hand. Who signs in which slot is decided by
+ * the order adults joined the household, and can be changed here.
  */
-export default function SendPanel({ template, onClose, onSent }: { template: Template; onClose: () => void; onSent: () => void }) {
-  const [mode, setMode] = useState<"requirement" | "families">("requirement");
-  const [requirements, setRequirements] = useState<RequirementChoice[]>([]);
-  const [requirementId, setRequirementId] = useState("");
-  // When households are picked by hand, the document can still be tied to a
-  // required document so each household&rsquo;s Paperwork status follows the signing.
-  const [trackId, setTrackId] = useState("");
+export default function SendPanel({ template, requirementId, yearLabel, onClose, onSent }: {
+  template: Template; requirementId: string | null; yearLabel: string; onClose: () => void; onSent: () => void;
+}) {
+  const [mode, setMode] = useState<"requirement" | "families">(requirementId ? "requirement" : "families");
   const [families, setFamilies] = useState<FamilyChoice[]>([]);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
@@ -45,26 +43,12 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
     if (!supabase) return;
     let cancelled = false;
     (async () => {
-      const [year, fams] = await Promise.all([
-        supabase.from("school_years").select("id").eq("is_current", true).maybeSingle(),
-        supabase.from("families").select("id,display_name,family_members(user_id,profiles(display_name,email,status))").order("display_name"),
-      ]);
+      const { data } = await supabase.from("families").select("id,display_name,family_members(user_id,profiles(display_name,email,status))").order("display_name");
       if (cancelled) return;
-      setFamilies(((fams.data ?? []) as unknown as { id: string; display_name: string; family_members: { user_id: string; profiles: { display_name: string | null; email: string; status: string } | null }[] }[]).map((f) => ({
+      setFamilies(((data ?? []) as unknown as { id: string; display_name: string; family_members: { user_id: string; profiles: { display_name: string | null; email: string; status: string } | null }[] }[]).map((f) => ({
         id: f.id, name: f.display_name,
         adults: f.family_members.map((m) => ({ user_id: m.user_id, name: m.profiles?.display_name || m.profiles?.email || "Adult", active: m.profiles?.status === "active" })),
       })));
-      if (year.data) {
-        const { data: reqs } = await supabase.from("requirements")
-          .select("id,title,sign_template_id,family_requirements(status)")
-          .eq("school_year_id", year.data.id).eq("kind", "document").eq("active", true).order("sort_order");
-        if (cancelled) return;
-        const rows = ((reqs ?? []) as unknown as { id: string; title: string; sign_template_id: string | null; family_requirements: { status: string }[] }[])
-          .filter((r) => !r.sign_template_id || r.sign_template_id === template.id)
-          .map((r) => ({ id: r.id, title: r.title, sign_template_id: r.sign_template_id, outstanding: r.family_requirements.filter((x) => x.status === "outstanding" || x.status === "sent").length }));
-        setRequirements(rows);
-        setRequirementId((current) => current || rows[0]?.id || "");
-      }
     })();
     return () => { cancelled = true; };
   }, [template.id]);
@@ -79,10 +63,9 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
     const args: Record<string, unknown> = {
       p_template: template.id, p_sequential: sequential, p_message: note.trim() || null, p_due_on: dueOn || null,
     };
-    if (mode === "requirement") {
-      args.p_requirement = requirementId || null;
-    } else {
-      args.p_requirement = trackId || null;
+    // A required document is always tracked against this year's requirement.
+    args.p_requirement = requirementId;
+    if (mode !== "requirement") {
       args.p_family_ids = [...chosen];
       const override: Record<string, string[]> = {};
       for (const id of chosen) if (assignments[id]?.length === template.signers_required) override[id] = assignments[id];
@@ -110,25 +93,17 @@ export default function SendPanel({ template, onClose, onSent }: { template: Tem
     </p>
 
     <p className="sign-hint">
-      When this is tied to a required document, each household&rsquo;s Paperwork status follows the signing on its own: it shows Sent when you send it, Complete once everyone it was sent to has signed and the signed copy is sealed, and goes back to Outstanding if you cancel it. Reminders and the compliance matrix use that status. Each school year has its own requirements, so next year, create that year&rsquo;s requirement and send the same document again: households that signed this year are included.
+      {requirementId
+        ? `This is required of every family for ${yearLabel}, so each household's Paperwork status follows the signing on its own: Sent when you send it, Complete once everyone it was sent to has signed and the copy is sealed, and Outstanding again if you cancel it. Next school year, mark it required again and send it to everyone.`
+        : "This document is not marked required, so sending it is not tracked in Compliance. To require it of every family, go back and tick \u201cRequired of every family\u201d on the document."}
     </p>
 
     <div className="send-panel-grid">
       <fieldset>
         <legend>Who gets it</legend>
-        <label className="checkbox-field"><input type="radio" name="mode" checked={mode === "requirement"} onChange={() => setMode("requirement")} /> Every household that still owes a required document this year</label>
-        {mode === "requirement" && <label><span className="field-caption">Required document</span>
-          <select value={requirementId} onChange={(e) => setRequirementId(e.target.value)}>
-            {!requirements.length && <option value="">No required documents this year (add one under Compliance)</option>}
-            {requirements.map((r) => <option key={r.id} value={r.id}>{r.title} · {r.outstanding} outstanding</option>)}
-          </select></label>}
-        <label className="checkbox-field"><input type="radio" name="mode" checked={mode === "families"} onChange={() => setMode("families")} /> Households I pick</label>
+        {requirementId && <label className="checkbox-field"><input type="radio" name="mode" checked={mode === "requirement"} onChange={() => setMode("requirement")} /> Every household that has not signed it yet for {yearLabel}</label>}
+        {requirementId && <label className="checkbox-field"><input type="radio" name="mode" checked={mode === "families"} onChange={() => setMode("families")} /> Households I pick</label>}
         {mode === "families" && <>
-          <label><span className="field-caption">Keep track of it as <i>optional</i></span>
-            <select value={trackId} onChange={(e) => setTrackId(e.target.value)}>
-              <option value="">Do not track it as a required document</option>
-              {requirements.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
-            </select></label>
           <input type="search" placeholder="Filter households" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter households" />
           <ul className="send-families">
             {visible.map((f) => <li key={f.id}>

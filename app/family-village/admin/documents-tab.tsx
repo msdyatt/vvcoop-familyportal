@@ -19,6 +19,9 @@ const COLUMNS = "id,title,storage_path,sha256,page_count,signers_required,status
 export default function DocumentsTab() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [sentCounts, setSentCounts] = useState<Record<string, number>>({});
+  // Which documents are required of every family for the current school year.
+  const [required, setRequired] = useState<Record<string, { id: string; active: boolean; due_on: string | null }>>({});
+  const [yearLabel, setYearLabel] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState<{ kind: "list" } | { kind: "edit" | "send"; template: Template }>({ kind: "list" });
   const [message, setMessage] = useState("");
@@ -29,10 +32,17 @@ export default function DocumentsTab() {
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const [t, r] = await Promise.all([
+    const { data: year } = await supabase.from("school_years").select("id,label").eq("is_current", true).maybeSingle();
+    const [t, r, reqs] = await Promise.all([
       supabase.from("sign_templates").select(COLUMNS).neq("status", "archived").order("created_at", { ascending: false }),
       supabase.from("sign_requests").select("template_id").neq("status", "voided"),
+      year ? supabase.from("requirements").select("id,sign_template_id,active,due_on").eq("school_year_id", year.id).not("sign_template_id", "is", null)
+            : Promise.resolve({ data: [] }),
     ]);
+    setYearLabel(year?.label ?? "");
+    const map: Record<string, { id: string; active: boolean; due_on: string | null }> = {};
+    for (const row of (reqs.data ?? []) as { id: string; sign_template_id: string; active: boolean; due_on: string | null }[]) map[row.sign_template_id] = { id: row.id, active: row.active, due_on: row.due_on };
+    setRequired(map);
     setTemplates((t.data ?? []) as Template[]);
     const counts: Record<string, number> = {};
     for (const row of (r.data ?? []) as { template_id: string }[]) counts[row.template_id] = (counts[row.template_id] ?? 0) + 1;
@@ -93,6 +103,18 @@ export default function DocumentsTab() {
     setMessage(`Made “${t.title} (copy)”. Its fields can be changed.`);
   }
 
+  /** Marks a document required of every family for this school year (or not). It appears in Compliance and Paperwork by itself. */
+  async function setRequiredFor(t: Template, on: boolean, due: string | null) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setMessage("");
+    const { error } = await supabase.rpc("sign_set_required", { p_template: t.id, p_required: on, p_due_on: due });
+    setMessage(error ? friendlyError(error) : on
+      ? `“${t.title}” is now required of every family for ${yearLabel}. It shows in Compliance; send it below when you are ready.`
+      : `“${t.title}” is no longer required for ${yearLabel}. Households keep their records.`);
+    await load();
+  }
+
   async function archive(t: Template) {
     if (!confirm(`Remove “${t.title}” from the list? Anything already sent keeps working.`)) return;
     const supabase = getSupabaseBrowserClient();
@@ -107,7 +129,8 @@ export default function DocumentsTab() {
       onClose={() => { setView({ kind: "list" }); load(); }} onSaved={load} />;
   }
   if (view.kind === "send") {
-    return <SendPanel template={view.template} onClose={() => setView({ kind: "list" })} onSent={() => { load(); setRefreshKey((k) => k + 1); }} />;
+    const req = required[view.template.id];
+    return <SendPanel template={view.template} requirementId={req?.active ? req.id : null} yearLabel={yearLabel} onClose={() => setView({ kind: "list" })} onSent={() => { load(); setRefreshKey((k) => k + 1); }} />;
   }
 
   return <div className="documents-tab">
@@ -119,7 +142,7 @@ export default function DocumentsTab() {
           <button type="button" className="sign-big" disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? "Working…" : "Upload a PDF"}</button>
         </div>
       </div>
-      <p className="sign-hint">Upload a PDF, place signature and other fields on it, then send it to households. Families sign inside Family Village, never from an emailed link.</p>
+      <p className="sign-hint">Upload a PDF, place signature and other fields on it, tick &ldquo;Required of every family&rdquo; if everyone must sign it this year (it then appears in Compliance), and send it. Families sign inside Family Village, never from an emailed link.{!yearLabel && " Set a current school year under Classes to be able to require documents."}</p>
       {message && <p className="admin-form-status" role="status">{message}</p>}
       {!loaded && <p className="portal-empty">Loading…</p>}
       {loaded && !templates.length && <p className="portal-empty">No documents yet. Upload a PDF to begin.</p>}
@@ -132,6 +155,13 @@ export default function DocumentsTab() {
               <span>{t.page_count} {t.page_count === 1 ? "page" : "pages"} · {t.status === "ready" ? t.signers_required === 1 ? "one signer" : "up to two signers" : "fields not finished"}{sent ? ` · sent to ${sent} ${sent === 1 ? "household" : "households"}` : ""}</span>
             </div>
             <span className={`status-pill ${t.status === "ready" ? "signed" : "pending"}`}>{t.status === "ready" ? "Ready to send" : "Draft"}</span>
+            {yearLabel && <div className="documents-required">
+              <label><input type="checkbox" checked={!!required[t.id]?.active} disabled={busy}
+                onChange={(e) => setRequiredFor(t, e.target.checked, required[t.id]?.due_on ?? null)} />
+                <b>Required of every family for {yearLabel}</b></label>
+              {required[t.id]?.active && <label><span className="field-caption">Due</span>
+                <input type="date" defaultValue={required[t.id]?.due_on ?? ""} onBlur={(e) => { if ((e.target.value || null) !== (required[t.id]?.due_on ?? null)) setRequiredFor(t, true, e.target.value || null); }} /></label>}
+            </div>}
             <div className="sent-actions">
               <button type="button" className="sign-big secondary compact" onClick={() => setView({ kind: "edit", template: t })}>{sent ? "View fields" : "Place fields"}</button>
               <button type="button" className="sign-big compact" disabled={t.status !== "ready"} onClick={() => setView({ kind: "send", template: t })}>Send</button>

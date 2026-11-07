@@ -1,7 +1,7 @@
 -- In-house e-signing: who may sign, in what order, what is recorded, and what
 -- can never be changed afterwards.
 begin;
-select plan(110);
+select plan(115);
 
 -- A1 administrator. Household F1: P1 and P2, both fully set up. F2: P3 alone.
 -- F3: P4 (no second factor yet) and P5 (set up). O is an outsider.
@@ -304,6 +304,28 @@ select is((select signed_document_id from public.family_requirements where famil
 select is((select count(*)::int from public.documents where kind = 'signed' and signature_provider = 'in_app'), 1, 'which is filed under the household''s documents');
 select throws_ok($$update public.sign_requests set sealed_sha256 = repeat('f', 64) where id = (select id from req)$$, 'P0001', 'A sealed record cannot be replaced.', 'a sealed record cannot be replaced');
 select throws_ok($$select public.sign_void((select id from req), 'oops')$$, 'P0001', 'A sealed record cannot be voided.', 'or voided');
+
+-- ---- marking a document required from the Documents screen ---------------------------------------------
+insert into public.requirements (id, school_year_id, kind, title) values
+  ('00000000-0000-0000-0000-0000000000c6', '00000000-0000-0000-0000-0000000000c1', 'document', 'handbook');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b3","role":"authenticated","aal":"aal2"}', true);
+set local role authenticated;
+select throws_ok($$select public.sign_set_required('00000000-0000-0000-0000-0000000000d2', true)$$, 'P0001', 'Administrator access is required.', 'only an administrator can mark a document required');
+reset role;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal2"}', true);
+set local role authenticated;
+select is((select public.sign_set_required('00000000-0000-0000-0000-0000000000d2', true, date '2027-01-31')), '00000000-0000-0000-0000-0000000000c6'::uuid,
+  'marking a document required adopts the existing requirement with the same title instead of making a duplicate');
+select is((select count(*)::int from public.requirements where sign_template_id = '00000000-0000-0000-0000-0000000000d2'), 1, 'so there is exactly one requirement for it, which Compliance shows');
+select is((select public.sign_set_required('00000000-0000-0000-0000-0000000000d2', true, date '2027-01-31')), '00000000-0000-0000-0000-0000000000c6'::uuid, 'doing it again changes nothing');
+select public.sign_set_required('00000000-0000-0000-0000-0000000000d2', false);
+reset role;
+select is((select active from public.requirements where id = '00000000-0000-0000-0000-0000000000c6'), false, 'turning it off hides the requirement but keeps it, and every household''s record');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal2"}', true);
+set local role authenticated;
+select public.sign_set_required('00000000-0000-0000-0000-0000000000d2', true, date '2027-02-15');
+reset role;
+select is((select active and due_on = date '2027-02-15' from public.requirements where id = '00000000-0000-0000-0000-0000000000c6'), true, 'turning it back on makes it required again, with the new due date');
 
 -- ---- a new school year: the same document goes out again ------------------------------------------------
 insert into public.school_years (id, label, is_current) values ('00000000-0000-0000-0000-0000000000c3', '2027-28', false);
