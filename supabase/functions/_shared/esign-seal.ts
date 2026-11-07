@@ -1,4 +1,5 @@
 import type { AdminClient } from "./types.ts";
+import type { TimestampResult } from "./rfc3161.ts";
 import {
   appendCertificate, flattenSigned, sha256Hex,
   type SealEvent, type SealField, type SealRecord, type SealRequest, type SealSigner, type SealValue, type TimestampInfo,
@@ -23,8 +24,9 @@ export interface SealStore {
   logTimestamp?(id: string, detail: Record<string, unknown>): Promise<void>;
 }
 
-/** Asks an independent authority to time-stamp a hash. Added by the timestamp step; absent until then. */
-export type Timestamper = (sha256Hex: string, requestId: string) => Promise<{ info: TimestampInfo; token: Uint8Array; detail: Record<string, unknown> } | null>;
+/** Asks an independent time-stamping authority (RFC 3161) to time-stamp a SHA-256 value. */
+export type Timestamper = (sha256Hex: string) => Promise<TimestampResult>;
+export type TimestampSetup = { authority: string; stamp: Timestamper };
 
 export type SealOutcome =
   | { ok: true; status: "completed"; sealedSha256: string; bodySha256: string; alreadySealed: boolean }
@@ -32,7 +34,10 @@ export type SealOutcome =
 
 export const bodyPath = (id: string) => `sign/requests/${id}/signed-content.pdf`;
 export const sealedPath = (id: string) => `sign/requests/${id}/sealed.pdf`;
+/** Timestamp over the signed content (printed on the certificate). Verify against signed-content.pdf. */
 export const tokenPath = (id: string) => `sign/requests/${id}/content-timestamp.tsr`;
+/** Timestamp over the final sealed PDF, certificate page included. Verify against sealed.pdf. */
+export const sealedTokenPath = (id: string) => `sign/requests/${id}/sealed-timestamp.tsr`;
 
 /**
  * Seals a fully signed request: re-checks the stored original against the hash
@@ -41,7 +46,7 @@ export const tokenPath = (id: string) => `sign/requests/${id}/content-timestamp.
  * request returns what it already has, and a claim that is already held (by a
  * call still running) makes this one step aside.
  */
-export async function sealRequest(store: SealStore, requestId: string, timestamper?: Timestamper): Promise<SealOutcome> {
+export async function sealRequest(store: SealStore, requestId: string, timestamp?: TimestampSetup): Promise<SealOutcome> {
   const req = await store.getRequest(requestId);
   if (!req) return { ok: false, status: "not_ready", message: "That request does not exist." };
   if (req.status === "completed" && req.sealed_sha256) {
@@ -76,23 +81,45 @@ export async function sealRequest(store: SealStore, requestId: string, timestamp
     const body = await flattenSigned(original, record, req.title);
     const bodySha256 = await sha256Hex(body);
 
-    let timestamp: TimestampInfo | null = null;
-    let token: Uint8Array | null = null;
-    let timestampDetail: Record<string, unknown> | null = null;
-    if (timestamper) {
-      const stamped = await timestamper(bodySha256, requestId);
-      if (stamped) { timestamp = stamped.info; token = stamped.token; timestampDetail = stamped.detail; }
+    // The certificate page prints the first timestamp, so it has to exist before
+    // the page is drawn. That is why it covers the signed content (everything but
+    // the certificate) and not the finished file: a file cannot contain a timestamp
+    // of itself. If an authority is configured and does not answer, sealing stops
+    // and can be retried; the signatures are already safe in the database.
+    let first: TimestampResult | null = null;
+    let info: TimestampInfo | null = null;
+    if (timestamp) {
+      first = await timestamp.stamp(bodySha256);
+      info = {
+        authority: timestamp.authority, genTime: first.genTime, serial: first.serial,
+        digestAlgorithm: first.digestAlgorithm, imprintHex: first.imprintHex,
+        covers: "the signed content: the original pages with every entry placed on them, before this page was added",
+      };
     }
 
     const sealedAt = new Date();
-    const sealed = await appendCertificate(body, req, record, { bodySha256, sealedAt, timestamp });
+    const sealed = await appendCertificate(body, req, record, { bodySha256, sealedAt, timestamp: info });
     const sealedSha256 = await sha256Hex(sealed);
 
+    // A second timestamp over the finished file, so the whole PDF can be checked
+    // too. Best effort: the first already carries the evidence that matters.
+    let second: TimestampResult | null = null;
+    let secondError: string | null = null;
+    if (timestamp) {
+      try { second = await timestamp.stamp(sealedSha256); } catch (error) { secondError = error instanceof Error ? error.message : String(error); }
+    }
+
     await store.upload(bodyPath(requestId), body);
-    if (token) await store.upload(tokenPath(requestId), token);
+    if (first) await store.upload(tokenPath(requestId), first.response);
     await store.upload(sealedPath(requestId), sealed);
+    if (second) await store.upload(sealedTokenPath(requestId), second.response);
     await store.complete(requestId, sealedSha256, bodySha256);
-    if (timestampDetail && store.logTimestamp) await store.logTimestamp(requestId, timestampDetail);
+    if (timestamp && store.logTimestamp) {
+      const base = { authority: timestamp.authority, standard: "RFC 3161" };
+      if (first) await store.logTimestamp(requestId, { ...base, covers: "signed-content", sha256: bodySha256, gen_time: first.genTime, serial: first.serial, policy: first.policy });
+      if (second) await store.logTimestamp(requestId, { ...base, covers: "sealed", sha256: sealedSha256, gen_time: second.genTime, serial: second.serial, policy: second.policy });
+      else if (secondError) await store.logTimestamp(requestId, { ...base, covers: "sealed", sha256: sealedSha256, error: secondError });
+    }
     return { ok: true, status: "completed", sealedSha256, bodySha256, alreadySealed: false };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -139,7 +166,7 @@ export function supabaseSealStore(admin: AdminClient): SealStore {
       return new Uint8Array(await r.data.arrayBuffer());
     },
     async upload(path, bytes) {
-      const r = await admin.storage.from(PRIVATE_BUCKET).upload(path, bytes, { contentType: path.endsWith(".pdf") ? "application/pdf" : "application/octet-stream", upsert: true });
+      const r = await admin.storage.from(PRIVATE_BUCKET).upload(path, bytes, { contentType: path.endsWith(".pdf") ? "application/pdf" : path.endsWith(".tsr") ? "application/timestamp-reply" : "application/octet-stream", upsert: true });
       if (r.error) throw new Error(`upload ${path}: ${r.error.message}`);
     },
     async complete(id, sealedSha256, bodySha256) {
