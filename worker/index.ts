@@ -1,7 +1,7 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import { guardRequest } from "./site-password";
+import { APPLE_APP_SITE_ASSOCIATION_PATH, guardRequest } from "./site-password";
 import { httpsRedirect, withSecurityHeaders } from "./security-headers";
 
 // Minimal shape of the Workers runtime's Fetcher binding -- just enough to
@@ -48,6 +48,14 @@ const worker = {
     // Shared-password gate, ahead of everything else so no route can slip past
     // it. See worker/site-password.ts -- it stays on until this call is removed
     // on purpose.
+    // The iPhone app's link to this site. Answered here, not from a static file:
+    // Apple needs it as JSON, with no redirect and no sign-in in front of it.
+    if (url.pathname === APPLE_APP_SITE_ASSOCIATION_PATH) {
+      return new Response(JSON.stringify({ webcredentials: { apps: ["VQUCJB5C7M.org.veritasvillage.family"] } }), {
+        headers: { "content-type": "application/json", "cache-control": "public, max-age=3600" },
+      });
+    }
+
     const gated = await guardRequest(request, env);
     if (gated) return withSecurityHeaders(gated);
 

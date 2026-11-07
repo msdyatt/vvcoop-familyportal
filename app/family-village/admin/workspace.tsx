@@ -10,7 +10,7 @@ import AdminDashboard from "./dashboard";
 
 // Every tab used to be a static import, so an admin session downloaded all
 // eight tabs' code (and everything they pull in -- rich text, CSV export,
-// OpenSign/Resend integration wiring...) up front, before ever opening one.
+// the PDF viewer, Resend integration wiring...) up front, before ever opening one.
 // AdminDashboard stays eager since it's what actually renders first; the
 // other seven only cost bytes once someone clicks their tab.
 const FamiliesTab = dynamic(() => import("./families-tab"));
@@ -20,11 +20,12 @@ const IntegrationsTab = dynamic(() => import("./integrations-tab"));
 const ActivityTab = dynamic(() => import("./activity-tab"));
 const MessageReportsTab = dynamic(() => import("./message-reports-tab"));
 const ComplianceTab = dynamic(() => import("./compliance-tab"));
+const DocumentsTab = dynamic(() => import("./documents-tab"));
 const ReportsTab = dynamic(() => import("./reports-tab"));
 const DuesTab = dynamic(() => import("./dues-tab"));
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-const TABS = ["dashboard", "invitations", "families", "classes", "compliance", "dues", "news", "reports", "activity", "message-reports", "integrations"] as const;
+const TABS = ["dashboard", "invitations", "families", "classes", "compliance", "documents", "dues", "news", "reports", "activity", "message-reports", "integrations"] as const;
 type Tab = (typeof TABS)[number];
 
 async function signOutToEntry() {
@@ -72,7 +73,7 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="compliance">Compliance</option><option value="dues">Dues</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="compliance">Compliance</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
@@ -81,6 +82,7 @@ export default function AdminWorkspace() {
       <button className={tab === "families" ? "active" : ""} onClick={() => setTab("families")}>Families</button>
       <button className={tab === "classes" ? "active" : ""} onClick={() => setTab("classes")}>Classes</button>
       <button className={tab === "compliance" ? "active" : ""} onClick={() => setTab("compliance")}>Compliance</button>
+      <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>Documents</button>
       <button className={tab === "dues" ? "active" : ""} onClick={() => setTab("dues")}>Dues</button>
       <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News &amp; calendar</button>
       <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
@@ -100,6 +102,7 @@ export default function AdminWorkspace() {
     {tab === "families" && <FamiliesTab actorUserId={userId} />}
     {tab === "classes" && <ClassesTab actorUserId={userId} />}
     {tab === "compliance" && <ComplianceTab actorUserId={userId} />}
+    {tab === "documents" && <DocumentsTab />}
     {tab === "dues" && <DuesTab actorUserId={userId} />}
     {tab === "news" && <NewsTab actorUserId={userId} />}
     {tab === "reports" && <ReportsTab />}

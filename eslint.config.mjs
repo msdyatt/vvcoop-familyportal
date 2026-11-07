@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party libraries copied in as minified files (see scripts/update-pdf-vendor.mjs).
+    "public/vendor/**",
     // The native app shell is its own project (own package.json); the
     // generated Xcode/Gradle files and copied web assets are not ours to lint.
     "mobile/**",

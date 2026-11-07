@@ -57,6 +57,8 @@ export function withSecurityHeaders(response: Response): Response {
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self'",
       "script-src 'self' 'unsafe-inline'",
+      // The PDF viewer's worker is one of our own files (see app/family-village/pdf-pages.tsx).
+      "worker-src 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
