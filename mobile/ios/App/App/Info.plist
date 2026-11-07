@@ -6,6 +6,10 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<!-- The app only uses the standard encryption built into iOS (HTTPS), which is exempt; this
+	     answers App Store Connect's export-compliance question for every build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleDisplayName</key>
         <string>Veritas Village</string>
 	<key>CFBundleExecutable</key>
