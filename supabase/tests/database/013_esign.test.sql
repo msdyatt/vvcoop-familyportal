@@ -1,7 +1,7 @@
 -- In-house e-signing: who may sign, in what order, what is recorded, and what
 -- can never be changed afterwards.
 begin;
-select plan(115);
+select plan(116);
 
 -- A1 administrator. Household F1: P1 and P2, both fully set up. F2: P3 alone.
 -- F3: P4 (no second factor yet) and P5 (set up). O is an outsider.
