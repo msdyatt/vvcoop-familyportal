@@ -60,7 +60,7 @@ export default function PrivacyPolicy() { return <>
     </ul>
 
     <h2>Electronic signatures</h2>
-    <p>Forms the co-op asks you to sign are signed inside Family Village, while you are signed in to your own account with your second sign-in step. There is no public signing link and no outside signing service.</p>
+    <p>Forms the co-op asks you to sign are signed inside Family Village, while you are signed in to your own account. There is no public signing link and no outside signing service.</p>
     <ul>
       <li><strong>What is recorded</strong> — the document you were sent; that you agreed to sign electronically and the wording you agreed to; your typed or drawn signature and initials and anything you typed into the form; your account name and email; the time; and the IP address and browser details your device used when you opened, agreed and signed. A history of each step (sent, opened, agreed, signed, reminded, sealed, downloaded) is kept, and it cannot be edited or deleted.</li>
       <li><strong>Where it is kept</strong> — in the co-op&rsquo;s own Family Village storage with Supabase, the same private storage as the rest of your records. When everyone has signed, the co-op&rsquo;s system produces one signed PDF with a certificate page listing the signers, times and IP addresses, and stores it there.</li>
