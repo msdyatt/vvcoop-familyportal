@@ -1,10 +1,11 @@
 import PublicNews from "./public-news";
 import BrandTransition from "./brand-transition";
+import SiteHeader from "./site-header";
 import FacebookGroupLink from "./facebook-group-link";
 import { calendarSubscribeUrl, googleCalendarAddUrl } from "../lib/supabase";
 
 export default function Home(){return <>
-  <header className="site-header"><nav aria-label="Main navigation"><a href="#welcome">Welcome</a><a href="#families">Families</a><a href="#rhythm">Our rhythm</a><a href="#resources">Resources</a><a href="#news">News</a></nav><a className="header-link" href="https://family.veritasvillage.org/family-village">Family sign in</a><details><summary>Menu</summary><div><a href="#welcome">Welcome</a><a href="#families">Families</a><a href="#rhythm">Our rhythm</a><a href="#resources">Resources</a><a href="#news">News</a><a href="https://family.veritasvillage.org/family-village">Family sign in</a></div></details></header>
+  <SiteHeader />
 
   <main id="top">
     <BrandTransition />
