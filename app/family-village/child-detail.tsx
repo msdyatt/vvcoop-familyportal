@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
-import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
+import { getSignedFileUrl, storeAvatar } from "../../lib/storage";
 import Avatar from "./avatar";
 import DetailModal from "./detail-modal";
 import { EditableSection, Field, GRADES } from "./admin/admin-ui";
@@ -229,7 +229,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setChildStatus("Uploading…");
-    const uploaded = await uploadPrivateFile(supabase, "avatars", file);
+    const uploaded = await storeAvatar(supabase, file);
     if ("error" in uploaded) { setChildStatus(uploaded.error); return; }
     await updateChild({ avatar_path: uploaded.path }, "Photo updated.");
   }

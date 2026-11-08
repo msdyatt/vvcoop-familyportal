@@ -15,6 +15,6 @@ export default function Avatar({ url, label, size = "md" }: { url: string | null
     // token invalidates on every load, so there is no stable cache key for an
     // optimizer to key off of.
     // eslint-disable-next-line @next/next/no-img-element
-    ? <img className={`avatar avatar-${size}`} src={url} alt="" width={64} height={64} />
+    ? <img className={`avatar avatar-${size}`} src={url} alt="" width={64} height={64} loading="lazy" decoding="async" />
     : <span className={`avatar avatar-${size} avatar-fallback`} aria-hidden="true">{initial}</span>;
 }

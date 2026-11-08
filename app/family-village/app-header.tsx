@@ -10,7 +10,7 @@ import AccountSettings from "./account-settings";
 import Avatar from "./avatar";
 import NotificationBell from "./notification-bell";
 import MessagesLink from "./messages/messages-link";
-import { getSignedFileUrl } from "../../lib/storage";
+import { clearAvatarUrlCache, getSignedFileUrl } from "../../lib/storage";
 import { disablePush } from "../../lib/push";
 import AppTabBar from "./app-tab-bar";
 import { TOUR_VERSION, isReturning } from "../../lib/onboarding";
@@ -60,6 +60,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
     // Stop pushes to this device before the session goes away, so the next
     // person to use a shared phone or computer doesn't receive them.
     await disablePush().catch(() => {});
+    clearAvatarUrlCache();
     await getSupabaseBrowserClient()?.auth.signOut();
     window.location.assign("/family-village");
   }
