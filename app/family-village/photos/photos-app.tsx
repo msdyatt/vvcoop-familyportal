@@ -39,17 +39,28 @@ export default function PhotosApp() {
     setThumbs((previous) => new Map([...previous, ...urls]));
   }, []);
 
+  // Photos with an open report are hidden from everyone but administrators, and an
+  // administrator reviews them under Admin > Reports, so the library leaves them out.
+  const [underReview, setUnderReview] = useState<string[]>([]);
+  const isAdmin = roles.includes("admin");
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (access !== "ready" || !isAdmin || !supabase) return;
+    void supabase.from("photo_reports").select("photo_id").eq("status", "open").then(({ data }) => setUnderReview([...new Set((data ?? []).map((row) => row.photo_id as string))]));
+  }, [access, isAdmin]);
+
   const query = useCallback((from: number) => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return null;
     let q = supabase.from("photos").select(PHOTO_COLUMNS).eq("status", "published");
+    if (underReview.length) q = q.not("id", "in", `(${underReview.join(",")})`);
     if (filters.year) q = q.eq("school_year_id", filters.year);
     if (filters.classId) q = q.eq("class_id", filters.classId);
     if (filters.album) q = q.eq("album_id", filters.album);
     if (filters.mine) q = q.eq("uploaded_by", userId);
     if (filters.search.trim()) q = q.ilike("caption", likePattern(filters.search.trim()));
     return q.order("taken_on", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).range(from, from + PHOTO_PAGE - 1);
-  }, [filters, userId]);
+  }, [filters, userId, underReview]);
 
   const loadPhotos = useCallback(async () => {
     const q = query(0);
@@ -208,7 +219,7 @@ export default function PhotosApp() {
 
     {uploading && <PhotoUpload roles={roles} userId={userId} classes={classes} albums={albums} teachingIds={teachingIds} years={years}
       onClose={() => setUploading(false)} onDone={() => { void afterChange(); }} />}
-    {open && <PhotoViewer photo={open} userId={userId} isAdmin={roles.includes("admin")} teachingIds={teachingIds}
+    {open && <PhotoViewer photo={open} userId={userId} onReported={() => setStatus("Thank you. That photo is hidden until an administrator has reviewed it.")} isAdmin={roles.includes("admin")} teachingIds={teachingIds}
       albums={albums} classes={classes} onClose={() => setOpenId(null)} onChanged={afterChange} />}
     <p className="portal-empty photos-note">Photos here are for the co-op&rsquo;s families only. {photos[0] ? `Most recent: ${photoDate(photos[0])}.` : ""}</p>
   </main>;
