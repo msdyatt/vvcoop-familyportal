@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import DemoAccountsCard from "./demo-accounts-card";
+import PhotoOptimizerCard from "./photo-optimizer-card";
 
 type Integration = { id: string; display_name: string; status: string; public_note: string | null; external_url: string | null; api_base_url: string | null; from_address: string | null; last_checked_at: string | null };
 
@@ -109,6 +110,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
         showFromAddress={row.id === "resend"}
       />)}
     </div>
+    <PhotoOptimizerCard />
     <DemoAccountsCard />
     <RecentPrintJobs />
   </section>;

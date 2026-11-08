@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
-import { getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
+import { getSignedFileUrls, storeAvatar } from "../../../lib/storage";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
 import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES } from "./admin-ui";
@@ -158,7 +158,7 @@ export default function FamiliesTab({ actorUserId }: { actorUserId: string }) {
   async function uploadChildAvatar(childId: string, file: File) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const uploaded = await uploadPrivateFile(supabase, "avatars", file);
+    const uploaded = await storeAvatar(supabase, file);
     if ("error" in uploaded) { setStatus(uploaded.error); return; }
     const { error } = await supabase.from("children").update({ avatar_path: uploaded.path }).eq("id", childId);
     if (error) { setStatus(error.message); return; }

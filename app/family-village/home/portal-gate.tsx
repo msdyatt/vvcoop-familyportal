@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "../../../lib/supabase";
+import LoadingScreen from "../loading-screen";
 import { getSignedFileUrl, getSignedFileUrls } from "../../../lib/storage";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
@@ -167,7 +168,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
     if (!result.error) await load();
   }
 
-  if (state === "loading") return <main className="portal-state"><p className="eyebrow">Family Village</p><h1>Gathering your village…</h1></main>;
+  if (state === "loading") return <LoadingScreen />;
   if (state === "signed-out") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><p>Your Family Village session has ended.</p><a href="/family-village">Return to sign in →</a></main>;
   if (state === "mfa-challenge") return <MfaChallengeScreen onVerified={load} onCancel={signOut} />;
   if (state === "error") return <main className="portal-state"><p className="eyebrow">Family Village</p><h1>We could not open your village.</h1><p>No private information was shown. Please try signing in again or contact a Village administrator.</p><a href="/family-village">Return to sign in →</a></main>;

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../lib/supabase";
-import { getSignedFileUrl, uploadPrivateFile } from "../../lib/storage";
+import { getSignedFileUrl, storeAvatar } from "../../lib/storage";
 import SubscribeLink from "./subscribe-link";
 import Avatar from "./avatar";
 import AvatarCropper from "./avatar-cropper";
@@ -108,7 +108,7 @@ function ContactSection({ onProfileUpdated }: { onProfileUpdated?: () => void })
     setAvatarBusy(true); setAvatarStatus("Uploading…");
     const { data } = await supabase.auth.getUser();
     if (!data.user) { setAvatarBusy(false); return; }
-    const uploaded = await uploadPrivateFile(supabase, "avatars", file);
+    const uploaded = await storeAvatar(supabase, file);
     if ("error" in uploaded) { setAvatarBusy(false); setAvatarStatus(uploaded.error); return; }
     const { error } = await supabase.from("profiles").update({ avatar_path: uploaded.path }).eq("id", data.user.id);
     setAvatarBusy(false);

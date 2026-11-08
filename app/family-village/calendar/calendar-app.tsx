@@ -1,6 +1,7 @@
 "use client";
 
 import { usePortalAccess } from "../../../lib/use-portal-access";
+import LoadingScreen from "../loading-screen";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import AppHeader from "../app-header";
 import CalendarView from "../calendar-view";
@@ -14,7 +15,7 @@ export default function CalendarApp() {
     window.location.assign("/family-village");
   }
 
-  if (access === "loading") return <main className="portal-state"><p className="eyebrow">Calendar</p><h1>Opening the calendar…</h1></main>;
+  if (access === "loading") return <LoadingScreen />;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></main>;
 

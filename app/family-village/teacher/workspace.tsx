@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
+import LoadingScreen from "../loading-screen";
 import { getSignedFileUrl, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { queueFilePrintJob } from "../../../lib/print-jobs";
 import { usePortalAccess } from "../../../lib/use-portal-access";
@@ -123,7 +124,7 @@ export default function TeacherWorkspace() {
     if (!error) await loadAll(userId);
   }
 
-  if (access === "loading") return <main className="portal-state"><p className="eyebrow">Teacher workspace</p><h1>Gathering your classes…</h1></main>;
+  if (access === "loading") return <LoadingScreen />;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private teacher workspace</p><h1>Teacher access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
 
