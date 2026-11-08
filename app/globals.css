@@ -8085,3 +8085,8 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 @media(prefers-reduced-motion:reduce) {
   .vv-spinner { animation-duration:2.4s; }
 }
+
+.document-viewer { display:grid; gap:12px; min-width:min(780px,86vw); }
+.document-viewer > a { justify-self:start; }
+.document-viewer-scroll { max-height:70vh; overflow:auto; background:var(--surface-sunken); padding:8px; }
+.document-viewer-scroll img { max-width:100%; height:auto; margin:0 auto; }
