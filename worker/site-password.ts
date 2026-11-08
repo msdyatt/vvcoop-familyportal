@@ -31,6 +31,10 @@ export type SitePasswordEnv = {
 /**
  * Paths that bypass the gate.
  *
+ * The homepage is intentionally public so reviewers and prospective families can
+ * verify the organization without receiving the private-site password. All
+ * other application routes remain behind the gate unless listed below.
+ *
  * `/family-village` is the private portal. It has its own Supabase
  * authentication, and stacking a shared password on top would mean families
  * entering two credentials to reach their own records. The gate exists to keep
@@ -49,6 +53,7 @@ export const APPLE_APP_SITE_ASSOCIATION_PATH = "/.well-known/apple-app-site-asso
 
 function isExempt(pathname: string): boolean {
   return (
+    pathname === "/" ||
     pathname === FORM_PATH ||
     pathname.startsWith("/family-village") ||
     pathname === "/privacy" ||
