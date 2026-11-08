@@ -11,16 +11,16 @@ export default function BrandTransition() {
     if (!hero) return;
 
     const updateFromScroll = () => {
-      setCompact(hero.getBoundingClientRect().bottom < window.innerHeight * 0.66);
+      setCompact(hero.getBoundingClientRect().top < -48);
     };
 
     updateFromScroll();
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setCompact(entry.intersectionRatio < 0.45);
+        setCompact(entry.boundingClientRect.top < -48 || entry.intersectionRatio < 0.78);
       },
-      { threshold: [0, 0.45, 1] },
+      { threshold: [0, 0.78, 1] },
     );
 
     observer.observe(hero);
