@@ -41,7 +41,7 @@ export default function PublicNews() {
   return <section id="news" className="public-news">
     <div className="public-news-heading">
       <p className="eyebrow">From the village</p>
-      <h2>Lately at the co-op.</h2>
+      <h2>A few notes<br/>from the co-op.</h2>
     </div>
     <div className="public-news-list">
       {posts.map((post) => <article key={post.id}>
@@ -54,7 +54,7 @@ export default function PublicNews() {
         <RichText html={post.body} />
         <PostAttachments attachments={attachments[post.id] ?? []} />
       </article>)}
-      {!posts.length && <article className="public-news-empty"><p className="eyebrow">Public updates</p><h3>News from the village.</h3><p>Public announcements will appear here as they are available. Families can sign in to Family Village for current community news.</p></article>}
+      {!posts.length && <article className="public-news-empty"><p className="eyebrow">Public updates</p><h3>News from the village.</h3><p>We’ll post announcements here when there’s something to share. Current family news lives inside Family Village.</p></article>}
     </div>
   </section>;
 }
