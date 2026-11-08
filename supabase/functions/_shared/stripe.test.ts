@@ -72,6 +72,11 @@ Deno.test("loadStripeConfig: off, no key, wrong-mode key and a good key are each
   const good = await loadStripeConfig(withSecrets("stripe_test", { STRIPE_SECRET_KEY_TEST: "sk_test_abc " }));
   assert(good.ok);
   if (good.ok) { assertEquals(good.livemode, false); assertEquals(good.secretKey, "sk_test_abc"); }
+  if (good.ok) assertEquals(good.publishableKey, null, "optional: the app falls back to Stripe's own page without it");
+  const withPk = await loadStripeConfig(withSecrets("stripe_test", { STRIPE_SECRET_KEY_TEST: "sk_test_abc", STRIPE_PUBLISHABLE_KEY_TEST: "pk_test_123" }));
+  assert(withPk.ok && withPk.publishableKey === "pk_test_123");
+  const wrongPk = await loadStripeConfig(withSecrets("stripe_test", { STRIPE_SECRET_KEY_TEST: "sk_test_abc", STRIPE_PUBLISHABLE_KEY_TEST: "pk_live_123" }));
+  assert(wrongPk.ok && wrongPk.publishableKey === null, "a live publishable key is never used in test mode");
   const restricted = await loadStripeConfig(withSecrets("stripe_live", { STRIPE_SECRET_KEY_LIVE: "rk_live_abc" }));
   assert(restricted.ok && restricted.livemode);
 });

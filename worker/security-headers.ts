@@ -46,17 +46,19 @@ export function withSecurityHeaders(response: Response): Response {
   headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://checkout.stripe.com\"), usb=()");
   headers.set("X-Frame-Options", "DENY");
   headers.set(
     "Content-Security-Policy-Report-Only",
     [
       "default-src 'self'",
-      "connect-src 'self' https://jtwemgyhxylbhjzxgyvh.supabase.co",
+      "connect-src 'self' https://jtwemgyhxylbhjzxgyvh.supabase.co https://api.stripe.com https://*.stripe.com",
       "img-src 'self' data: blob: https://jtwemgyhxylbhjzxgyvh.supabase.co",
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      // Stripe's embedded payment form is an iframe of Stripe's, never ours.
+      "frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com",
       // The PDF viewer's worker is one of our own files (see app/family-village/pdf-pages.tsx).
       "worker-src 'self'",
       "frame-ancestors 'none'",

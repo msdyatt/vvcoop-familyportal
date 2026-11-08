@@ -3,7 +3,8 @@ import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import { createDuesCheckout } from "./dues-checkout.ts";
 import { fakeAdmin, fakeStripe } from "./stripe-fakes.ts";
 
-const config = { ok: true as const, provider: "stripe_test" as const, livemode: false, secretKey: "sk_test_fake" };
+const config = { ok: true as const, provider: "stripe_test" as const, livemode: false, secretKey: "sk_test_fake", publishableKey: null };
+const embeddedConfig = { ...config, publishableKey: "pk_test_fake" };
 const input = { userId: "u1", userEmail: "mom@example.test", chargeId: "charge-1" };
 const started = { payment_id: "pay-1", amount_cents: 60000, existing: false, status: "pending", family_id: "fam-1", saved_for_autopay: false, installment_id: null };
 const tables = {
@@ -27,7 +28,7 @@ function setup(over: { begin?: unknown; tables?: Record<string, unknown[]>; rout
 Deno.test("checkout: the amount comes from the database, bank transfer is offered first, and the page cannot choose it", async () => {
   const { admin, stripe, deps } = setup();
   const result = await createDuesCheckout(deps, { ...input, payAll: false });
-  assertEquals(result, { ok: true, url: "https://checkout.stripe.com/c/pay/cs_1", paymentId: "pay-1" });
+  assertEquals(result, { ok: true, kind: "hosted", url: "https://checkout.stripe.com/c/pay/cs_1", paymentId: "pay-1" });
   const session = stripe.requests.find((r) => r.path === "/v1/checkout/sessions")!;
   assertEquals(session.params["line_items[0][price_data][unit_amount]"], "60000");
   assertEquals(session.params["payment_method_types[0]"], "us_bank_account");
@@ -70,7 +71,7 @@ Deno.test("checkout: a double click reuses the open page instead of starting a s
     routes: { "GET /v1/checkout/sessions/cs_old": { id: "cs_old", status: "open", url: "https://checkout.stripe.com/c/pay/cs_old" } },
   });
   const result = await createDuesCheckout(deps, input);
-  assertEquals(result.ok && result.url, "https://checkout.stripe.com/c/pay/cs_old");
+  assertEquals(result.ok && result.kind === "hosted" && result.url, "https://checkout.stripe.com/c/pay/cs_old");
   assertEquals(stripe.requests.some((r) => r.method === "POST"), false);
 });
 
@@ -115,5 +116,51 @@ Deno.test("checkout: if Stripe cannot open the page the attempt is released so t
   const { admin, deps } = setup({ routes: { "POST /v1/checkout/sessions": () => ({ status: 500, body: { error: { message: "boom" } } }) } });
   const result = await createDuesCheckout(deps, input);
   assertEquals(!result.ok && result.status, 502);
+  assertEquals(admin.called("billing_cancel_payment")[0].args.p_payment, "pay-1");
+});
+
+Deno.test("checkout: on the website the form is embedded, with return_url and no redirect for cards", async () => {
+  const { stripe, deps } = setup({ routes: { "POST /v1/checkout/sessions": { id: "cs_e", client_secret: "cs_e_secret_x", url: null } } });
+  const result = await createDuesCheckout({ ...deps, config: embeddedConfig }, { ...input, embedded: true });
+  assertEquals(result, { ok: true, kind: "embedded", clientSecret: "cs_e_secret_x", publishableKey: "pk_test_fake", paymentId: "pay-1" });
+  const session = stripe.requests.find((r) => r.path === "/v1/checkout/sessions")!;
+  assertEquals(session.params["ui_mode"], "embedded");
+  assertEquals(session.params["redirect_on_completion"], "if_required");
+  assertStringIncludes(session.params["return_url"], "/family-village/dues?checkout=success");
+  assertEquals(session.params["success_url"], undefined, "embedded sessions take return_url, not success_url");
+  assertEquals(session.params["line_items[0][price_data][unit_amount]"], "60000", "the amount still comes from the database");
+});
+
+Deno.test("checkout: without a publishable key the app falls back to Stripe's own page", async () => {
+  const { stripe, deps } = setup();
+  const result = await createDuesCheckout(deps, { ...input, embedded: true });
+  assertEquals(result.ok && result.kind, "hosted");
+  assertEquals(stripe.requests.find((r) => r.path === "/v1/checkout/sessions")!.params["ui_mode"], undefined);
+});
+
+Deno.test("checkout: an open embedded page is resumed; one started the other way is closed and replaced", async () => {
+  const resumed = setup({
+    begin: { data: { ...started, existing: true, checkout_session_id: "cs_old" } },
+    routes: { "GET /v1/checkout/sessions/cs_old": { id: "cs_old", status: "open", ui_mode: "embedded", client_secret: "cs_old_secret_y" } },
+  });
+  const r1 = await createDuesCheckout({ ...resumed.deps, config: embeddedConfig }, { ...input, embedded: true });
+  assertEquals(r1.ok && r1.kind === "embedded" && r1.clientSecret, "cs_old_secret_y");
+
+  let calls = 0;
+  const admin = fakeAdmin({
+    tables: tables as never,
+    rpc: {
+      billing_begin_payment: () => (++calls === 1 ? { data: { ...started, existing: true, checkout_session_id: "cs_old" } } : { data: { ...started, payment_id: "pay-2" } }),
+      billing_attach_checkout: () => ({ data: null }), billing_set_customer: () => ({ data: null }), billing_cancel_payment: () => ({ data: null }),
+    },
+  });
+  const stripe = fakeStripe({
+    "GET /v1/checkout/sessions/cs_old": { id: "cs_old", status: "open", ui_mode: "hosted", url: "https://checkout.stripe.com/c/pay/cs_old" },
+    "POST /v1/checkout/sessions/cs_old/expire": { id: "cs_old", status: "expired" },
+    "POST /v1/customers": { id: "cus_1" }, "POST /v1/checkout/sessions": { id: "cs_new", client_secret: "cs_new_secret", url: null },
+  });
+  const r2 = await createDuesCheckout({ admin: admin.client, stripe: stripe.stripe, config: embeddedConfig }, { ...input, embedded: true });
+  assertEquals(r2.ok && r2.paymentId, "pay-2");
+  assertEquals(stripe.requests.some((r) => r.path === "/v1/checkout/sessions/cs_old/expire"), true);
   assertEquals(admin.called("billing_cancel_payment")[0].args.p_payment, "pay-1");
 });

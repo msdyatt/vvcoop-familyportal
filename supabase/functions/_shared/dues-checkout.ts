@@ -14,10 +14,13 @@ export type CheckoutInput = {
   payAll?: boolean;
   /** The household agreed to automatic monthly collection with the method it is about to enter. */
   autopay?: boolean;
+  /** Show Stripe's form inside the page. Falls back to Stripe's own page when no publishable key is set. */
+  embedded?: boolean;
 };
 
 export type CheckoutResult =
-  | { ok: true; url: string; paymentId: string }
+  | { ok: true; kind: "hosted"; url: string; paymentId: string }
+  | { ok: true; kind: "embedded"; clientSecret: string; publishableKey: string; paymentId: string }
   | { ok: false; status: number; error: string; code: string };
 
 type Deps = { admin: AdminClient; stripe: StripeClient; config: Extract<StripeConfig, { ok: true }>; origin?: string; nowSeconds?: number };
@@ -48,6 +51,7 @@ function begin(admin: AdminClient, input: CheckoutInput) {
 export async function createDuesCheckout(deps: Deps, input: CheckoutInput): Promise<CheckoutResult> {
   const { admin, stripe } = deps;
   const origin = deps.origin ?? APP_ORIGIN;
+  const embedded = Boolean(input.embedded) && Boolean(deps.config.publishableKey);
 
   let attempt = await begin(admin, input);
   for (let round = 0; round < 2; round++) {
@@ -58,7 +62,7 @@ export async function createDuesCheckout(deps: Deps, input: CheckoutInput): Prom
     }
     const started = attempt.data as any;
 
-    if (!started.existing) return await openSession(deps, input, started, origin);
+    if (!started.existing) return await openSession(deps, input, started, origin, embedded);
 
     // Something is already in flight for this charge.
     if (started.status === "processing") {
@@ -68,7 +72,15 @@ export async function createDuesCheckout(deps: Deps, input: CheckoutInput): Prom
       return { ok: false, status: 409, code: "starting", error: "A payment is already starting. Give it a moment, then try again." };
     }
     const session = await stripe.get(`/v1/checkout/sessions/${started.checkout_session_id}`);
-    if (session.status === "open" && session.url) return { ok: true, url: session.url, paymentId: started.payment_id };
+    const sameKind = (session.ui_mode === "embedded") === embedded;
+    if (session.status === "open" && sameKind) {
+      if (embedded && session.client_secret) return { ok: true, kind: "embedded", clientSecret: session.client_secret, publishableKey: deps.config.publishableKey!, paymentId: started.payment_id };
+      if (!embedded && session.url) return { ok: true, kind: "hosted", url: session.url, paymentId: started.payment_id };
+    }
+    // Open, but started the other way (say on the website, now in the app): close it so there is one page.
+    if (session.status === "open") {
+      await stripe.post(`/v1/checkout/sessions/${started.checkout_session_id}/expire`, {}).catch(() => undefined);
+    }
     if (session.status === "complete") {
       return { ok: false, status: 409, code: "processing", error: "Your payment was submitted and is being confirmed. Check back shortly." };
     }
@@ -79,7 +91,7 @@ export async function createDuesCheckout(deps: Deps, input: CheckoutInput): Prom
   return { ok: false, status: 409, code: "busy", error: "Could not start a payment right now. Please try again." };
 }
 
-async function openSession(deps: Deps, input: CheckoutInput, started: any, origin: string): Promise<CheckoutResult> {
+async function openSession(deps: Deps, input: CheckoutInput, started: any, origin: string, embedded: boolean): Promise<CheckoutResult> {
   const { admin, stripe } = deps;
   const paymentId = started.payment_id as string;
   try {
@@ -116,13 +128,15 @@ async function openSession(deps: Deps, input: CheckoutInput, started: any, origi
       payment_method_options: {
         us_bank_account: { verification_method: "automatic", financial_connections: { permissions: ["payment_method"] } },
       },
-      success_url: `${origin}/family-village/dues?checkout=success`,
-      cancel_url: `${origin}/family-village/dues?checkout=canceled`,
+      ...(embedded
+        ? { ui_mode: "embedded", return_url: `${origin}/family-village/dues?checkout=success`, redirect_on_completion: "if_required" }
+        : { success_url: `${origin}/family-village/dues?checkout=success`, cancel_url: `${origin}/family-village/dues?checkout=canceled` }),
       expires_at: (deps.nowSeconds ?? Math.floor(Date.now() / 1000)) + 31 * 60,
     }, paymentId);
 
     await admin.rpc("billing_attach_checkout", { p_payment: paymentId, p_session_id: session.id });
-    return { ok: true, url: session.url, paymentId };
+    if (embedded) return { ok: true, kind: "embedded", clientSecret: session.client_secret, publishableKey: deps.config.publishableKey!, paymentId };
+    return { ok: true, kind: "hosted", url: session.url, paymentId };
   } catch (error) {
     // Nothing reached Stripe that could charge anyone; free the charge for another try.
     await admin.rpc("billing_cancel_payment", { p_payment: paymentId, p_reason: "Could not open the checkout page." });

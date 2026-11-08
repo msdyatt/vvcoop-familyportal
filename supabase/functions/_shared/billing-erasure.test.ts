@@ -13,7 +13,7 @@ const tables = {
     { id: "b2", family_id: "f2", livemode: false, stripe_customer_id: "cus_2", stripe_payment_method_id: "pm_2" },
   ],
 };
-const config = { ok: true as const, provider: "stripe_test" as const, livemode: false, secretKey: "sk_test_x" };
+const config = { ok: true as const, provider: "stripe_test" as const, livemode: false, secretKey: "sk_test_x", publishableKey: null };
 
 Deno.test("erasure: a household's last adult is removed from Stripe; a shared household is left alone", async () => {
   const admin = fakeAdmin({ tables: tables as never });
