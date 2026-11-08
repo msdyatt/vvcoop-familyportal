@@ -720,6 +720,10 @@ footer nav a:hover {
     min-height:64px;
     padding:12px 6vw;
   }
+  .site-header details {
+    grid-column:2;
+    justify-self:end;
+  }
   .site-header nav,.header-link {
     display:none;
   }
