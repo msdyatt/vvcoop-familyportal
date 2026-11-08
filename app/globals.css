@@ -247,11 +247,17 @@ a {
   align-items:center;
   min-height:var(--site-header-height);
   padding:15px 5vw;
-  background:rgba(250,247,241,.94);
+  background:rgba(250,247,241,.96);
   border-bottom:1px solid rgba(11,42,61,.12);
   box-shadow:0 4px 18px rgba(11,42,61,.06);
   -webkit-backdrop-filter:blur(12px);
   backdrop-filter:blur(12px);
+  transform:translateY(-105%);
+  transition:transform .55s cubic-bezier(.22,1,.36,1);
+}
+
+.site-header.is-revealed {
+  transform:translateY(0);
 }
 
 .brand-transition {
