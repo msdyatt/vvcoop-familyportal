@@ -3,6 +3,7 @@ import "./globals.css";
 import "./platform.css";
 import { PLATFORM_SCRIPT } from "../lib/platform";
 import ErrorReporter from "./error-reporter";
+import SwipeBack from "./swipe-back";
 import Toaster from "./toaster";
 import GlobalErrorBoundary from "./global-error-boundary";
 
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <body>
       <ErrorReporter />
       <Toaster />
+      <SwipeBack />
       <GlobalErrorBoundary>{children}</GlobalErrorBoundary>
     </body>
   </html>;

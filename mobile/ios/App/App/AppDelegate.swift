@@ -57,6 +57,9 @@ class ViewController: CAPBridgeViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         removeTopEdgeEffect()
+        // Swipe in from the left edge to go back to the previous page, and from the
+        // right to go forward, as in any iPhone app. Off by default in a web view.
+        webView?.allowsBackForwardNavigationGestures = true
     }
 
     override func viewDidLayoutSubviews() {
