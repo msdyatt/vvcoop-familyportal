@@ -284,6 +284,24 @@ a {
   transform:translateX(0);
 }
 
+.brand-transition,
+.brand-transition:hover,
+.brand-transition:focus-visible {
+  text-decoration:none;
+  transform:translateX(-50%);
+}
+
+.brand-transition.is-compact,
+.brand-transition.is-compact:hover,
+.brand-transition.is-compact:focus-visible {
+  transform:translateX(0);
+}
+
+.brand-transition:focus-visible {
+  outline:2px solid var(--terracotta-text);
+  outline-offset:6px;
+}
+
 .brand-transition img {
   width:100%;
   height:auto;
@@ -300,6 +318,11 @@ a {
   font-size:12px;
   font-weight:700;
   text-decoration:none;
+  transition:color .2s ease;
+}
+
+.site-header nav a:hover,.header-link:hover {
+  color:var(--terracotta-text);
 }
 
 .header-link {
