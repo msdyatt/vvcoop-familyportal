@@ -4,6 +4,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import LoadingScreen from "../loading-screen";
+import { useBackLayer } from "../../../lib/use-back-layer";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
 import AppHeader from "../app-header";
@@ -43,6 +44,10 @@ export default function AdminWorkspace() {
     const wanted = new URLSearchParams(window.location.search).get("tab");
     return (TABS as readonly string[]).includes(wanted ?? "") ? (wanted as Tab) : "dashboard";
   });
+  // The tab the page opened on; switching to another is a step Back can undo.
+  const [startTab] = useState<Tab>(tab);
+  useBackLayer(tab !== startTab, () => { setTabState(startTab); window.dispatchEvent(new Event("vv-locationchange")); });
+
   function setTab(next: Tab) {
     setTabState(next);
     // Keep the address (and the bottom bar's highlight) in step with the tab.

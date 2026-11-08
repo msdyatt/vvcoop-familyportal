@@ -5,6 +5,7 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import LoadingScreen from "../loading-screen";
 import { getSignedFileUrls } from "../../../lib/storage";
 import { usePortalAccess } from "../../../lib/use-portal-access";
+import { useBackLayer } from "../../../lib/use-back-layer";
 import { conversationTitle, isChannel, shortTime, type ConversationRow } from "../../../lib/messages";
 import AppHeader from "../app-header";
 import Avatar from "../avatar";
@@ -39,8 +40,10 @@ export default function MessagesApp() {
 
   function select(id: string | null) {
     setSelectedId(id);
-    window.history.replaceState(null, "", id ? `?c=${id}` : window.location.pathname);
   }
+
+  // Back (button or swipe) returns from a conversation to the list.
+  useBackLayer(selectedId !== null, () => setSelectedId(null));
 
   useEffect(() => {
     if (access !== "ready") return;
