@@ -46,6 +46,7 @@
    preflight alone keeps the reset without them. */
 @import "tailwindcss/preflight";
 :root {
+  --site-header-height:78px;
   /* --- Veritas Village brand, 2026 Edition -------------------------------
      Three colours carry the brand: Ink Navy, Parchment Cream, Terracotta.
      Hill Sage is retained as a fourth supporting colour by choice; the guide
@@ -98,6 +99,10 @@
 
 html {
   scroll-behavior:smooth;
+}
+
+html {
+  scroll-padding-top:var(--site-header-height);
 }
 
 body {
@@ -232,21 +237,27 @@ a {
 }
 
 .site-header {
-  position:absolute;
-  z-index:10;
+  position:fixed;
+  z-index:20;
   top:0;
   left:0;
   right:0;
   display:grid;
   grid-template-columns:1fr auto 1fr;
   align-items:center;
-  padding:25px 5vw;
+  min-height:var(--site-header-height);
+  padding:15px 5vw;
+  background:rgba(250,247,241,.94);
+  border-bottom:1px solid rgba(11,42,61,.12);
+  box-shadow:0 4px 18px rgba(11,42,61,.06);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
 }
 
 .brand-transition {
   position:fixed;
-  z-index:12;
-  top:clamp(150px,21vh,205px);
+  z-index:25;
+  top:clamp(145px,21vh,205px);
   left:50%;
   width:min(360px,68vw);
   display:flex;
@@ -261,7 +272,7 @@ a {
 }
 
 .brand-transition.is-compact {
-  top:22px;
+  top:16px;
   left:5vw;
   width:132px;
   transform:translateX(0);
@@ -706,6 +717,8 @@ footer nav a:hover {
 @media(max-width:850px) {
   .site-header {
     grid-template-columns:1fr auto;
+    min-height:64px;
+    padding:12px 6vw;
   }
   .site-header nav,.header-link {
     display:none;
@@ -789,8 +802,9 @@ footer nav a:hover {
     width:min(236px,54vw);
   }
   .brand-transition.is-compact {
+    top:13px;
     left:24px;
-    width:132px;
+    width:112px;
   }
   .hero h1 {
     font-size:43px;
