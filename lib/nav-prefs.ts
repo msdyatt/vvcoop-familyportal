@@ -21,7 +21,8 @@ export type Destination = {
   group: "Family" | "Everywhere" | "Teaching" | "Administration";
 };
 
-export const MAX_SLOTS = 4;
+/** Five shortcuts plus the Menu button: the most a phone-width bar can hold and still read. */
+export const MAX_SLOTS = 5;
 
 const FAMILY = "/family-village/home";
 const TEACHER = "/family-village/teacher";
@@ -38,13 +39,14 @@ export const DESTINATIONS: Destination[] = [
   { id: "photos", label: "Photos", href: "/family-village/photos", icon: "photos", group: "Everywhere" },
   { id: "messages", label: "Messages", href: "/family-village/messages", icon: "messages", group: "Everywhere" },
   { id: "teacher-home", label: "Teaching", href: TEACHER, icon: "teach", role: "teacher", group: "Teaching" },
-  { id: "teacher-classes", label: "My classes", href: `${TEACHER}#classes`, icon: "classes", role: "teacher", group: "Teaching" },
-  { id: "teacher-lounge", label: "Lounge", href: `${TEACHER}#lounge`, icon: "news", role: "teacher", group: "Teaching" },
+  { id: "teacher-news", label: "Team news", href: `${TEACHER}/news`, icon: "news", role: "teacher", group: "Teaching" },
+  { id: "teacher-classes", label: "My classes", href: `${TEACHER}/classes`, icon: "classes", role: "teacher", group: "Teaching" },
+  { id: "teacher-lounge", label: "Print queue", href: `${TEACHER}/print`, icon: "paperwork", role: "teacher", group: "Teaching" },
   { id: "admin-dashboard", label: "Dashboard", href: ADMIN, icon: "dashboard", role: "admin", group: "Administration" },
   { id: "admin-families", label: "Families", href: `${ADMIN}?tab=families`, icon: "families", role: "admin", group: "Administration" },
   { id: "admin-classes", label: "Classes", href: `${ADMIN}?tab=classes`, icon: "classes", role: "admin", group: "Administration" },
   { id: "admin-invitations", label: "Invites", href: `${ADMIN}?tab=invitations`, icon: "invitations", role: "admin", group: "Administration" },
-  { id: "admin-compliance", label: "Compliance", href: `${ADMIN}?tab=compliance`, icon: "compliance", role: "admin", group: "Administration" },
+  { id: "admin-compliance", label: "Forms", href: `${ADMIN}?tab=compliance`, icon: "compliance", role: "admin", group: "Administration" },
   { id: "admin-news", label: "News", href: `${ADMIN}?tab=news`, icon: "news", role: "admin", group: "Administration" },
   { id: "admin-reports", label: "Reports", href: `${ADMIN}?tab=reports`, icon: "reports", role: "admin", group: "Administration" },
   { id: "admin-activity", label: "Activity", href: `${ADMIN}?tab=activity`, icon: "activity", role: "admin", group: "Administration" },

@@ -646,3 +646,42 @@ html[data-app] dialog.child-detail-panel button:not(.child-detail-close):not(.ba
     font-size: 15px;
   }
 }
+
+/* A fuller bar (five shortcuts and Menu) gets a little tighter so every label still fits. */
+.app-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-tabbar.many .app-tab {
+  font-size: 10px;
+}
+
+.app-tabbar.many .app-tab-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.app-menu .app-menu-group {
+  border-top: 1px solid rgba(var(--navy-rgb), .1);
+}
+
+.app-menu .app-menu-group > p {
+  margin: 14px 4px 0;
+  color: var(--sage-text);
+  font: 700 11px var(--sans);
+  letter-spacing: .6px;
+  text-transform: uppercase;
+}
+
+.app-menu .app-menu-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-menu .app-menu-group li + li {
+  border-top: 0;
+}
