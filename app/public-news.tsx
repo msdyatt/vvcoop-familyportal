@@ -41,7 +41,7 @@ export default function PublicNews() {
   return <section id="news" className="public-news">
     <div className="public-news-heading">
       <p className="eyebrow">From the village</p>
-      <h2>A few notes<br/>from the co-op.</h2>
+      <h2>Lately at the co-op.</h2>
     </div>
     <div className="public-news-list">
       {posts.map((post) => <article key={post.id}>
