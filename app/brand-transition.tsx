@@ -7,28 +7,15 @@ export default function BrandTransition() {
   const [compact, setCompact] = useState(false);
 
   useEffect(() => {
-    const hero = document.querySelector<HTMLElement>(".hero");
-    if (!hero) return;
-
     const updateFromScroll = () => {
-      setCompact(hero.getBoundingClientRect().top < -48);
+      setCompact(window.scrollY > 48);
     };
 
     updateFromScroll();
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setCompact(entry.boundingClientRect.top < -48 || entry.intersectionRatio < 0.78);
-      },
-      { threshold: [0, 0.78, 1] },
-    );
-
-    observer.observe(hero);
-    window.addEventListener("resize", updateFromScroll);
+    window.addEventListener("scroll", updateFromScroll, { passive: true });
 
     return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", updateFromScroll);
+      window.removeEventListener("scroll", updateFromScroll);
     };
   }, []);
 
