@@ -243,23 +243,33 @@ a {
   padding:25px 5vw;
 }
 
-.mini-brand {
+.brand-transition {
+  position:fixed;
+  z-index:12;
+  top:clamp(150px,21vh,205px);
+  left:50%;
+  width:min(360px,68vw);
   display:flex;
   align-items:center;
-  text-decoration:none;
+  justify-content:center;
+  transform:translateX(-50%);
+  transition:
+    top .65s cubic-bezier(.22,1,.36,1),
+    left .65s cubic-bezier(.22,1,.36,1),
+    width .65s cubic-bezier(.22,1,.36,1),
+    transform .65s cubic-bezier(.22,1,.36,1);
 }
 
-.mini-brand img {
+.brand-transition.is-compact {
+  top:22px;
+  left:5vw;
   width:132px;
-  height:auto;
+  transform:translateX(0);
 }
 
-.mini-brand span {
-  margin-left:5px;
-  color:var(--terracotta-text);
-  font:700 9px var(--sans);
-  letter-spacing:2.5px;
-  text-transform:uppercase;
+.brand-transition img {
+  width:100%;
+  height:auto;
 }
 
 .site-header nav {
@@ -306,40 +316,11 @@ a {
   position:relative;
 }
 
-.hero-logo {
+.hero-logo-placeholder {
   width:min(360px,68vw);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.hero-logo img {
-  width:100%;
-  height:auto;
-}
-
-.hero-brand-row {
-  width:min(720px,82vw);
-  display:grid;
-  grid-template-columns:1fr auto auto 1fr;
-  gap:15px;
-  align-items:center;
+  aspect-ratio:900 / 310;
   margin-bottom:8px;
-}
-
-.hero-brand-row>span {
-  height:1px;
-  background:linear-gradient(90deg,transparent,var(--terracotta));
-}
-
-.hero-brand-row>span:last-child {
-  background:linear-gradient(90deg,var(--terracotta),transparent);
-}
-
-.hero-brand-row>i {
-  color:var(--antique-gold);
-  font-size:8px;
-  font-style:normal;
+  visibility:hidden;
 }
 
 .descriptor,.eyebrow {
@@ -757,7 +738,8 @@ footer nav a:hover {
     font-size:13px;
     font-weight:700;
   }
-  .hero-logo {
+  .brand-transition:not(.is-compact),
+  .hero-logo-placeholder {
     width:min(320px,60vw);
   }
   .welcome,.families,.resources {
@@ -802,8 +784,13 @@ footer nav a:hover {
   .hero {
     padding-top:95px;
   }
-  .hero-logo {
+  .brand-transition:not(.is-compact),
+  .hero-logo-placeholder {
     width:min(236px,54vw);
+  }
+  .brand-transition.is-compact {
+    left:24px;
+    width:132px;
   }
   .hero h1 {
     font-size:43px;
