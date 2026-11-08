@@ -290,6 +290,8 @@ a {
 }
 
 .site-header nav {
+  grid-column:2;
+  justify-self:center;
   display:flex;
   gap:28px;
 }
@@ -301,6 +303,7 @@ a {
 }
 
 .header-link {
+  grid-column:3;
   justify-self:end;
   padding-bottom:3px;
   border-bottom:1px solid var(--terracotta);
