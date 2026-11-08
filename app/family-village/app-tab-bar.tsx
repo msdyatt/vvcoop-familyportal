@@ -114,7 +114,7 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   const bar = resolveBar(prefs, section, roles);
 
   return <>
-    <nav className="app-tabbar" aria-label="Main">
+    <nav className={`app-tabbar${bar.length >= 5 ? " many" : ""}`} aria-label="Main">
       {bar.map((dest) => {
         const active = isActive(dest, path, hash, search);
         const badge = dest.id === "messages" ? unread : 0;
@@ -132,9 +132,14 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
     {menuOpen && <DetailModal title="Menu" onClose={() => setMenuOpen(false)}>
       <ul className="app-menu">
         <li><a href="/family-village/home">Family home</a></li>
-        {availableDestinations(roles).filter((d) => d.group === "Family" && d.id !== "home").map((d) => <li key={d.id}><a className="app-menu-sub" href={d.href}>{d.label}</a></li>)}
-        {roles.includes("teacher") && <li><a href="/family-village/teacher">Teacher&rsquo;s Lounge</a></li>}
-        {roles.includes("admin") && <li><a href="/family-village/admin">Administration</a></li>}
+        {(["Family", "Everywhere", "Teaching", "Administration"] as const).map((group) => {
+          const items = availableDestinations(roles).filter((d) => d.group === group && d.id !== "home");
+          if (!items.length) return null;
+          return <li key={group} className="app-menu-group">
+            <p>{group === "Everywhere" ? "Anywhere in the portal" : group === "Teaching" ? "Teacher" : group === "Administration" ? "Admin" : group}</p>
+            <ul>{items.map((d) => <li key={d.id}><a className="app-menu-sub" href={d.href}>{d.label}</a></li>)}</ul>
+          </li>;
+        })}
         <li><button type="button" onClick={() => { setMenuOpen(false); setEditing(true); }}>Customize bottom bar</button></li>
         <li><button type="button" onClick={() => { setMenuOpen(false); onOpenAccount(); }}>Account &amp; security</button></li>
         <li><button type="button" onClick={() => { setMenuOpen(false); onTour(); }}>Take the tour</button></li>

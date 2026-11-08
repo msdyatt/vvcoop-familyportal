@@ -49,7 +49,18 @@ function summarizeReads(reads: { name: string; read_at: string }[]): string | nu
   return `Read by ${latest.name} on ${formatReadTime(latest.read_at)}${rest ? ` · +${rest} more` : ""}`;
 }
 
-export default function TeacherWorkspace() {
+/** The Teacher page shows everything; each part also has a page of its own that shows only that part. */
+export type TeacherView = "home" | "news" | "classes" | "print";
+
+const TEACHER_HEADERS: Record<TeacherView, { title: string; subtitle: string }> = {
+  home: { title: "Teacher’s Lounge", subtitle: "Your classes, roster, and resources in one place." },
+  news: { title: "Teaching team news", subtitle: "Announcements for the teaching team." },
+  classes: { title: "My classes", subtitle: "Rosters, notes, class dates and files." },
+  print: { title: "Print queue", subtitle: "Handouts waiting for the office printer." },
+};
+
+export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView }) {
+  const show = (part: string) => view === "home" || view === part;
   const { state: access, userId, roles, recheck } = usePortalAccess("teacher");
   const [classes, setClasses] = useState<ClassRow[]>([]);
   /** class_id -> 'lead' | 'assistant'. Assistants are shown a smaller page. */
@@ -131,25 +142,25 @@ export default function TeacherWorkspace() {
   const reload = () => loadAll(userId);
 
   return <main className="workspace-preview">
-    <AppHeader current="teacher" roles={roles} title="Teacher’s Lounge" subtitle="Your classes, roster, and resources in one place." />
+    <AppHeader current="teacher" roles={roles} title={TEACHER_HEADERS[view].title} subtitle={TEACHER_HEADERS[view].subtitle} />
     <div className="preview-banner"><b>Only your assigned classes are shown.</b> Families and students outside your roster stay private.</div>
     {!classes.length && <p className="portal-empty portal-empty-standalone">No classes are assigned to you yet. A Village administrator can assign you to a class.</p>}
 
     {classes.length > 0 && <section className="workspace-grid">
       <article className="workspace-nav">
-        <a className="active" href="#news">Teaching team news</a>
-        <a href="#classes">Classes</a>
-        <a href="#lounge">Print queue</a>
+        <a className={view === "news" ? "active" : ""} href="/family-village/teacher/news">Teaching team news</a>
+        <a className={view === "classes" ? "active" : ""} href="/family-village/teacher/classes">Classes</a>
+        <a className={view === "print" ? "active" : ""} href="/family-village/teacher/print">Print queue</a>
       </article>
 
       <div className="workspace-main">
-        <NewsSection classes={classes} />
+        {show("news") && <NewsSection classes={classes} />}
 
         {/* Each class rolls up its own roster, notes, class dates, and files
             into one dropdown -- clicking a class is the only navigation this
             needs, instead of a separate class picker driving several
             sections further down the page. */}
-        <section id="classes">
+        {show("classes") && <section id="classes">
           <p className="card-kicker">My classes</p>
           <h2>Your classroom, organized.</h2>
           <div className="teacher-class-accordion">
@@ -173,9 +184,9 @@ export default function TeacherWorkspace() {
               </CollapsibleRecord>;
             })}
           </div>
-        </section>
+        </section>}
 
-        <PrintSection classes={classes} roleByClass={roleByClass} userId={userId} queue={printQueue} onSaved={reload} />
+        {show("print") && <PrintSection classes={classes} roleByClass={roleByClass} userId={userId} queue={printQueue} onSaved={reload} />}
       </div>
     </section>}
   </main>;
