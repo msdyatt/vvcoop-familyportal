@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { useBackLayer } from "../../lib/use-back-layer";
 
 /**
  * QA finding VV-20: this used to be a plain `role="dialog"` div -- real
@@ -15,7 +16,8 @@ import { useEffect, useId, useRef } from "react";
  * automatically. Only the accessible name and focus restoration on close are
  * still this component's job.
  */
-export default function DetailModal({ title, onClose, children }: { title?: string; onClose: () => void; children: React.ReactNode }) {
+export default function DetailModal({ title, onClose, backLayer = true, children }: { title?: string; onClose: () => void; /** False for a sheet whose links leave the page (the Menu), so it does not leave a spare history entry behind. */ backLayer?: boolean; children: React.ReactNode }) {
+  useBackLayer(backLayer, onClose);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const restoreFocusTo = useRef<HTMLElement | null>(null);
