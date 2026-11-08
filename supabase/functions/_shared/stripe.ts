@@ -92,10 +92,11 @@ export class StripeClient {
 // --- configuration -------------------------------------------------------------------
 
 export type StripeConfig =
-  | { ok: true; provider: "stripe_test" | "stripe_live"; livemode: boolean; secretKey: string }
+  | { ok: true; provider: "stripe_test" | "stripe_live"; livemode: boolean; secretKey: string; publishableKey: string | null }
   | { ok: false; code: "off" | "no_key" | "wrong_key"; provider: DuesProvider; message: string };
 
 const SECRET_NAMES = { stripe_test: "STRIPE_SECRET_KEY_TEST", stripe_live: "STRIPE_SECRET_KEY_LIVE" } as const;
+const PUBLISHABLE_NAMES = { stripe_test: "STRIPE_PUBLISHABLE_KEY_TEST", stripe_live: "STRIPE_PUBLISHABLE_KEY_LIVE" } as const;
 const WEBHOOK_NAMES = { stripe_test: "STRIPE_WEBHOOK_SECRET_TEST", stripe_live: "STRIPE_WEBHOOK_SECRET_LIVE" } as const;
 
 export async function readProvider(admin: AdminClient): Promise<DuesProvider> {
@@ -129,7 +130,11 @@ export async function loadStripeConfig(admin: AdminClient): Promise<StripeConfig
       message: `The ${name} secret does not look like a ${provider === "stripe_live" ? "live" : "test"}-mode key. Nothing was sent to Stripe.`,
     };
   }
-  return { ok: true, provider, livemode: provider === "stripe_live", secretKey };
+  // The publishable key is meant to be public (it goes to the browser). It is optional:
+  // without it the pay page falls back to Stripe's own page instead of embedding.
+  const publishable = (await readVaultSecret(admin, PUBLISHABLE_NAMES[provider]))?.trim() ?? "";
+  const publishableKey = new RegExp(`^pk_${provider === "stripe_live" ? "live" : "test"}_`).test(publishable) ? publishable : null;
+  return { ok: true, provider, livemode: provider === "stripe_live", secretKey, publishableKey };
 }
 
 export async function loadWebhookSecrets(admin: AdminClient): Promise<{ test: string | null; live: string | null }> {

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { usePortalAccess } from "../../../lib/use-portal-access";
-import { downloadReceipt, startCheckout } from "../../../lib/dues-api";
+import { downloadReceipt, startCheckout, type EmbedInfo } from "../../../lib/dues-api";
+import { mountEmbeddedCheckout } from "../../../lib/stripe-embed";
 import {
   CHARGE_COLUMNS, PAYMENT_COLUMNS, describeInstallments, formatCents, formatDueDate, formatWhen, methodLabel, monthlyPreview,
   nextPaymentCents, paymentStatusLabel, savedMethodLabel,
@@ -35,6 +36,7 @@ export default function DuesApp() {
   const { state: access, userId, roles, recheck } = usePortalAccess("member");
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
+  const [embed, setEmbed] = useState<EmbedInfo | null>(null);
   const [returned] = useState(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("checkout"));
 
   const load = useCallback(async () => {
@@ -105,12 +107,13 @@ export default function DuesApp() {
     {error && <p className="dues-error" role="alert">{error}</p>}
     {!data && !error && <p className="portal-empty">Loading…</p>}
     {data && !data.charges.length && <p className="portal-empty">Nothing is owed right now. When the co-op opens dues for the year, they will appear here.</p>}
-    {data && data.charges.map((charge) => <ChargeCard key={charge.id} charge={charge} data={data} onChanged={load} />)}
+    {embed && <EmbeddedPayment info={embed} onClose={() => { setEmbed(null); void load(); }} />}
+    {data && data.charges.map((charge) => <ChargeCard key={charge.id} charge={charge} data={data} onChanged={load} onEmbed={setEmbed} />)}
     <p className="dues-footnote">Questions about a charge? Message an administrator from Messages. Your card or bank details are entered on Stripe&rsquo;s secure page and are never stored by the co-op.</p>
   </main>;
 }
 
-function ChargeCard({ charge, data, onChanged }: { charge: DuesCharge; data: Loaded; onChanged: () => Promise<void> }) {
+function ChargeCard({ charge, data, onChanged, onEmbed }: { charge: DuesCharge; data: Loaded; onChanged: () => Promise<void>; onEmbed: (info: EmbedInfo) => void }) {
   const provider = data.settings?.provider ?? "off";
   const plan = data.plans.find((p) => p.charge_id === charge.id && p.status === "active") ?? null;
   const completedPlan = data.plans.find((p) => p.charge_id === charge.id && p.status === "completed") ?? null;
@@ -147,8 +150,10 @@ function ChargeCard({ charge, data, onChanged }: { charge: DuesCharge; data: Loa
     } else if (plan?.kind === "monthly" && !autopayOn && autopayAgree) {
       autopay = true;
     }
-    const failure = await startCheckout(supabase, { chargeId: charge.id, payAll: kind === "all" || (!plan && choice === "full"), autopay });
-    if (failure) { setBusy(false); setMessage(failure); void onChanged(); }
+    const result = await startCheckout(supabase, { chargeId: charge.id, payAll: kind === "all" || (!plan && choice === "full"), autopay });
+    setBusy(false);
+    if (result.error) { setMessage(result.error); void onChanged(); return; }
+    if (result.embed) onEmbed(result.embed);
   }
 
   async function backToFull() {
@@ -267,5 +272,39 @@ function ChargeCard({ charge, data, onChanged }: { charge: DuesCharge; data: Loa
         </tbody>
       </table>
     </div>}
+  </section>;
+}
+
+/** Stripe's payment form, inside the page. The details typed here go to Stripe, not to us. */
+function EmbeddedPayment({ info, onClose }: { info: EmbedInfo; onClose: () => void }) {
+  const target = useRef<HTMLDivElement>(null);
+  const [problem, setProblem] = useState("");
+  const [done, setDone] = useState(false);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; });
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      if (!target.current) return;
+      try {
+        const remove = await mountEmbeddedCheckout(target.current, { clientSecret: info.clientSecret, publishableKey: info.publishableKey, onComplete: () => setDone(true) });
+        if (cancelled) remove(); else cleanup = remove;
+      } catch (error) {
+        if (!cancelled) setProblem(error instanceof Error ? error.message : "The payment form could not be loaded.");
+      }
+    })();
+    return () => { cancelled = true; cleanup?.(); };
+  }, [info]);
+
+  return <section className="dues-embed" aria-label="Pay dues">
+    <header>
+      <h2>{done ? "Thank you" : "Pay by bank transfer, card, Apple Pay or Google Pay"}</h2>
+      <button type="button" className="compliance-cta ghost" onClick={() => closeRef.current()}>{done ? "Done" : "Cancel"}</button>
+    </header>
+    {done && <p className="dues-flash" role="status">Your payment was submitted. Card payments show here within a minute; bank transfers take 1–4 business days to clear.</p>}
+    {problem && <p className="dues-error" role="alert">{problem}</p>}
+    <div ref={target} hidden={done} />
   </section>;
 }

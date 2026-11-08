@@ -5378,6 +5378,10 @@ footer nav a:hover {
 .dues-history td { padding:10px 8px; vertical-align:top; border-bottom:1px solid rgba(var(--navy-rgb),.08); font-variant-numeric:tabular-nums; }
 .dues-history td small { display:block; margin-top:4px; color:var(--terracotta-deep); }
 
+.dues-embed { display:grid; gap:12px; padding:18px; background:var(--surface); border:1px solid rgba(var(--navy-rgb),.2); border-left:4px solid var(--navy); }
+.dues-embed header { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.dues-embed h2 { margin:0; font:600 17px var(--sans); }
+
 .dues-footnote { margin:0; color:var(--sage-text); font-size:12px; line-height:1.5; }
 
 @media (max-width:640px) {

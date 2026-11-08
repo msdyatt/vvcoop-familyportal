@@ -48,6 +48,14 @@ Settings → Payments → Payment methods. Make sure these are **on**:
 Turn off any you do not want families to see. The portal asks for bank transfer first, then
 card.
 
+**Register the site for Apple Pay and Google Pay on the embedded form.** Settings → Payments →
+Payment method domains → **Add a domain** → `family.veritasvillage.org` (do it once in test
+mode and again in live mode). Without it the embedded form still takes cards and bank transfers,
+but Apple Pay and Google Pay will not appear on the website.
+
+In the iPhone and Android apps the payment opens Stripe's own page in the phone's browser
+sheet, because Apple Pay and Google Pay do not work inside an app's embedded web view.
+
 Also: Settings → Branding. Upload the Veritas Village logo and set the brand colour, so the
 payment page looks like the co-op's.
 Settings → Customer emails: switch on **Successful payments** and **Refunds** if you want
@@ -56,7 +64,7 @@ Stripe to email a receipt as well as the portal's own PDF receipt.
 ## 5. Get the test keys
 
 1. Make sure the dashboard is in **Test mode** (sandbox).
-2. Developers → API keys → reveal the **Secret key** (it starts `sk_test_`).
+2. Developers → API keys. Copy the **Publishable key** (`pk_test_...`; it is meant to be public) and reveal the **Secret key** (`sk_test_...`).
 
 Keep that tab open for step 6. Do not copy it anywhere but Vault.
 
@@ -69,10 +77,11 @@ Keep that tab open for step 6. Do not copy it anywhere but Vault.
    | Name (exactly) | Value |
    | --- | --- |
    | `STRIPE_SECRET_KEY_TEST` | the `sk_test_...` key |
+   | `STRIPE_PUBLISHABLE_KEY_TEST` | the `pk_test_...` key. Optional: with it the payment form appears inside the Dues page on the website; without it families are sent to Stripe's own page |
    | `STRIPE_WEBHOOK_SECRET_TEST` | the `whsec_...` signing secret from step 7 |
 
-3. Later, for live mode, add `STRIPE_SECRET_KEY_LIVE` and `STRIPE_WEBHOOK_SECRET_LIVE` the
-   same way (see the last section).
+3. Later, for live mode, add `STRIPE_SECRET_KEY_LIVE`, `STRIPE_PUBLISHABLE_KEY_LIVE` and
+   `STRIPE_WEBHOOK_SECRET_LIVE` the same way (see the last section).
 
 The portal checks that the key matches the mode. A live key in the test slot is refused
 and nothing is sent to Stripe.

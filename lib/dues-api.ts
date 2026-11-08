@@ -1,13 +1,38 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { edgeFunctionUrl, functionErrorMessage } from "./supabase";
 
-/** Opens Stripe's hosted page for a charge. Returns an error message, or null after navigating. */
-export async function startCheckout(supabase: SupabaseClient, input: { chargeId: string; payAll?: boolean; autopay?: boolean }): Promise<string | null> {
-  const { data, error } = await supabase.functions.invoke("dues-checkout", { body: input });
-  if (error || data?.error) return functionErrorMessage(error, data, "The payment page could not be opened.");
-  if (!data?.url || typeof data.url !== "string" || !data.url.startsWith("https://")) return "The payment page could not be opened.";
-  window.location.assign(data.url);
-  return null;
+export type EmbedInfo = { clientSecret: string; publishableKey: string; chargeId: string };
+
+/** Inside the iPhone or Android app, as opposed to a browser tab or an installed web app. */
+export function isNativeApp(): boolean {
+  return document.documentElement.dataset.shell === "native";
+}
+
+/**
+ * Starts a payment for a charge.
+ *
+ * On the website the payment form is embedded in the page: this returns what the
+ * page needs to show it. In the iPhone and Android apps it opens Stripe's own page
+ * in the phone's browser instead, because Apple Pay and Google Pay do not work
+ * inside an app's embedded web view. Either way the page never says how much;
+ * the database decides.
+ */
+export async function startCheckout(supabase: SupabaseClient, input: { chargeId: string; payAll?: boolean; autopay?: boolean }): Promise<{ error?: string; embed?: EmbedInfo; opened?: boolean }> {
+  const { data, error } = await supabase.functions.invoke("dues-checkout", { body: { ...input, embedded: !isNativeApp() } });
+  if (error || data?.error) return { error: await functionErrorMessage(error, data, "The payment page could not be opened.") };
+
+  if (data?.kind === "embedded" && typeof data.clientSecret === "string" && typeof data.publishableKey === "string") {
+    return { embed: { clientSecret: data.clientSecret, publishableKey: data.publishableKey, chargeId: input.chargeId } };
+  }
+  if (typeof data?.url === "string" && data.url.startsWith("https://")) {
+    // The app's own browser sheet (Safari View Controller on iPhone, a Custom Tab on Android),
+    // which supports Apple Pay and Google Pay; anywhere else, a normal page navigation.
+    const browser = (window as unknown as { Capacitor?: { Plugins?: { Browser?: { open: (o: { url: string }) => Promise<void> } } } }).Capacitor?.Plugins?.Browser;
+    if (isNativeApp() && browser) await browser.open({ url: data.url });
+    else window.location.assign(data.url);
+    return { opened: true };
+  }
+  return { error: "The payment page could not be opened." };
 }
 
 /** Fetches the receipt PDF with the person's own session and hands it to the browser. */
