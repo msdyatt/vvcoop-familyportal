@@ -31,7 +31,7 @@ export type SitePasswordEnv = {
 /**
  * Paths that bypass the gate.
  *
- * The homepage is intentionally public so reviewers and prospective families can
+ * The homepage and official information pages are intentionally public so reviewers and prospective families can
  * verify the organization without receiving the private-site password. All
  * other application routes remain behind the gate unless listed below.
  *
@@ -54,6 +54,9 @@ export const APPLE_APP_SITE_ASSOCIATION_PATH = "/.well-known/apple-app-site-asso
 function isExempt(pathname: string): boolean {
   return (
     pathname === "/" ||
+    pathname === "/about" ||
+    pathname === "/programs" ||
+    pathname === "/contact" ||
     pathname === FORM_PATH ||
     pathname.startsWith("/family-village") ||
     pathname === "/privacy" ||
