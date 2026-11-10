@@ -70,3 +70,33 @@ test("renders a focused email-and-password portal entry", async () => {
   assert.match(packageJson, /"xss": "1\.0\.15"/);
   assert.doesNotMatch(packageJson, /sanitize-html/);
 });
+
+test("serves distinct, navigable nonprofit verification pages publicly", async () => {
+  const cases = [
+    ["/about", /A village built by families\./],
+    ["/programs", /A shared foundation, many discoveries\./],
+    ["/contact", /Get in touch\./],
+  ];
+  for (const [path, heading] of cases) {
+    const response = await request(path, { headers: { accept: "text/html" } });
+    assert.equal(response.status, 200, `${path} is public`);
+    const html = await response.text();
+    assert.match(html, heading);
+    assert.match(html, /href="\/about"/);
+    assert.match(html, /href="\/programs"/);
+    assert.match(html, /href="\/contact"/);
+    assert.doesNotMatch(html, /This site is password protected/);
+  }
+});
+
+test("displays nonprofit identity and administrative contact details", async () => {
+  for (const path of ["/about", "/contact"]) {
+    const response = await request(path, { headers: { accept: "text/html" } });
+    const html = await response.text();
+    assert.match(html, /42-2025384/);
+    assert.match(html, /509 Las Colinas Drive/);
+    assert.match(html, /Leander, Texas/);
+    assert.match(html, /VERITAS VILLAGE/);
+    assert.match(html, /family\.veritasvillage\.org\/family-village/);
+  }
+});
