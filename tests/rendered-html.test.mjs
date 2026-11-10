@@ -82,6 +82,8 @@ test("serves distinct, navigable nonprofit verification pages publicly", async (
     assert.equal(response.status, 200, `${path} is public`);
     const html = await response.text();
     assert.match(html, heading);
+    assert.match(html, /class="public-header-logo"/, `${path} shows the header brand link`);
+    assert.match(html, /lockup-horizontal-navy/, `${path} uses the existing site logo`);
     assert.match(html, /href="\/about"/);
     assert.match(html, /href="\/programs"/);
     assert.match(html, /href="\/contact"/);
