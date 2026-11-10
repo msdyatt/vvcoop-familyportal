@@ -31,7 +31,7 @@ export default function AboutPage() {
         <div className="public-card-grid">
           <article className="public-card"><span className="public-card-index">01</span><h3>Parent-led</h3><p>Families help teach, assist, and support the day. This is not a drop-off program.</p></article>
           <article className="public-card"><span className="public-card-index">02</span><h3>Many ages</h3><p>Our learning community welcomes preschool through high-school students, with flexibility for individual needs.</p></article>
-          <article className="public-card"><span className="public-card-index">03</span><h3>Learning together</h3><p>History and science studies form the year's foundation, with electives shaped by families' interests and abilities.</p></article>
+          <article className="public-card"><span className="public-card-index">03</span><h3>Learning together</h3><p>History and science studies form the year&apos;s foundation, with electives shaped by families&apos; interests and abilities.</p></article>
         </div>
       </section>
 
@@ -45,11 +45,11 @@ export default function AboutPage() {
             <div><dt>Official website</dt><dd><a href="https://veritasvillage.org/">veritasvillage.org</a></dd></div>
             <div><dt>Registered physical business address</dt><dd>509 Las Colinas Drive, Leander, Texas</dd></div>
           </dl>
-          <p className="public-fine-print">This is the organization's administrative address, not a public classroom or drop-in location. Please contact the co-op before planning any visit.</p>
+          <p className="public-fine-print">This is the organization&apos;s administrative address, not a public classroom or drop-in location. Please contact the co-op before planning any visit.</p>
           <a className="public-text-link" href="/contact">Contact our organization →</a>
         </div>
       </section>
-      <section className="public-cta"><p className="eyebrow">Join the conversation</p><h2>There's room to grow together.</h2><p>Curious about what a day at Veritas Village looks like?</p><a href="/contact" className="public-button">Get in touch →</a></section>
+      <section className="public-cta"><p className="eyebrow">Join the conversation</p><h2>There&apos;s room to grow together.</h2><p>Curious about what a day at Veritas Village looks like?</p><a href="/contact" className="public-button">Get in touch →</a></section>
     </PublicSiteFrame>
   );
 }
