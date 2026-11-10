@@ -1,4 +1,20 @@
 /* Public nonprofit verification pages: self-contained, on-brand and responsive. */
+/* Match the compact homepage wordmark in the fixed header on public detail pages. */
+.public-header-logo {
+  position: fixed;
+  z-index: 21;
+  top: 15px;
+  left: 5vw;
+  width: 132px;
+  display: block;
+  line-height: 0;
+}
+.public-header-logo img { display: block; width: 100%; height: auto; }
+.public-header-logo:focus-visible { outline: 2px solid var(--terracotta-text); outline-offset: 5px; }
+@media (max-width: 850px) {
+  .public-header-logo { top: 10px; left: 6vw; width: 116px; }
+}
+
 .public-page { min-height: 100dvh; padding-top: 78px; color: var(--navy); background: var(--cream); }
 .public-page .public-hero { padding: clamp(88px, 10vw, 145px) 8vw clamp(70px, 9vw, 124px); text-align:center; background: radial-gradient(circle at 50% 35%, rgba(var(--panel-rgb),.75), transparent 52%); }
 .public-page .public-hero h1 { margin: 0 auto 24px; font: 700 clamp(44px, 6vw, 82px)/1.08 var(--serif); letter-spacing:-.045em; }
