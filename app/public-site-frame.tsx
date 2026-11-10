@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import SiteHeader from "./site-header";
+import Link from "next/link";
 
 export default function PublicSiteFrame({ children }: { children: ReactNode }) {
   return (
@@ -10,7 +11,7 @@ export default function PublicSiteFrame({ children }: { children: ReactNode }) {
         <span>Veritas Village</span>
         <span>Learning in truth. Growing in community.</span>
         <nav aria-label="Public website">
-          <a href="/">Home</a>
+          <Link href="/">Home</Link>
           <a href="/about">About</a>
           <a href="/programs">Programs</a>
           <a href="/contact">Contact</a>
