@@ -2,12 +2,19 @@
 
 import { useEffect, useState } from "react";
 
-export default function SiteHeader() {
-  const [revealed, setRevealed] = useState(false);
+const navigation = [
+  { href: "/", label: "Home" },
+  { href: "/about", label: "About" },
+  { href: "/programs", label: "Programs" },
+  { href: "/contact", label: "Contact" },
+];
+
+export default function SiteHeader({ alwaysVisible = false }: { alwaysVisible?: boolean }) {
+  const [revealed, setRevealed] = useState(alwaysVisible);
 
   useEffect(() => {
     const updateFromScroll = () => {
-      setRevealed(window.scrollY > 48);
+      setRevealed(alwaysVisible || window.scrollY > 48);
     };
 
     updateFromScroll();
@@ -16,16 +23,12 @@ export default function SiteHeader() {
     return () => {
       window.removeEventListener("scroll", updateFromScroll);
     };
-  }, []);
+  }, [alwaysVisible]);
 
   return (
     <header className={`site-header${revealed ? " is-revealed" : ""}`}>
       <nav aria-label="Main navigation">
-        <a href="#welcome">Welcome</a>
-        <a href="#families">Families</a>
-        <a href="#rhythm">Our rhythm</a>
-        <a href="#resources">Resources</a>
-        <a href="#news">News</a>
+        {navigation.map(({ href, label }) => <a key={href} href={href}>{label}</a>)}
       </nav>
       <a className="header-link" href="https://family.veritasvillage.org/family-village">
         Family sign in
@@ -33,11 +36,7 @@ export default function SiteHeader() {
       <details>
         <summary>Menu</summary>
         <div>
-          <a href="#welcome">Welcome</a>
-          <a href="#families">Families</a>
-          <a href="#rhythm">Our rhythm</a>
-          <a href="#resources">Resources</a>
-          <a href="#news">News</a>
+          {navigation.map(({ href, label }) => <a key={href} href={href}>{label}</a>)}
           <a href="https://family.veritasvillage.org/family-village">Family sign in</a>
         </div>
       </details>

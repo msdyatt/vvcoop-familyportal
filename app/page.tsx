@@ -27,5 +27,5 @@ export default function Home(){return <>
 
     <section className="invitation"><div className="invitation-mark" aria-hidden="true">◆</div><p>Questions are welcome.</p><h2>Start with a<br/>conversation.</h2><span>Wondering about enrollment, classes, or what a co-op day feels like?</span><a href="mailto:veritasvillagecoop@gmail.com">Email Veritas Village →</a></section>
   </main>
-  <footer><span>Veritas Village</span><span>Learning in truth. Growing in community.</span><span>Central Texas</span><nav aria-label="Site policies"><a href="mailto:veritasvillagecoop@gmail.com?subject=Feedback%20on%20the%20website">Feedback</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms &amp; Conditions</a></nav></footer>
+  <footer><span>Veritas Village</span><span>Learning in truth. Growing in community.</span><span>Central Texas</span><nav aria-label="Public website"><a href="/about">About</a><a href="/programs">Programs</a><a href="/contact">Contact</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms &amp; Conditions</a></nav></footer>
   </>}
