@@ -77,8 +77,8 @@ export default function OnboardingTour({ roles, returning, onFinish, onOpenAccou
 }) {
   const steps = tourSteps({ roles, returning });
   const [index, setIndex] = useState(0);
-  // Inside the iOS/Android app the shell provides window.Capacitor; in a browser it does not.
-  const native = typeof window !== "undefined" && Boolean((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.());
+  // Inside the iPhone or Android app the early platform script marks the page as native (lib/platform.ts); in a browser it does not.
+  const native = typeof document !== "undefined" && document.documentElement.dataset.shell === "native";
   const last = index === steps.length - 1;
   const copy = stepCopy(steps[index], returning, native, () => { onFinish(); onOpenAccount(); });
 

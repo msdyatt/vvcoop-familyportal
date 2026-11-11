@@ -1,8 +1,9 @@
 /**
  * Swipe in from the left edge to go back.
  *
- * For the installed web app and the native app, which have no browser chrome:
- * a browser tab already has its own gesture. Pages here are separate loads, so
+ * For the installed web app and the Android app, which have no browser chrome:
+ * a browser tab already has its own gesture, and the iPhone app's native frame
+ * brings the system's. Pages here are separate loads, so
  * "back" is the browser's history, and this asks for it. Popups, reports and
  * open conversations are history steps too (see back-layers.ts), so the same
  * swipe closes them.
@@ -43,6 +44,8 @@ export function initSwipeBack(): () => void {
   if (typeof document === "undefined") return () => {};
   const root = document.documentElement;
   if (root.dataset.app !== "1") return () => {};
+  // The iPhone app's native frame has its own edge swipe (and closes popups first); two would both fire.
+  if (root.dataset.frame) return () => {};
 
   let start: { x: number; y: number } | null = null;
   let arrow: HTMLDivElement | null = null;

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Page 3 | Veritas Village</title>
+<link rel="stylesheet" href="frame.css">
+</head>
+<body>
+<h1>Page 3</h1>
+<p>Swipe from the left edge or use the back button. With a popup open, back closes the popup first.</p>
+<a href="page4.html">Push page 4</a>
+<a href="index.html">Push the index again</a>
+<button id="layer">Open a popup layer</button>
+<button id="close">post("close")</button>
+<div class="filler"></div><div class="filler"></div><div class="filler"></div><div class="filler"></div>
+<script>
+  var layers = [];
+  window.addEventListener('popstate', function () { var el = layers.pop(); if (el) el.remove(); });
+  document.getElementById('layer').onclick = function () {
+    var el = document.createElement('div');
+    el.className = 'layer';
+    el.innerHTML = '<div><strong>Popup</strong><p>Back closes me first.</p><button class="x">Close</button></div>';
+    document.body.appendChild(el); history.pushState({}, ''); layers.push(el);
+    el.querySelector('.x').onclick = function () { history.back(); };
+  };
+  document.getElementById('close').onclick = function () { VVNative.post('close'); };
+</script>
+</body>
+</html>
