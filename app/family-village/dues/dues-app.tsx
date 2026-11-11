@@ -38,7 +38,7 @@ export default function DuesApp() {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
   const [embed, setEmbed] = useState<EmbedInfo | null>(null);
-  const [returned] = useState(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("checkout"));
+  const [returned, setReturned] = useState(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("checkout"));
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
@@ -110,12 +110,12 @@ export default function DuesApp() {
     {!data && !error && <p className="portal-empty">Loading…</p>}
     {data && !data.charges.length && <p className="portal-empty">Nothing is owed right now. When the co-op opens dues for the year, they will appear here.</p>}
     {embed && <EmbeddedPayment info={embed} onClose={() => { setEmbed(null); void load(); }} />}
-    {data && data.charges.map((charge) => <ChargeCard key={charge.id} charge={charge} data={data} onChanged={load} onEmbed={setEmbed} />)}
+    {data && data.charges.map((charge) => <ChargeCard key={charge.id} charge={charge} data={data} onChanged={load} onEmbed={setEmbed} onPaid={() => setReturned("success")} />)}
     <p className="dues-footnote">Questions about a charge? Message an administrator from Messages. Your card or bank details are entered on Stripe&rsquo;s secure page and are never stored by the co-op.</p>
   </main>;
 }
 
-function ChargeCard({ charge, data, onChanged, onEmbed }: { charge: DuesCharge; data: Loaded; onChanged: () => Promise<void>; onEmbed: (info: EmbedInfo) => void }) {
+function ChargeCard({ charge, data, onChanged, onEmbed, onPaid }: { charge: DuesCharge; data: Loaded; onChanged: () => Promise<void>; onEmbed: (info: EmbedInfo) => void; onPaid: () => void }) {
   const provider = data.settings?.provider ?? "off";
   const plan = data.plans.find((p) => p.charge_id === charge.id && p.status === "active") ?? null;
   const completedPlan = data.plans.find((p) => p.charge_id === charge.id && p.status === "completed") ?? null;
@@ -156,6 +156,7 @@ function ChargeCard({ charge, data, onChanged, onEmbed }: { charge: DuesCharge; 
     setBusy(false);
     if (result.error) { setMessage(result.error); void onChanged(); return; }
     if (result.embed) onEmbed(result.embed);
+    if (result.completed) { onPaid(); void onChanged(); }
   }
 
   async function backToFull() {

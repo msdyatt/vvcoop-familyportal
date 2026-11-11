@@ -1,6 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { edgeFunctionUrl, functionErrorMessage } from "./supabase";
 
+/** Apple's identifier for the co-op's Apple Pay merchant account (created in the Apple Developer account). */
+export const APPLE_MERCHANT_ID = "merchant.org.veritasvillage.family";
+/** The app's custom URL scheme, used when a bank's own page sends the person back to the app. */
+export const APP_RETURN_URL = "org.veritasvillage.family://stripe-redirect";
+
+type StripePlugin = {
+  initialize: (o: { publishableKey: string }) => Promise<void>;
+  createPaymentSheet: (o: Record<string, unknown>) => Promise<void>;
+  presentPaymentSheet: () => Promise<{ paymentResult: "paymentSheetCompleted" | "paymentSheetCanceled" | "paymentSheetFailed" }>;
+};
+type CapacitorGlobal = { isPluginAvailable?: (name: string) => boolean; Plugins?: { Stripe?: StripePlugin; Browser?: { open: (o: { url: string }) => Promise<void> } } };
+const capacitor = () => (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor;
+
+/** True in an app build that includes Stripe's native payment sheet; older builds use the browser sheet. */
+export function hasNativePayments(): boolean {
+  const cap = capacitor();
+  return isNativeApp() && Boolean(cap?.Plugins?.Stripe) && (cap?.isPluginAvailable?.("Stripe") ?? true);
+}
+
 export type EmbedInfo = { clientSecret: string; publishableKey: string; chargeId: string };
 
 /** Inside the iPhone or Android app, as opposed to a browser tab or an installed web app. */
@@ -17,17 +36,37 @@ export function isNativeApp(): boolean {
  * inside an app's embedded web view. Either way the page never says how much;
  * the database decides.
  */
-export async function startCheckout(supabase: SupabaseClient, input: { chargeId: string; payAll?: boolean; autopay?: boolean }): Promise<{ error?: string; embed?: EmbedInfo; opened?: boolean }> {
-  const { data, error } = await supabase.functions.invoke("dues-checkout", { body: { ...input, embedded: !isNativeApp() } });
+export async function startCheckout(supabase: SupabaseClient, input: { chargeId: string; payAll?: boolean; autopay?: boolean }): Promise<{ error?: string; embed?: EmbedInfo; opened?: boolean; completed?: boolean }> {
+  const native = hasNativePayments();
+  const { data, error } = await supabase.functions.invoke("dues-checkout", { body: { ...input, embedded: !isNativeApp(), native } });
   if (error || data?.error) return { error: await functionErrorMessage(error, data, "The payment page could not be opened.") };
 
+  if (data?.kind === "native" && native) {
+    // Stripe's own payment sheet, native to the phone: Apple Pay / Google Pay, bank, or card. The
+    // details are entered into Stripe's sheet and never pass through this page.
+    const stripe = capacitor()!.Plugins!.Stripe!;
+    try {
+      await stripe.initialize({ publishableKey: data.publishableKey });
+      await stripe.createPaymentSheet({
+        paymentIntentClientSecret: data.paymentIntentClientSecret, customerId: data.customerId, merchantDisplayName: data.merchantDisplayName,
+        enableApplePay: true, applePayMerchantId: APPLE_MERCHANT_ID, enableGooglePay: true, GooglePayIsTesting: String(data.publishableKey).startsWith("pk_test_"),
+        countryCode: "US", currencyCode: "usd", allowsDelayedPaymentMethods: true, paymentMethodLayout: "vertical", returnURL: APP_RETURN_URL,
+      });
+      const { paymentResult } = await stripe.presentPaymentSheet();
+      if (paymentResult === "paymentSheetCompleted") return { completed: true };
+      if (paymentResult === "paymentSheetFailed") return { error: "The payment did not go through. You were not charged. Please try again." };
+      return {};   // closed without paying: the attempt stays open and resumes next time
+    } catch {
+      return { error: "The payment sheet could not be opened. Please try again." };
+    }
+  }
   if (data?.kind === "embedded" && typeof data.clientSecret === "string" && typeof data.publishableKey === "string") {
     return { embed: { clientSecret: data.clientSecret, publishableKey: data.publishableKey, chargeId: input.chargeId } };
   }
   if (typeof data?.url === "string" && data.url.startsWith("https://")) {
     // The app's own browser sheet (Safari View Controller on iPhone, a Custom Tab on Android),
     // which supports Apple Pay and Google Pay; anywhere else, a normal page navigation.
-    const browser = (window as unknown as { Capacitor?: { Plugins?: { Browser?: { open: (o: { url: string }) => Promise<void> } } } }).Capacitor?.Plugins?.Browser;
+    const browser = capacitor()?.Plugins?.Browser;
     if (isNativeApp() && browser) await browser.open({ url: data.url });
     else window.location.assign(data.url);
     return { opened: true };

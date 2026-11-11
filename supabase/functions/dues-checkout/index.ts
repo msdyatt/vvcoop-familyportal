@@ -22,7 +22,7 @@ async function handle(req: Request): Promise<Response> {
   if (!auth.ok) return auth.response;
   const { caller } = auth;
 
-  const body = await req.json().catch(() => null) as { chargeId?: string; payAll?: boolean; autopay?: boolean; embedded?: boolean } | null;
+  const body = await req.json().catch(() => null) as { chargeId?: string; payAll?: boolean; autopay?: boolean; embedded?: boolean; native?: boolean } | null;
   const chargeId = body?.chargeId?.trim();
   if (!chargeId) return json({ error: "Say which charge to pay." }, 400);
 
@@ -34,9 +34,12 @@ async function handle(req: Request): Promise<Response> {
 
   const result = await createDuesCheckout(
     { admin: caller.admin, stripe: new StripeClient(config.secretKey), config },
-    { userId: caller.userId, userEmail: caller.email, chargeId, payAll: Boolean(body?.payAll), autopay: Boolean(body?.autopay), embedded: Boolean(body?.embedded) },
+    { userId: caller.userId, userEmail: caller.email, chargeId, payAll: Boolean(body?.payAll), autopay: Boolean(body?.autopay), embedded: Boolean(body?.embedded), native: Boolean(body?.native) },
   );
   if (!result.ok) return json({ error: result.error, code: result.code }, result.status);
+  if (result.kind === "native") {
+    return json({ kind: "native", paymentIntentClientSecret: result.paymentIntentClientSecret, publishableKey: result.publishableKey, customerId: result.customerId, merchantDisplayName: result.merchantDisplayName, amountCents: result.amountCents, paymentId: result.paymentId });
+  }
   return json(result.kind === "embedded"
     ? { kind: "embedded", clientSecret: result.clientSecret, publishableKey: result.publishableKey, paymentId: result.paymentId }
     : { kind: "hosted", url: result.url, paymentId: result.paymentId });
