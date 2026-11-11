@@ -26,6 +26,9 @@ struct PathProperties: Decodable {
     var detent: String?
     /// "signin" marks the sign-in page: leaving it replaces it instead of stacking on top.
     var role: String?
+    /// For sheets: "frame" means a link tapped inside the sheet closes the sheet and opens in the page
+    /// stack underneath (the notification list); otherwise links open inside the sheet.
+    var links: String?
 }
 
 struct PathRule: Decodable {
@@ -63,6 +66,6 @@ final class PathRules {
         for rule in rules where rule.expressions.contains(where: { $0.firstMatch(in: target, range: range) != nil }) {
             return rule.properties
         }
-        return PathProperties(presentation: .push, detent: nil, role: nil)
+        return PathProperties(presentation: .push, detent: nil, role: nil, links: nil)
     }
 }

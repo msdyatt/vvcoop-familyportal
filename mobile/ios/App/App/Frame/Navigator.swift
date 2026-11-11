@@ -4,6 +4,8 @@ import UIKit
 /// Decides what a request to open a URL turns into, using the path rules, and does it.
 final class Navigator {
     private unowned let frame: FrameController
+    /// Where the pages get their navigation bar buttons from.
+    var chromeSource: FrameController? { frame }
     private var lastOpened: (url: URL, at: Date)?
 
     init(frame: FrameController) { self.frame = frame }
@@ -18,6 +20,20 @@ final class Navigator {
 
         let rules = PathRules.shared
         let properties = rules.properties(for: url)
+
+        // A link tapped in a sheet that hands its links to the frame (the notification list): close the
+        // sheet, then open the link over the page that was underneath.
+        if let page, properties.presentation != .sheet,
+           rules.properties(for: page.webView.url ?? page.url).links == "frame",
+           let sheet = page.navigationController, sheet.presentingViewController != nil {
+            lastOpened = nil
+            sheet.dismiss(animated: true) { [weak self] in
+                guard let self else { return }
+                self.open(url, from: self.frame.currentPage)
+            }
+            return
+        }
+
         let leavingSignIn = page.map { rules.properties(for: $0.webView.url ?? $0.url).role == "signin" } ?? false
 
         FrameLog.event("open \(url.path) as \(properties.presentation.rawValue)")
