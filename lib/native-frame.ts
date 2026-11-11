@@ -13,6 +13,8 @@ export type NativeFrame = {
   frame: true;
   platform: string;
   version: number;
+  /** What this build of the frame can do, e.g. "pay.sheet". Older builds lack the entry. */
+  capabilities?: string[];
   /** Fire and forget. */
   post(type: string, payload?: Record<string, unknown>): void;
   /** Ask the frame something and wait for its answer. */

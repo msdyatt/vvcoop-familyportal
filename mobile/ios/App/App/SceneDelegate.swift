@@ -23,6 +23,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         #endif
     }
 
+    /// A bank's page (Stripe's bank-account linking) sends the person back through our URL scheme.
+    func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
+        for context in contexts { _ = PaymentSheetPresenter.shared.handle(url: context.url) }
+    }
+
     func sceneWillResignActive(_ scene: UIScene) { AppLock.shared.willResignActive() }
     func sceneDidEnterBackground(_ scene: UIScene) { AppLock.shared.didEnterBackground() }
     func sceneDidBecomeActive(_ scene: UIScene) { AppLock.shared.didBecomeActive() }

@@ -40,6 +40,7 @@ enum Bridge {
             frame: true,
             platform: 'ios',
             version: \(FrameConfig.bridgeVersion),
+            capabilities: ['share', 'push', 'pay.sheet'],
             post: function (type, payload) { post({ type: type, payload: payload || {} }); },
             call: function (type, payload) {
               return new Promise(function (resolve, reject) {
