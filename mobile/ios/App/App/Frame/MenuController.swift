@@ -21,9 +21,8 @@ final class MenuController: UITableViewController {
     init(state: FrameState) {
         super.init(style: .insetGrouped)
         title = "Menu"
-        let home = state.currentSection.map { FrameDestination(id: "section-home", label: "\($0.label) home", href: $0.home, icon: "home", section: $0.id) }
         var built: [(String?, [Row])] = []
-        if let home { built.append((nil, [.destination(home)])) }
+        built.append((nil, [.destination(FrameDestination(id: "home-page", label: "Home", href: state.home, icon: "home"))]))
         for group in state.menu {
             let rows = group.items.filter { $0.id != "home" }.map { Row.destination($0) }
             if !rows.isEmpty { built.append((group.title, rows)) }

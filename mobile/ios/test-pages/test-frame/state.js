@@ -10,15 +10,12 @@
   var home = d('home', 'Home', 'tabs.html', 'home');
   var photos = d('photos', 'Photos', 'photos.html', 'photos');
   var messages = d('messages', 'Messages', 'messages.html', 'messages');
-  var teaching = d('teacher-home', 'Teaching', 'teacher.html', 'teach', 'teacher');
+  var teaching = d('teacher-home', 'Teaching', 'teacher.html', 'teach');
   var state = {
     signedIn: true,
-    section: document.body.dataset.section || 'home',
     unread: 3,
-    sections: [
-      { id: 'home', label: 'Family', home: '/test-frame/tabs.html', bar: [home, photos, messages] },
-      { id: 'teacher', label: 'Teacher', home: '/test-frame/teacher.html', bar: [home, teaching, messages] }
-    ],
+    home: '/test-frame/tabs.html',
+    bar: [home, photos, messages],
     menu: [
       { title: 'Family', items: [home] },
       { title: 'Anywhere in the portal', items: [photos, messages] },

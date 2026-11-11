@@ -136,10 +136,19 @@ installed web app never have `window.VVNative`, so none of this reaches them.
 
 `lib/nav-prefs.ts` stays the single source. A small client component in the
 page runs the same `resolveBar()` it runs today and tells the frame, through
-the bridge, the roles, the current section, the resolved bar for each section
-the person has, the Menu groups, and the unread count (`unread_message_count`,
-already polled by `useUnreadCount`). Native draws what it is told and sends
-taps back as navigations. The page does not draw its own bar in the frame.
+the bridge, the person's bar, the Menu groups and the unread count
+(`unread_message_count`, already polled by `useUnreadCount`). Native draws what it
+is told and sends taps back as navigations. The page does not draw its own bar in
+the frame.
+
+**One bar for the whole app.** The web keeps a bar per section (Family, Teacher,
+Admin) that changes as you move between them. In the first version of the frame it
+followed the page the same way, and on a phone that read as the bar jumping around.
+The frame now always uses the person's main ("home") bar. Teacher and Admin pages
+are on it if the person puts them there (the customizer in the frame edits only this
+bar and offers every destination their roles allow), and are a tap away in the Menu
+otherwise. Opening a page that is not on the bar pushes it over the current tab, and
+the bar does not change. The web and the home-screen app are unchanged.
 
 - A standalone `UITabBar` (native control, gets the system's glass look) so six
   items (five choices plus Menu) all show.
