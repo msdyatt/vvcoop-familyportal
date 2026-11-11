@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "../../../lib/supabase";
 import PageSkeleton from "../page-skeleton";
-import { getSignedFileUrl, getSignedFileUrls } from "../../../lib/storage";
+import { getSignedFileUrls } from "../../../lib/storage";
+import DocumentViewer from "../document-viewer";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
@@ -69,7 +70,6 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const [openDocumentId, setOpenDocumentId] = useState<string | null>(null);
-  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -151,13 +151,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
 
   async function signOut() { await getSupabaseBrowserClient()?.auth.signOut(); window.location.assign("/family-village"); }
 
-  async function openDocument(id: string, storagePath: string | null) {
-    setOpenDocumentId(id); setDocumentUrl(null);
-    if (!storagePath) return;
-    const supabase = getSupabaseBrowserClient(); if (!supabase) return;
-    const url = await getSignedFileUrl(supabase, storagePath);
-    setDocumentUrl(url);
-  }
+  function openDocument(id: string) { setOpenDocumentId(id); }
 
   async function setEventCompletion(eventId: string, childIds: string[], done: boolean) {
     const supabase = getSupabaseBrowserClient(); if (!supabase || !childIds.length) return;
@@ -234,7 +228,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
       {/* Documents that aren't a requirement -- class handouts and anything an
           administrator has shared with this household. Signed copies are
           excluded because they already appear above, against their requirement. */}
-      {show("documents") && <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other documents</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id, document.storage_path)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id, document.storage_path); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>}
+      {show("documents") && <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other documents</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>}
       {show("paperwork") && <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">Family records</p><h2>Paperwork &amp; dues</h2>
         {portal && <FamilyCompliance familyId={portal.familyId} />}
       </section>}
@@ -258,9 +252,9 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
         : `${new Date(openEvent.starts_at).toLocaleString("en-US",{ month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}${openEvent.ends_at ? ` – ${new Date(openEvent.ends_at).toLocaleTimeString("en-US",{ hour:"numeric", minute:"2-digit" })}` : ""}`}{openEvent.location ? ` · ${openEvent.location}` : ""}</p>
       {openEvent.description && <p style={{ whiteSpace: "pre-wrap" }}>{openEvent.description}</p>}
     </DetailModal>}
-    {openDocument_ && <DetailModal title={openDocument_.title} onClose={() => { setOpenDocumentId(null); setDocumentUrl(null); }}>
+    {openDocument_ && <DetailModal title={openDocument_.title} onClose={() => setOpenDocumentId(null)}>
       <p className="portal-empty" style={{ marginBottom: 16 }}>{openDocument_.kind}{openDocument_.signature_status ? ` · ${openDocument_.signature_status}` : ""}</p>
-      {documentUrl ? <a href={documentUrl} target="_blank" rel="noreferrer" className="email-button" style={{ textDecoration: "none" }}>Open document ↗</a> : <p className="portal-empty">No file is attached to this record yet.</p>}
+      {openDocument_.storage_path ? <DocumentViewer path={openDocument_.storage_path} title={openDocument_.title} /> : <p className="portal-empty">No file is attached to this record yet.</p>}
     </DetailModal>}
   </main>;
 }
