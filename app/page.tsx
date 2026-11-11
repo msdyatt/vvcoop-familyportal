@@ -2,7 +2,7 @@ import PublicNews from "./public-news";
 import BrandTransition from "./brand-transition";
 import SiteHeader from "./site-header";
 import FacebookGroupLink from "./facebook-group-link";
-import { calendarSubscribeUrl, googleCalendarAddUrl } from "../lib/supabase";
+import { calendarSubscribeUrl, googleCalendarAddUrl } from "../lib/calendar-links";
 
 export default function Home(){return <>
   <SiteHeader />

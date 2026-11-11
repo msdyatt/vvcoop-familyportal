@@ -34,37 +34,9 @@ export async function functionErrorMessage(error: unknown, data: { error?: strin
   return (error as { message?: string })?.message || fallback;
 }
 
-/** Public HTTPS URL for a deployed edge function -- e.g. the calendar feed, which a calendar app polls directly rather than through the supabase-js client. */
+/** Public HTTPS URL for a deployed edge function the browser calls directly. Calendar subscription links are deliberately not built from this: they point at the co-op's own domain (lib/calendar-links.ts). */
 export function edgeFunctionUrl(name: string) {
   return `${projectUrl}/functions/v1/${name}`;
-}
-
-/** The plain https URL for a calendar-feed scope -- what to paste into Google Calendar's "Other calendars → From URL" field. */
-export function calendarFeedUrl(query: string) {
-  return `${edgeFunctionUrl("calendar-feed")}?${query}`;
-}
-
-/**
- * The webcal:// form of the same feed.
- *
- * Apple Calendar, Outlook, and most phone calendar apps treat a webcal://
- * link specially -- clicking it opens a real "Subscribe" prompt that keeps
- * refreshing on its own. A plain https:// link to the same .ics resource
- * usually just downloads or opens the raw file once, which reads as broken
- * ("this only shows today's events") the moment anything on the calendar
- * changes.
- */
-export function calendarSubscribeUrl(query: string) {
-  return calendarFeedUrl(query).replace(/^https?:\/\//, "webcal://");
-}
-
-/**
- * Opens Google Calendar's own "Add by URL" flow with the feed pre-filled,
- * so subscribing there is one click too instead of a copy-paste into
- * Settings -> Add calendar -> From URL.
- */
-export function googleCalendarAddUrl(query: string) {
-  return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarFeedUrl(query))}`;
 }
 
 export function getSupabaseBrowserClient() {
