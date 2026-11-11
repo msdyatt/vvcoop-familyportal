@@ -240,6 +240,9 @@ final class FrameController: UIViewController, UITabBarDelegate {
         Bridge.emit("action", payload: ["name": action.rawValue], in: page.webView)
     }
 
+    /// Whether anyone is signed in (a bar is showing, or one was remembered from last time).
+    var isSignedIn: Bool { signedOut == nil && state != nil }
+
     /// The page on top of the stack on screen.
     var currentPage: WebPageController? { content.topViewController as? WebPageController }
 

@@ -164,7 +164,7 @@ message). The bell opens `/family-village/notifications` (a small web page listi
 `notifications` rows) as a sheet; its path rule has `links: "frame"`, so tapping a notification
 closes the sheet and pushes its `link_path` over the page underneath.
 
-### Native touches (PR 4)
+### Native touches (PR 4, built)
 
 Pull to refresh (`UIRefreshControl`), share sheet for report PDFs (the page
 passes the blob to the frame, which writes a temp file and presents
@@ -261,3 +261,14 @@ its log (`log show --predicate 'subsystem == "org.veritasvillage.family"'`):
 Not verified here: passkey sign-in (needs the associated-domains entitlement, so a signed build on
 a phone), haptics (the Simulator has none), the interactive swipe feel and animation on a real
 device, signed-in pages, and the Android build (CI runs it).
+
+### PR 4: native touches
+
+Verified in the Simulator with the test pages: pull to refresh and haptic calls (from PR 1), the share
+sheet (`VVNative.call("share")` shows the system sheet with the file, Save to Files, Copy), the lock
+screen (debug flag `-VVLockDemo 1` shows it), the Menu's Face ID switch is built but only appears when
+the device has a passcode, so it is not visible in the Simulator.
+Not verified: Face ID itself, passcode fallback, locking after 30 seconds away (all need a phone), the
+camera and photo pickers (WKWebView shows the system sheet for `<input type=file>`; `NSCameraUsageDescription`
+is now in Info.plist so Take Photo no longer crashes), and the real report, receipt and CSV downloads
+(they now route through `shareBlob` when `VVNative` exists; they need a signed-in session).

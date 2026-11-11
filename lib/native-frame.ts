@@ -61,3 +61,30 @@ export function buildFrameState(input: { prefs: NavPrefs; roles: string[]; secti
       .filter((g) => g.items.length > 0),
   };
 }
+
+export type HapticStyle = "light" | "medium" | "heavy" | "success" | "warning" | "error" | "selection";
+
+/** A small tap on the phone. Does nothing outside the frame. */
+export function haptic(style: HapticStyle = "selection") {
+  nativeFrame()?.post("haptic", { style });
+}
+
+function toBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Hands a file to the phone's own share sheet (Save to Files, Print, AirDrop, Mail...). Resolves true once the
+ * sheet has been shown and closed, false if the frame is not there; rejects if the frame could not present it.
+ */
+export async function shareBlob(blob: Blob, filename: string): Promise<boolean> {
+  const frame = nativeFrame();
+  if (!frame) return false;
+  await frame.call("share", { filename, mime: blob.type || "application/octet-stream", base64: await toBase64(blob) });
+  return true;
+}

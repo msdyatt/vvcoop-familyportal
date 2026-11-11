@@ -1,6 +1,7 @@
 import type { jsPDF as JsPdfClass } from "jspdf";
 import type autoTableFn from "jspdf-autotable";
 import type { ReportDoc } from "./report-doc";
+import { shareBlob } from "./native-frame";
 
 const MARGIN = 36;
 const INK: [number, number, number] = [0, 0, 0];
@@ -124,6 +125,8 @@ export type Delivery = "shared" | "opened" | "downloaded";
  * or opens in the viewer; on a computer it downloads.
  */
 export async function deliverPdf(blob: Blob, filename: string): Promise<Delivery> {
+  // The iPhone app's native frame has its own share sheet.
+  try { if (await shareBlob(blob, filename)) return "shared"; } catch { /* fall through to the ordinary routes */ }
   const inApp = document.documentElement.dataset.app === "1";
   const file = new File([blob], filename, { type: "application/pdf" });
   const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };

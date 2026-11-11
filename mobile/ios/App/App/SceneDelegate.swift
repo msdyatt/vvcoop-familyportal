@@ -6,7 +6,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = FrameController()
+        let frame = FrameController()
+        window?.rootViewController = frame
         window?.makeKeyAndVisible()
+        if let window {
+            AppLock.shared.attach(to: window)
+            AppLock.shared.isSignedIn = { [weak frame] in frame?.isSignedIn ?? false }
+        }
     }
+
+    func sceneWillResignActive(_ scene: UIScene) { AppLock.shared.willResignActive() }
+    func sceneDidEnterBackground(_ scene: UIScene) { AppLock.shared.didEnterBackground() }
+    func sceneDidBecomeActive(_ scene: UIScene) { AppLock.shared.didBecomeActive() }
 }
