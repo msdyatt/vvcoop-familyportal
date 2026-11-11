@@ -9,5 +9,8 @@ xcrun simctl launch --terminate-running-process <udid> org.veritasvillage.family
   -VVBaseURL http://localhost:8765 -VVStartPath /test-frame/index.html
 ```
 
+Tabs: start at `/test-frame/signin.html`, press Sign in; `tabs.html`, `photos.html`, `messages.html`
+and `teacher.html` send the same `state` message the portal sends.
+
 What each page proves is listed on the page itself. `path-configuration.json` has rules for
 `/test-frame/sheet*` (opens as a sheet) and `/test-frame/replace*` (swaps the current page).

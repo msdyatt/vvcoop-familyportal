@@ -1,0 +1,84 @@
+import UIKit
+
+/// The Menu tab's sheet: the sections and destinations the person can reach, then the account actions.
+/// Destinations come from the page (so the list has one definition, in lib/nav-prefs.ts); the four
+/// actions run the web screens that already exist.
+final class MenuController: UITableViewController {
+    enum Action: String {
+        case customize, account, tour, signOut
+    }
+
+    private enum Row {
+        case destination(FrameDestination)
+        case action(Action, String, String)
+    }
+
+    private var groups: [(title: String?, rows: [Row])] = []
+    var onDestination: ((FrameDestination) -> Void)?
+    var onAction: ((Action) -> Void)?
+
+    init(state: FrameState) {
+        super.init(style: .insetGrouped)
+        title = "Menu"
+        let home = state.currentSection.map { FrameDestination(id: "section-home", label: "\($0.label) home", href: $0.home, icon: "home", section: $0.id) }
+        var built: [(String?, [Row])] = []
+        if let home { built.append((nil, [.destination(home)])) }
+        for group in state.menu {
+            let rows = group.items.filter { $0.id != "home" }.map { Row.destination($0) }
+            if !rows.isEmpty { built.append((group.title, rows)) }
+        }
+        built.append((nil, [
+            .action(.customize, "Customize bottom bar", "slider.horizontal.3"),
+            .action(.account, "Account & security", "person.crop.circle"),
+            .action(.tour, "Take the tour", "questionmark.circle"),
+        ]))
+        built.append((nil, [.action(.signOut, "Sign out", "rectangle.portrait.and.arrow.right")]))
+        groups = built
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        tableView.backgroundColor = Brand.cream
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "row")
+        navigationItem.rightBarButtonItem = UIBarButtonItem(systemItem: .done, primaryAction: UIAction { [weak self] _ in
+            self?.dismiss(animated: true)
+        })
+    }
+
+    override func numberOfSections(in tableView: UITableView) -> Int { groups.count }
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { groups[section].rows.count }
+    override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? { groups[section].title }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "row", for: indexPath)
+        var content = cell.defaultContentConfiguration()
+        switch groups[indexPath.section].rows[indexPath.row] {
+        case .destination(let destination):
+            content.text = destination.label
+            content.image = Symbols.image(for: destination.icon)
+            cell.accessoryType = .disclosureIndicator
+        case .action(let action, let text, let symbol):
+            content.text = text
+            content.image = UIImage(systemName: symbol)
+            if action == .signOut { content.textProperties.color = .systemRed; content.imageProperties.tintColor = .systemRed }
+            cell.accessoryType = .none
+        }
+        if content.imageProperties.tintColor == nil { content.imageProperties.tintColor = Brand.navy }
+        cell.contentConfiguration = content
+        cell.backgroundColor = .white
+        return cell
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let row = groups[indexPath.section].rows[indexPath.row]
+        dismiss(animated: true) { [weak self] in
+            switch row {
+            case .destination(let destination): self?.onDestination?(destination)
+            case .action(let action, _, _): self?.onAction?(action)
+            }
+        }
+    }
+}

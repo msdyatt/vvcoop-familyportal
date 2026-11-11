@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import {
   availableDestinations, cleanPrefs, isActive, readCachedPrefs, readLastSection, resolveBar, writeCachedPrefs, writeLastSection,
   type IconName, type NavPrefs, type Section,
 } from "../../lib/nav-prefs";
 import { useUnreadCount } from "./messages/messages-link";
+import { buildFrameState, nativeFrame } from "../../lib/native-frame";
 import BarCustomizer from "./bar-customizer";
 import DetailModal from "./detail-modal";
 
@@ -113,6 +114,23 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   }
 
   const bar = resolveBar(prefs, section, roles);
+
+  // Inside the iPhone app's native frame, the frame draws the tab bar. Tell it what the person has chosen
+  // (resolved here, so the choices have one definition) and the unread count. Nothing happens elsewhere.
+  const rolesKey = roles.join(",");
+  useEffect(() => {
+    nativeFrame()?.post("state", buildFrameState({ prefs, roles: rolesKey ? rolesKey.split(",") : [], section, unread }));
+  }, [prefs, rolesKey, section, unread]);
+
+  // Menu actions the frame cannot do itself run on the existing web screens.
+  const actions = useRef({ onOpenAccount, onTour, onSignOut });
+  useEffect(() => { actions.current = { onOpenAccount, onTour, onSignOut }; });
+  useEffect(() => nativeFrame()?.on<{ name?: string }>("action", ({ name }) => {
+    if (name === "customize") setEditing(true);
+    else if (name === "account") actions.current.onOpenAccount();
+    else if (name === "tour") actions.current.onTour();
+    else if (name === "signOut") actions.current.onSignOut();
+  }), []);
 
   return <>
     <nav className={`app-tabbar${bar.length >= 5 ? " many" : ""}`} aria-label="Main">
