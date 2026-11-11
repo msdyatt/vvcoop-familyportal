@@ -406,7 +406,7 @@ extension WebPageController {
     fileprivate func probeWidth() {
         let script = """
         (function(){var w=innerWidth,out=[];document.querySelectorAll('body *').forEach(function(e){var r=e.getBoundingClientRect();if(r.right>w+1&&out.length<6)out.push(e.tagName+'.'+String(e.className).slice(0,40)+' right='+Math.round(r.right));});
-        var vv=window.visualViewport;return JSON.stringify({path:location.pathname,scrollW:document.documentElement.scrollWidth,clientW:document.documentElement.clientWidth,innerW:w,vvW:vv&&vv.width,scale:vv&&vv.scale,bodyScrollW:document.body.scrollWidth,sticking:out});})()
+        var vv=window.visualViewport;return JSON.stringify({htmlAttrs:document.documentElement.getAttributeNames().join(','),frame:document.documentElement.dataset.frame,app:document.documentElement.dataset.app,shell:document.documentElement.dataset.shell,vv:typeof window.VVNative,path:location.pathname,scrollW:document.documentElement.scrollWidth,clientW:document.documentElement.clientWidth,innerW:w,vvW:vv&&vv.width,scale:vv&&vv.scale,bodyScrollW:document.body.scrollWidth,sticking:out});})()
         """
         webView.evaluateJavaScript(script) { result, _ in
             if let text = result as? String { FrameLog.event("width: \(text)") }

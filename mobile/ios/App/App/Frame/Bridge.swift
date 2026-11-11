@@ -67,7 +67,41 @@ enum Bridge {
               (listeners[type] || []).slice().forEach(function (fn) { try { fn(payload); } catch (e) {} });
             }
           };
-          document.documentElement.setAttribute('data-frame', 'ios');
+
+          // The frame owns its own flags. The page's head script sets the same ones, but React can rebuild <html> if a page
+          // hits a hydration error, and the flags go with it; then the web header, the web bottom bar and the compact
+          // layout come back on top of the native ones. So they are set here and put back whenever they go missing.
+          var root = document.documentElement;
+          var attrObserver = null;
+          function watch() {
+            root = document.documentElement;
+            if (attrObserver) attrObserver.disconnect();
+            attrObserver = new MutationObserver(flag);
+            attrObserver.observe(root, { attributes: true });
+          }
+          function flag() {
+            if (root.getAttribute('data-frame') !== 'ios') root.setAttribute('data-frame', 'ios');
+            if (root.getAttribute('data-platform') !== 'ios') root.setAttribute('data-platform', 'ios');
+            if (root.getAttribute('data-shell') !== 'native') root.setAttribute('data-shell', 'native');
+            if (root.getAttribute('data-app') !== '1') root.setAttribute('data-app', '1');
+          }
+          flag();
+          watch();
+          // If the whole <html> element is swapped for a new one, the flags go on that one too.
+          new MutationObserver(function () { if (document.documentElement !== root) { watch(); flag(); } }).observe(document, { childList: true });
+
+          // The web page's own header, bottom bar and public-site logo are replaced by the native ones. Hidden from here, with
+          // a style sheet that is not part of the page's DOM, so it holds whatever the page (or a deploy) does.
+          var css = '.app-header, .app-tabbar, .site-header, .public-header-logo { display: none !important; }';
+          try {
+            var sheet = new CSSStyleSheet();
+            sheet.replaceSync(css);
+            document.adoptedStyleSheets = document.adoptedStyleSheets.concat([sheet]);
+          } catch (e) {
+            var style = document.createElement('style');
+            style.textContent = css;
+            (document.head || root).appendChild(style);
+          }
         })();
         """
         return WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)

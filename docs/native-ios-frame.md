@@ -318,3 +318,11 @@ there), `register_device_token` with a real token, FCM sending (needs Sam's APNs
   calendar grid, wide tables) scroll inside the page and are not affected. The cause on the real signed-in pages is not
   confirmed (no signed-in session here); debug builds log each page's width against the screen (`width:` lines in the
   frame log) to find it.
+
+**The frame sets its own flags and hides the web header itself.** A signed-in page showed the web header under the native one,
+with the web layout (no `data-frame`, no `data-app`) even though the sign-in page had both. The likely cause is React rebuilding
+`<html>` after a hydration error on that page, which takes the attributes the head script set. So the injected script (Bridge.swift)
+now sets `data-frame`, `data-platform`, `data-shell` and `data-app` itself, puts them back whenever they go missing (and follows
+`<html>` if it is replaced), and hides `.app-header`, `.app-tabbar`, `.site-header` and `.public-header-logo` with a style sheet
+that is not part of the page's DOM. This also means the frame does not wait for a web deploy to stop doubling the header. The
+web CSS rules stay for the other platforms and as a second line. Test page: `test-frame/dup.html` strips the flags and checks.
