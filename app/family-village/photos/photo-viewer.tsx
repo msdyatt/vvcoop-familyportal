@@ -6,9 +6,9 @@ import { PRIVATE_BUCKET } from "../../../lib/storage";
 import { photoDate, type Album, type ClassOption, type PhotoRow } from "../../../lib/photos";
 import DetailModal from "../detail-modal";
 
-export default function PhotoViewer({ photo, userId, isAdmin, teachingIds, albums, classes, onClose, onChanged }: {
+export default function PhotoViewer({ photo, userId, isAdmin, teachingIds, albums, classes, onClose, onChanged, onReported }: {
   photo: PhotoRow; userId: string; isAdmin: boolean; teachingIds: Set<string>;
-  albums: Album[]; classes: ClassOption[]; onClose: () => void; onChanged: () => void | Promise<void>;
+  albums: Album[]; classes: ClassOption[]; onClose: () => void; onChanged: () => void | Promise<void>; onReported: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -62,7 +62,10 @@ export default function PhotoViewer({ photo, userId, isAdmin, teachingIds, album
     const { error } = await supabase.rpc("report_photo", { p_id: photo.id, p_reason: reason });
     if (error) { setStatus(error.message); return; }
     setReporting(false); setReason("");
-    setStatus("Thank you. An administrator will look at this photo.");
+    // The photo is hidden the moment it is reported, so there is nothing left to show here.
+    await onChanged();
+    onClose();
+    onReported();
   }
 
   return <DetailModal title={photo.caption ?? "Photo"} onClose={onClose}>

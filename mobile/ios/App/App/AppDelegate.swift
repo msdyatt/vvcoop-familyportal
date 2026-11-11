@@ -57,6 +57,9 @@ class ViewController: CAPBridgeViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         removeTopEdgeEffect()
+        // The page handles swipe-back itself (lib/swipe-back.ts), so it can also close popups and
+        // go back inside a page. The system's own gesture stays off so the two never both fire.
+        webView?.allowsBackForwardNavigationGestures = false
     }
 
     override func viewDidLayoutSubviews() {

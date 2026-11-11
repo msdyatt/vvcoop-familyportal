@@ -10,6 +10,7 @@ import {
 } from "../../../lib/report-doc";
 import { buildFamilyDirectory, buildFamilyReadiness, type FamilyRow, type RequirementRow, type TeacherLink } from "../../../lib/report-doc-families";
 import { deliverPdf, makePdf } from "../../../lib/report-pdf";
+import { useBackLayer } from "../../../lib/use-back-layer";
 
 type ReportId = "roster" | "schedules" | "teachers" | "lists" | "class-readiness" | "family-readiness" | "directory";
 
@@ -78,6 +79,8 @@ export default function ReportsTab() {
   const [classData, setClassData] = useState<ClassData | null>(null);
   const [familyData, setFamilyData] = useState<FamilyData | null>(null);
   const [failed, setFailed] = useState(false);
+  // Back (button or swipe) returns from a report to the list.
+  useBackLayer(selected !== null, () => setSelected(null));
 
   const open = useCallback(async (id: ReportId) => {
     setSelected(id);

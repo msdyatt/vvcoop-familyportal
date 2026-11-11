@@ -12,7 +12,7 @@ import { getSupabaseBrowserClient } from "../lib/supabase";
  *
  * Renders nothing if the link isn't set, rather than a dead `#` anchor.
  */
-export default function FacebookGroupLink({ className, children }: { className?: string; children: React.ReactNode }) {
+export default function FacebookGroupLink({ className, children, fallback }: { className?: string; children: React.ReactNode; fallback?: React.ReactNode }) {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,6 +27,6 @@ export default function FacebookGroupLink({ className, children }: { className?:
     return () => { cancelled = true; };
   }, []);
 
-  if (!url) return null;
+  if (!url) return fallback ?? null;
   return <a className={className} href={url} target="_blank" rel="noreferrer">{children}</a>;
 }

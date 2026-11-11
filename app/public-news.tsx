@@ -54,7 +54,7 @@ export default function PublicNews() {
         <RichText html={post.body} />
         <PostAttachments attachments={attachments[post.id] ?? []} />
       </article>)}
-      {!posts.length && <article className="public-news-empty"><p className="eyebrow">The next story starts here</p><h3>Community news is coming.</h3><p>Updates chosen for public sharing will gather here as the Village grows.</p></article>}
+      {!posts.length && <article className="public-news-empty"><p className="eyebrow">Public updates</p><h3>News from the village.</h3><p>We’ll post announcements here when there’s something to share. Current family news lives inside Family Village.</p></article>}
     </div>
   </section>;
 }

@@ -46,6 +46,7 @@
    preflight alone keeps the reset without them. */
 @import "tailwindcss/preflight";
 :root {
+  --site-header-height:78px;
   /* --- Veritas Village brand, 2026 Edition -------------------------------
      Three colours carry the brand: Ink Navy, Parchment Cream, Terracotta.
      Hill Sage is retained as a fourth supporting colour by choice; the guide
@@ -98,6 +99,10 @@
 
 html {
   scroll-behavior:smooth;
+}
+
+html {
+  scroll-padding-top:var(--site-header-height);
 }
 
 body {
@@ -232,37 +237,79 @@ a {
 }
 
 .site-header {
-  position:absolute;
-  z-index:10;
+  position:fixed;
+  z-index:20;
   top:0;
   left:0;
   right:0;
   display:grid;
   grid-template-columns:1fr auto 1fr;
   align-items:center;
-  padding:25px 5vw;
+  min-height:var(--site-header-height);
+  padding:15px 5vw;
+  background:rgba(250,247,241,.96);
+  border-bottom:1px solid rgba(11,42,61,.12);
+  box-shadow:0 4px 18px rgba(11,42,61,.06);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+  transform:translateY(-105%);
+  transition:transform .55s cubic-bezier(.22,1,.36,1);
 }
 
-.mini-brand {
+.site-header.is-revealed {
+  transform:translateY(0);
+}
+
+.brand-transition {
+  position:fixed;
+  z-index:25;
+  top:clamp(145px,21vh,205px);
+  left:50%;
+  width:min(360px,68vw);
   display:flex;
   align-items:center;
-  text-decoration:none;
+  justify-content:center;
+  transform:translateX(-50%);
+  transition:
+    top .65s cubic-bezier(.22,1,.36,1),
+    left .65s cubic-bezier(.22,1,.36,1),
+    width .65s cubic-bezier(.22,1,.36,1),
+    transform .65s cubic-bezier(.22,1,.36,1);
 }
 
-.mini-brand img {
+.brand-transition.is-compact {
+  top:16px;
+  left:5vw;
   width:132px;
+  transform:translateX(0);
+}
+
+.brand-transition,
+.brand-transition:hover,
+.brand-transition:focus-visible {
+  text-decoration:none;
+  transform:translateX(-50%);
+}
+
+.brand-transition.is-compact,
+.brand-transition.is-compact:hover,
+.brand-transition.is-compact:focus-visible {
+  transform:translateX(0);
+}
+
+.brand-transition:focus-visible {
+  outline:2px solid var(--terracotta-text);
+  outline-offset:6px;
+}
+
+.brand-transition img {
+  width:100%;
   height:auto;
 }
 
-.mini-brand span {
-  margin-left:5px;
-  color:var(--terracotta-text);
-  font:700 9px var(--sans);
-  letter-spacing:2.5px;
-  text-transform:uppercase;
-}
-
 .site-header nav {
+  grid-column:2;
+  justify-self:center;
   display:flex;
   gap:28px;
 }
@@ -271,9 +318,15 @@ a {
   font-size:12px;
   font-weight:700;
   text-decoration:none;
+  transition:color .2s ease;
+}
+
+.site-header nav a:hover,.header-link:hover {
+  color:var(--terracotta-text);
 }
 
 .header-link {
+  grid-column:3;
   justify-self:end;
   padding-bottom:3px;
   border-bottom:1px solid var(--terracotta);
@@ -306,40 +359,11 @@ a {
   position:relative;
 }
 
-.hero-logo {
+.hero-logo-placeholder {
   width:min(360px,68vw);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.hero-logo img {
-  width:100%;
-  height:auto;
-}
-
-.hero-brand-row {
-  width:min(720px,82vw);
-  display:grid;
-  grid-template-columns:1fr auto auto 1fr;
-  gap:15px;
-  align-items:center;
+  aspect-ratio:900 / 310;
   margin-bottom:8px;
-}
-
-.hero-brand-row>span {
-  height:1px;
-  background:linear-gradient(90deg,transparent,var(--terracotta));
-}
-
-.hero-brand-row>span:last-child {
-  background:linear-gradient(90deg,var(--terracotta),transparent);
-}
-
-.hero-brand-row>i {
-  color:var(--antique-gold);
-  font-size:8px;
-  font-style:normal;
+  visibility:hidden;
 }
 
 .descriptor,.eyebrow {
@@ -725,6 +749,12 @@ footer nav a:hover {
 @media(max-width:850px) {
   .site-header {
     grid-template-columns:1fr auto;
+    min-height:64px;
+    padding:12px 6vw;
+  }
+  .site-header details {
+    grid-column:2;
+    justify-self:end;
   }
   .site-header nav,.header-link {
     display:none;
@@ -757,7 +787,8 @@ footer nav a:hover {
     font-size:13px;
     font-weight:700;
   }
-  .hero-logo {
+  .brand-transition:not(.is-compact),
+  .hero-logo-placeholder {
     width:min(320px,60vw);
   }
   .welcome,.families,.resources {
@@ -802,8 +833,14 @@ footer nav a:hover {
   .hero {
     padding-top:95px;
   }
-  .hero-logo {
+  .brand-transition:not(.is-compact),
+  .hero-logo-placeholder {
     width:min(236px,54vw);
+  }
+  .brand-transition.is-compact {
+    top:13px;
+    left:24px;
+    width:112px;
   }
   .hero h1 {
     font-size:43px;
@@ -8047,46 +8084,54 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
   font-weight:600;
 }
 
-/* ---- The loading screen (app/family-village/loading-screen.tsx) -------------- */
-.vv-loading {
-  position:fixed;
-  inset:0;
-  display:flex;
-  flex-direction:column;
-  gap:22px;
-  align-items:center;
-  justify-content:center;
-  padding:env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
-  overflow:hidden;
-  overscroll-behavior:none;
-  touch-action:none;
-  background:#0b2a3d;
+/* ---- Page placeholder (app/family-village/page-skeleton.tsx) ------------------ */
+.vv-skeleton {
+  display:grid;
+  gap:16px;
+  margin-top:8px;
 }
 
-.vv-loading img {
-  width:72px;
-  height:72px;
-  border-radius:18px;
+.vv-skeleton-line,.vv-skeleton-block {
+  display:block;
+  border-radius:10px;
+  background:linear-gradient(90deg,rgba(var(--navy-rgb),.06) 25%,rgba(var(--navy-rgb),.12) 50%,rgba(var(--navy-rgb),.06) 75%);
+  background-size:200% 100%;
+  animation:vv-shimmer 1.4s ease-in-out infinite;
 }
 
-.vv-spinner {
-  width:28px;
-  height:28px;
-  border:3px solid rgba(250,247,241,.25);
-  border-top-color:#faf7f1;
-  border-radius:50%;
-  animation:vv-spin .8s linear infinite;
-}
+.vv-skeleton-line { height:18px; width:62%; }
+.vv-skeleton-line.wide { width:88%; height:26px; }
+.vv-skeleton-block { height:120px; }
+.vv-skeleton-block.short { height:80px; }
 
-@keyframes vv-spin {
-  to { transform:rotate(360deg); }
+@keyframes vv-shimmer {
+  from { background-position:200% 0; }
+  to { background-position:-200% 0; }
 }
 
 @media(prefers-reduced-motion:reduce) {
-  .vv-spinner { animation-duration:2.4s; }
+  .vv-skeleton-line,.vv-skeleton-block { animation:none; }
 }
 
 .document-viewer { display:grid; gap:12px; min-width:min(780px,86vw); }
 .document-viewer > a { justify-self:start; }
 .document-viewer-scroll { max-height:70vh; overflow:auto; background:var(--surface-sunken); padding:8px; }
 .document-viewer-scroll img { max-width:100%; height:auto; margin:0 auto; }
+
+/* Between pages the browser fades the content while the header and the bar stay where they are. */
+@view-transition {
+  navigation:auto;
+}
+
+.app-header { view-transition-name:app-header; }
+.app-tabbar { view-transition-name:app-tabbar; }
+
+::view-transition-old(root),::view-transition-new(root) {
+  animation-duration:.14s;
+}
+
+@media(prefers-reduced-motion:reduce) {
+  @view-transition { navigation:none; }
+}
+
+.app-header-lockup.on-light { display:none; }

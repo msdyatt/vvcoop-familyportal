@@ -87,8 +87,9 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   useEffect(() => {
     const onChange = () => { setHash(window.location.hash); setSearch(window.location.search); };
     window.addEventListener("hashchange", onChange);
+    window.addEventListener("popstate", onChange);
     window.addEventListener("vv-locationchange", onChange);
-    return () => { window.removeEventListener("hashchange", onChange); window.removeEventListener("vv-locationchange", onChange); };
+    return () => { window.removeEventListener("hashchange", onChange); window.removeEventListener("popstate", onChange); window.removeEventListener("vv-locationchange", onChange); };
   }, []);
 
   // While a field has focus the keyboard needs the room; the bar steps aside (see platform.css).
@@ -129,7 +130,7 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
       </button>
     </nav>
 
-    {menuOpen && <DetailModal title="Menu" onClose={() => setMenuOpen(false)}>
+    {menuOpen && <DetailModal title="Menu" backLayer={false} onClose={() => setMenuOpen(false)}>
       <ul className="app-menu">
         <li><a href="/family-village/home">Family home</a></li>
         {(["Family", "Everywhere", "Teaching", "Administration"] as const).map((group) => {
