@@ -25,15 +25,18 @@ export default function DocumentStatus({ actorUserId, yearId, refreshKey }: { ac
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !yearId) { setLoaded(true); return; }
-    const [reqs, fams] = await Promise.all([
+    const [reqs, fams, leaving] = await Promise.all([
       supabase.from("requirements")
         .select("id,school_year_id,kind,title,description,active,sort_order,document_id,sign_template_id,amount_per_family,amount_per_child,payment_url,due_on")
         .eq("school_year_id", yearId).eq("kind", "document").eq("active", true).order("sort_order").order("title"),
       supabase.from("families").select("id,display_name").order("display_name"),
+      // Households recorded as not returning that year are not asked for anything.
+      supabase.from("household_school_years").select("family_id").eq("school_year_id", yearId).eq("status", "not_returning"),
     ]);
     const list = (reqs.data ?? []) as Requirement[];
+    const notReturning = new Set((leaving.data ?? []).map((row) => row.family_id as string));
     setRequirements(list);
-    setFamilies((fams.data ?? []) as Family[]);
+    setFamilies(((fams.data ?? []) as Family[]).filter((family) => !notReturning.has(family.id)));
     if (list.length) {
       const { data } = await supabase.from("family_requirements")
         .select("id,requirement_id,family_id,status,signed_document_id,signed_at,note").in("requirement_id", list.map((r) => r.id));

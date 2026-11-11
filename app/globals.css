@@ -8137,3 +8137,22 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 .app-header-lockup.on-light { display:none; }
 
 .dues-year { display:grid; gap:4px; max-width:260px; margin:4px 0 12px; }
+
+/* ---- Start next school year (app/family-village/admin/year-rollover.tsx) ---- */
+.rollover-steps { display:flex; flex-wrap:wrap; gap:8px 18px; margin:0 0 14px; padding:0; list-style:none; font-size:13px; color:var(--sage-text); }
+.rollover-steps li { display:flex; align-items:center; gap:6px; }
+.rollover-steps li.current { color:var(--navy); font-weight:700; }
+.rollover-steps li span { display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; border:1px solid currentColor; font-size:12px; }
+.rollover-panel { display:grid; gap:14px; }
+.rollover-options { display:grid; gap:12px; }
+.rollover-options, .rollover-households { margin:0; padding:0; list-style:none; }
+.rollover-panel .checkbox-field { display:flex; align-items:flex-start; gap:10px; }
+.rollover-panel .checkbox-field > span { display:grid; gap:2px; }
+.rollover-terms { display:grid; gap:10px; }
+.rollover-term { display:grid; grid-template-columns:minmax(80px,1fr) repeat(2,minmax(0,1fr)); gap:10px; align-items:end; }
+.rollover-households { max-height:360px; }
+.rollover-household-line { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.rollover-headline { margin:0; font-size:20px; font-weight:700; color:var(--navy); }
+.rollover-review ul { display:grid; gap:6px; margin:10px 0 0; padding-left:18px; }
+.rollover-returning { margin-top:12px; padding-top:6px; border-top:1px solid rgba(var(--navy-rgb),.12); }
+@media (max-width:560px) { .rollover-term { grid-template-columns:1fr; } }

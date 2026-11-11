@@ -9,6 +9,7 @@ import { ClassBlock, Room, WEEKDAYS, formatBlock, formatBlockTime, formatWeekday
 import { printElement } from "../../../lib/dom";
 import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES, GradePicker, formatGrades } from "./admin-ui";
 import EnrollmentPeriods from "./enrollment-periods";
+import YearRollover from "./year-rollover";
 import DetailModal from "../detail-modal";
 
 type TeacherAssignment = { user_id: string; assignment_role: string; profiles: { display_name: string | null; email: string } | null };
@@ -320,6 +321,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
       <summary><span>Schedule &amp; enrollment settings</span><small>School years, terms, meeting times, rooms, and enrollment windows</small></summary>
       <div className="schedule-settings-body">
         <SchoolYears years={years} onSaved={load} onStatus={setStatus} />
+        <YearRollover years={years} onSaved={load} onStatus={setStatus} />
         <AcademicTerms terms={terms} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
         <TimeBlocks blocks={blocks} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
         <Rooms rooms={rooms} onSaved={load} onStatus={setStatus} />
