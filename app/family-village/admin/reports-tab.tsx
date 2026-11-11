@@ -60,15 +60,21 @@ async function loadFamilyData(): Promise<FamilyData | null> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return null;
   const [{ data: year }, familyResult, requirementResult, teacherResult] = await Promise.all([
-    supabase.from("school_years").select("label").eq("is_current", true).maybeSingle(),
+    supabase.from("school_years").select("id,label").eq("is_current", true).maybeSingle(),
     supabase.from("families").select("id,display_name,last_name,children(id,first_name,last_initial,active,age_band),family_members(user_id,profiles(display_name,email,phone,status))").order("display_name"),
     supabase.from("family_requirements").select("family_id,status,requirements!inner(kind,title,active,school_years!inner(is_current))").eq("requirements.active", true).eq("requirements.school_years.is_current", true),
     supabase.from("teacher_assignments").select("user_id,class_id,classes!inner(school_years!inner(is_current))").eq("classes.school_years.is_current", true),
   ]);
+  // Households an administrator recorded as not returning this year are left out
+  // of the household reports. Their accounts and records are untouched.
+  const { data: leaving } = year
+    ? await supabase.from("household_school_years").select("family_id").eq("school_year_id", year.id).eq("status", "not_returning")
+    : { data: [] };
+  const notReturning = new Set((leaving ?? []).map((row) => row.family_id as string));
   return {
     yearLabel: year?.label ?? "",
-    families: (familyResult.data ?? []) as unknown as FamilyRow[],
-    requirements: (requirementResult.data ?? []) as unknown as RequirementRow[],
+    families: ((familyResult.data ?? []) as unknown as FamilyRow[]).filter((family) => !notReturning.has(family.id)),
+    requirements: ((requirementResult.data ?? []) as unknown as RequirementRow[]).filter((row) => !notReturning.has(row.family_id)),
     teacherLinks: (teacherResult.data ?? []) as TeacherLink[],
   };
 }
