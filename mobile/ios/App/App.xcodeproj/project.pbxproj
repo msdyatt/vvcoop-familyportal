@@ -30,6 +30,7 @@
 		F4A11F586759516708038943 /* PushManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E586759516708038943 /* PushManager.swift */; };
 		F4A11F41668A32BFA72DB15C /* PaymentSheetPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E41668A32BFA72DB15C /* PaymentSheetPresenter.swift */; };
 		F4A11F9EA07930C5BDC87051 /* HeaderBand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E9EA07930C5BDC87051 /* HeaderBand.swift */; };
+		F4A11F04EDCC82A019C17B4E /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E04EDCC82A019C17B4E /* SplashView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -57,6 +58,7 @@
 		F4A11E586759516708038943 /* PushManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushManager.swift; sourceTree = "<group>"; };
 		F4A11E41668A32BFA72DB15C /* PaymentSheetPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentSheetPresenter.swift; sourceTree = "<group>"; };
 		F4A11E9EA07930C5BDC87051 /* HeaderBand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderBand.swift; sourceTree = "<group>"; };
+		F4A11E04EDCC82A019C17B4E /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -107,6 +109,7 @@
 			sourceTree = "<group>";
 		};
 		F4A11E000000000000000300 /* Frame */ = {isa = PBXGroup; children = (
+				F4A11E04EDCC82A019C17B4E /* SplashView.swift */,
 				F4A11E9EA07930C5BDC87051 /* HeaderBand.swift */,
 				F4A11E41668A32BFA72DB15C /* PaymentSheetPresenter.swift */,
 				F4A11E586759516708038943 /* PushManager.swift */,
@@ -204,6 +207,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F4A11F04EDCC82A019C17B4E /* SplashView.swift in Sources */,
 				F4A11F9EA07930C5BDC87051 /* HeaderBand.swift in Sources */,
 				F4A11F41668A32BFA72DB15C /* PaymentSheetPresenter.swift in Sources */,
 				F4A11F586759516708038943 /* PushManager.swift in Sources */,
