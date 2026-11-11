@@ -21,14 +21,13 @@ const ClassesTab = dynamic(() => import("./classes-tab"));
 const IntegrationsTab = dynamic(() => import("./integrations-tab"));
 const ActivityTab = dynamic(() => import("./activity-tab"));
 const MessageReportsTab = dynamic(() => import("./message-reports-tab"));
-const ComplianceTab = dynamic(() => import("./compliance-tab"));
 const DocumentsTab = dynamic(() => import("./documents-tab"));
 const ReportsTab = dynamic(() => import("./reports-tab"));
 const DuesTab = dynamic(() => import("./dues-tab"));
 const ExpensesTab = dynamic(() => import("./expenses-tab"));
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-const TABS = ["dashboard", "invitations", "families", "classes", "compliance", "documents", "dues", "expenses", "news", "reports", "activity", "message-reports", "integrations"] as const;
+const TABS = ["dashboard", "invitations", "families", "classes", "documents", "dues", "expenses", "news", "reports", "activity", "message-reports", "integrations"] as const;
 type Tab = (typeof TABS)[number];
 
 async function signOutToEntry() {
@@ -41,7 +40,9 @@ export default function AdminWorkspace() {
   // The bottom bar links straight to a tab with ?tab=, so read it once on load.
   const [tab, setTabState] = useState<Tab>(() => {
     if (typeof window === "undefined") return "dashboard";
-    const wanted = new URLSearchParams(window.location.search).get("tab");
+    // Compliance was folded into Documents and Dues; old links still land somewhere useful.
+    const raw = new URLSearchParams(window.location.search).get("tab");
+    const wanted = raw === "compliance" ? "documents" : raw;
     return (TABS as readonly string[]).includes(wanted ?? "") ? (wanted as Tab) : "dashboard";
   });
   // The tab the page opened on; switching to another is a step Back can undo.
@@ -81,7 +82,7 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="compliance">Compliance</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
@@ -89,7 +90,6 @@ export default function AdminWorkspace() {
       <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}>Invitations</button>
       <button className={tab === "families" ? "active" : ""} onClick={() => setTab("families")}>Families</button>
       <button className={tab === "classes" ? "active" : ""} onClick={() => setTab("classes")}>Classes</button>
-      <button className={tab === "compliance" ? "active" : ""} onClick={() => setTab("compliance")}>Compliance</button>
       <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>Documents</button>
       <button className={tab === "dues" ? "active" : ""} onClick={() => setTab("dues")}>Dues</button>
       <button className={tab === "expenses" ? "active" : ""} onClick={() => setTab("expenses")}>Expenses</button>
@@ -110,8 +110,7 @@ export default function AdminWorkspace() {
 
     {tab === "families" && <FamiliesTab actorUserId={userId} />}
     {tab === "classes" && <ClassesTab actorUserId={userId} />}
-    {tab === "compliance" && <ComplianceTab actorUserId={userId} />}
-    {tab === "documents" && <DocumentsTab />}
+        {tab === "documents" && <DocumentsTab actorUserId={userId} />}
     {tab === "dues" && <DuesTab actorUserId={userId} />}
     {tab === "expenses" && <ExpensesTab />}
     {tab === "news" && <NewsTab actorUserId={userId} />}

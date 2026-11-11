@@ -8135,3 +8135,5 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 }
 
 .app-header-lockup.on-light { display:none; }
+
+.dues-year { display:grid; gap:4px; max-width:260px; margin:4px 0 12px; }
