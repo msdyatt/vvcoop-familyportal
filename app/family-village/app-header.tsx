@@ -72,13 +72,15 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
             lockup, and pairs the cream variant with dark fields -- which is
             Admin's navy band. Rendered at 150px wide, above its 120px minimum. */}
         <Image
-          className="app-header-lockup"
+          className={`app-header-lockup${current === "admin" ? " on-dark" : ""}`}
           src={current === "admin" ? "/brand/lockup-horizontal-cream.png" : "/brand/lockup-horizontal-navy.png"}
           alt="Veritas Village"
           width={900}
           height={310}
           priority
         />
+        {/* In the apps the header takes the colour of the screen, so Admin needs the navy lockup there too. */}
+        {current === "admin" && <Image className="app-header-lockup on-light" src="/brand/lockup-horizontal-navy.png" alt="" aria-hidden="true" width={900} height={310} />}
       </a>
       <div className="app-header-title"><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
       <div className="app-header-actions">

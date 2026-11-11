@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
-import LoadingScreen from "../loading-screen";
+import PageSkeleton from "../page-skeleton";
 import { getSignedFileUrls } from "../../../lib/storage";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import { useBackLayer } from "../../../lib/use-back-layer";
@@ -75,7 +75,8 @@ export default function MessagesApp() {
     window.location.assign("/family-village");
   }
 
-  if (access === "loading") return <LoadingScreen />;
+  // The header and bar stay put while the page fills in; only the content area is a placeholder.
+  if (access === "loading") return <main className="workspace-preview messages-page"><AppHeader current="home" roles={roles} title={"Messages"} subtitle={"Talk with teachers and other families."} /><PageSkeleton /></main>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></main>;
 
