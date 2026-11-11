@@ -24,6 +24,9 @@ final class WebPageController: UIViewController {
     private let failure = FailureView()
     private let refresh = UIRefreshControl()
     private var pageTitle: String?
+    /// Light clock text on the navy strip and the admin band; dark on the lighter bands.
+    private var statusStyle: UIStatusBarStyle = .lightContent
+    override var preferredStatusBarStyle: UIStatusBarStyle { statusStyle }
     /// Which section's colours the header wears ("home", "teacher", "admin"), when the page says.
     private var themeName: String?
     /// The last `state` this page sent (the person's bar, section, unread count). Applied again whenever
@@ -184,14 +187,29 @@ final class WebPageController: UIViewController {
         let isHeaderPage = stack?.tabKey != nil
         strip.isHidden = stack?.isSheet ?? false
         band.isHidden = !isHeaderPage
-        guard isHeaderPage, let frame = navigator?.chromeSource else { return }
+        guard isHeaderPage, let frame = navigator?.chromeSource else {
+            strip.backgroundColor = Brand.navy
+            setStatusStyle(.lightContent)
+            return
+        }
         let path = (webView?.url ?? url).path
+        let theme = HeaderTheme.resolve(name: themeName, path: path)
+        // The header's colour runs up behind the clock, as the web header's band does under the status bar.
+        strip.backgroundColor = theme.background
+        setStatusStyle(theme.isDark ? .lightContent : .darkContent)
         band.configure(
-            theme: HeaderTheme.resolve(name: themeName, path: path),
+            theme: theme,
             title: pageTitle ?? Self.cleanTitle(webView?.title),
             showBack: (stack?.viewControllers.first !== self) || hasInPageHistory,
             unread: frame.notificationUnread,
             menu: frame.profileMenu())
+    }
+
+    private func setStatusStyle(_ style: UIStatusBarStyle) {
+        guard style != statusStyle else { return }
+        statusStyle = style
+        setNeedsStatusBarAppearanceUpdate()
+        navigationController?.setNeedsStatusBarAppearanceUpdate()
     }
 
     /// The header's back button: closes what is open inside the page first, otherwise leaves the page.

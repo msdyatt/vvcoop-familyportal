@@ -8,6 +8,8 @@ struct HeaderTheme {
     let foreground: UIColor
     let rule: UIColor
     let logo: String
+    /// Whether the band is dark, so the clock above it is drawn light.
+    var isDark: Bool { logo == "LockupCream" }
 
     static let family = HeaderTheme(background: Brand.cream, foreground: Brand.navy, rule: Brand.terracotta, logo: "LockupNavy")
     static let teacher = HeaderTheme(

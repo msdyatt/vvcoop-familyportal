@@ -44,6 +44,9 @@ final class FrameNavigationController: UINavigationController, UIGestureRecogniz
         navigationBar.barStyle = style == .navy ? .black : .default
     }
 
+    /// Pages choose their own clock colour (it depends on the header's colour); sheets use the bar's.
+    override var childForStatusBarStyle: UIViewController? { isSheet ? nil : topViewController }
+
     override var preferredStatusBarStyle: UIStatusBarStyle { style == .navy ? .lightContent : .darkContent }
 
     /// The system's back-swipe pops a page. While the page has a popup, report, conversation or tab
