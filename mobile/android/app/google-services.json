@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "236582247217",
+    "project_id": "veritas-village",
+    "storage_bucket": "veritas-village.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:236582247217:android:fa12ba21330139b94eae10",
+        "android_client_info": {
+          "package_name": "org.veritasvillage.family"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxfEVQsBsScAFtDzw4-K0yuXWVgDwAfZ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -175,27 +175,31 @@ passcode on return to the app (`LocalAuthentication`, with a cover view while
 the app is inactive), haptics on key actions, JavaScript alert and confirm
 dialogs (Capacitor used to supply these).
 
-### Push (PR 5)
+### Push (PR 5, built)
 
-PR #16 already built the server half: `register_device_token`, FCM v1 sending,
-`link_path` in the payload. The frame keeps that and changes only the phone
-half.
+PR #16 built the server half (`register_device_token`, FCM v1 sending, `link_path` as `data.url`) with
+the Capacitor Firebase plugin on the phone. PR 5 keeps all of that and replaces only the iPhone half, and
+it **supersedes #16**: it carries #16's migration (renamed to a current timestamp so `db push` does not see
+it as out of order), `fcm.ts`, `deliver-push`, `lib/push.ts`, `lib/native.ts`, the push router, the Android
+plugin wiring and `GoogleService-Info.plist`, and leaves out #16's Capacitor iOS changes (view controller,
+Package.swift, entitlements overwrite). Close #16 once this merges.
 
-1. The Firebase iOS SDK (`FirebaseMessaging`, Swift package) is added to the
-   target. `GoogleService-Info.plist` and the Push Notifications capability
-   come from #16. `aps-environment` is **added** to the existing entitlements
-   file, next to Associated Domains. #16 replaced that file's contents, which
-   is the conflict to resolve.
-2. The page asks through the bridge (`push.enable`, `push.disable`,
-   `push.status`). Native requests permission, registers with APNs, hands the
-   token to Firebase, and returns the FCM token. The web code calls
-   `register_device_token` as #16 does. `lib/native.ts` gets one more backend
-   (the frame) beside the Capacitor one used on Android.
-3. A tap on a notification arrives in `UNUserNotificationCenterDelegate`. The
-   frame reads `url` from the payload, runs it through the same safe-path check
-   as the server, selects the tab that owns the section, and pushes the page.
-   A tap during a cold launch waits until the frame is ready. No web code runs
-   for taps, so it also works before the page has loaded.
+1. The Firebase iOS SDK (`FirebaseMessaging`, Swift package, 12.19.3, the version #16 resolved) is in the
+   target. `aps-environment` is added to the entitlements next to Associated Domains and Apple Pay (#16 replaced
+   the file's contents, which was the conflict); `UIBackgroundModes: remote-notification` is in Info.plist.
+2. `lib/native.ts` treats the frame as a push backend shaped like the Capacitor plugin: `push.status`,
+   `push.enable`, `push.token`, `push.disable` over the bridge, and a `pushToken` event when Firebase rotates
+   the token. `lib/push.ts` is #16's, unchanged: it calls `register_device_token` and keeps the token.
+3. A tap on a notification arrives in `PushManager` (`UNUserNotificationCenterDelegate`). It reads `url`, applies
+   the same "only a path on this site" rule as the server and `safeAppPath`, and asks the frame to open it
+   over the tab on screen. On a cold launch the frame opens its remembered tab bar first and then the page. A tap
+   while signed out waits for sign-in. No web code runs for taps. While the app is open, notifications still show
+   as banners.
+
+What Sam still has to do (unchanged from #16): upload the APNs key to Firebase, and put the Firebase
+service-account key in Supabase Vault as `FCM_SERVICE_ACCOUNT`. Until then the permission prompt and token
+work but nothing is sent. `aps-environment` is `development` for debug builds; Xcode's automatic signing
+switches it to `production` when archiving.
 
 ### Apple Pay for dues (PR 6, before the frame ships to families)
 
@@ -272,3 +276,15 @@ Not verified: Face ID itself, passcode fallback, locking after 30 seconds away (
 camera and photo pickers (WKWebView shows the system sheet for `<input type=file>`; `NSCameraUsageDescription`
 is now in Info.plist so Take Photo no longer crashes), and the real report, receipt and CSV downloads
 (they now route through `shareBlob` when `VVNative` exists; they need a signed-in session).
+
+### PR 5: push
+
+Verified in the Simulator: Firebase configures at launch without crashing; `push.status` answers `prompt`; `push.enable`
+shows the system permission prompt and answers `granted`; a notification sent with `xcrun simctl push` shows as a banner
+while the app is open; a notification tap that launches the app (simulated with `-VVSimulatePushTap`, which runs the
+same open path) waits for the remembered tab bar and opens the page over the tab on screen. Also found and fixed here:
+the Face ID lock fired after a system alert, because the "fresh launch" marker was never cleared.
+
+Not verified: a real APNs delivery and token (the Simulator has no APNs device token, so `push.token` cannot succeed
+there), `register_device_token` with a real token, FCM sending (needs Sam's APNs key in Firebase and
+`FCM_SERVICE_ACCOUNT` in Supabase Vault), the notification delegate with a real tap, and Android (CI builds it).
