@@ -1,14 +1,9 @@
 import UIKit
 
-/// The notification bell for the navigation bar, with an unread count in a small badge.
-///
-/// Drawn into an image (not a custom view) so the system's bar button styling cannot recolour the
-/// badge. iOS 26 puts bar buttons on light glass, where dark icons read; earlier versions draw them
-/// straight on the navy bar, where light ones do.
+/// The notification bell with an unread count in a small badge, drawn into one image so the badge keeps its
+/// colour whatever the button around it does.
 enum BellImage {
-    static func make(count: Int) -> UIImage {
-        let ink: UIColor
-        if #available(iOS 26.0, *) { ink = Brand.navy } else { ink = Brand.cream }
+    static func make(count: Int, ink: UIColor) -> UIImage {
         let size = CGSize(width: 30, height: 30)
         let renderer = UIGraphicsImageRenderer(size: size)
         let image = renderer.image { _ in

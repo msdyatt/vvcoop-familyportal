@@ -7,8 +7,8 @@ import UIKit
 /// page last told us (`FrameState`, from the person's own choices); the last item is always Menu.
 ///
 /// The bar always follows the page on top: when a page appears, the state it reported is applied. So a
-/// page that belongs to another section (a Teacher page opened from Family home) shows that section's
-/// bar, and going back restores the previous one.
+/// page that belongs to another section (a Teacher page opened from Family home) shows the same bar. There is
+/// one bar for the whole app (the person's main one), so it never changes as they move around.
 final class FrameController: UIViewController, UITabBarDelegate {
     private(set) lazy var navigator = Navigator(frame: self)
     private let container = UIView()
@@ -24,7 +24,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
     private var stacks: [String: FrameNavigationController] = [:]
     private var barKeys: [String] = []
     private static let menuTag = -1
-    private var notificationUnread = 0
+    private(set) var notificationUnread = 0
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
     override var childForStatusBarStyle: UIViewController? { content }
@@ -56,11 +56,11 @@ final class FrameController: UIViewController, UITabBarDelegate {
             tabBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
-        if let cached = FrameStore.loadState(), cached.signedIn, let section = cached.currentSection, !section.bar.isEmpty {
+        if let cached = FrameStore.loadState(), cached.signedIn, !cached.bar.isEmpty {
             // Open straight into the bar they had last time. If the session is gone, the page redirects to
             // sign-in and the frame goes back to signed-out.
             state = cached
-            rebuildBar(for: section)
+            rebuildBar()
             select(key: FrameStore.lastKey().flatMap { barKeys.contains($0) ? $0 : nil } ?? barKeys[0])
             // A tap that launched the app is waiting; the cached bar is enough to open it.
             DispatchQueue.main.async { self.openPendingPath() }
@@ -82,6 +82,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
         FrameLog.event("signed out: sign-in page \(url.path)")
         stacks.removeAll()
         barKeys.removeAll()
+        tabBar.setItems(nil, animated: false)
         state = nil
         FrameStore.clear()
         let stack = FrameNavigationController(rootViewController: WebPageController(url: url, navigator: navigator))
@@ -94,17 +95,17 @@ final class FrameController: UIViewController, UITabBarDelegate {
 
     /// A page (the one on top, or one that has just loaded and is on top) says what the bar should be.
     func apply(_ newState: FrameState, from page: WebPageController) {
-        guard newState.signedIn, let section = newState.currentSection else { return }
+        guard newState.signedIn, !newState.bar.isEmpty else { return }
         let first = self.state == nil || signedOut != nil
-        FrameLog.event("state from \(page.url.path): section \(newState.section), unread \(newState.unread), first \(first)")
+        FrameLog.event("state from \(page.url.path): unread \(newState.unread), first \(first)")
         self.state = newState
         FrameStore.save(newState)
 
         if first, let stack = page.navigationController as? FrameNavigationController, stack === signedOut {
-            enterSignedIn(newState, section: section, adopting: page, from: stack)
+            enterSignedIn(newState, adopting: page, from: stack)
             return
         }
-        rebuildBar(for: section)
+        rebuildBar()
         selectItem(forPageIn: page.navigationController)
         updateBadge(newState.unread)
         openPendingPath()
@@ -112,12 +113,12 @@ final class FrameController: UIViewController, UITabBarDelegate {
 
     /// The first page after sign-in arrives in the sign-in stack. If it is one of the bar's own pages, it
     /// becomes that tab's first page (no second load); otherwise the first tab opens.
-    private func enterSignedIn(_ newState: FrameState, section: FrameSection, adopting page: WebPageController, from stack: FrameNavigationController) {
+    private func enterSignedIn(_ newState: FrameState, adopting page: WebPageController, from stack: FrameNavigationController) {
         signedOut = nil
-        rebuildBar(for: section)
+        rebuildBar()
         var key = barKeys.first
-        if let match = section.bar.first(where: { Self.sameRoot($0.href, page.webView.url ?? page.url) }) {
-            let adopted = "\(section.id)/\(match.id)"
+        if let match = newState.bar.first(where: { Self.sameRoot($0.href, page.webView.url ?? page.url) }) {
+            let adopted = match.id
             stack.setViewControllers([UIViewController()], animated: false)
             stacks[adopted] = FrameNavigationController(rootViewController: page, tabKey: adopted)
             key = adopted
@@ -133,11 +134,15 @@ final class FrameController: UIViewController, UITabBarDelegate {
         return path(target) == path(url) && (target.query ?? "") == (url.query ?? "")
     }
 
-    private func rebuildBar(for section: FrameSection) {
-        FrameLog.event("bar [\(section.id)]: \(section.bar.map(\.label).joined(separator: ", ")), Menu")
-        barKeys = section.bar.map { "\(section.id)/\($0.id)" }
+    /// Draws the bar from the latest state. A tab's stack is kept by destination id, so an unchanged tab keeps
+    /// its pages when the bar is redrawn (for instance after the person customises it).
+    private func rebuildBar() {
+        guard let bar = state?.bar else { return }
+        if tabBar.items?.map(\.title) == bar.map(\.label) + ["Menu"] { setTabBarVisible(true); updateBadge(state?.unread ?? 0); return }
+        FrameLog.event("bar: \(bar.map(\.label).joined(separator: ", ")), Menu")
+        barKeys = bar.map(\.id)
         var items: [UITabBarItem] = []
-        for (index, destination) in section.bar.enumerated() {
+        for (index, destination) in bar.enumerated() {
             items.append(UITabBarItem(title: destination.label, image: Symbols.image(for: destination.icon), tag: index))
         }
         items.append(UITabBarItem(title: "Menu", image: Symbols.image(for: "menu"), tag: Self.menuTag))
@@ -147,8 +152,8 @@ final class FrameController: UIViewController, UITabBarDelegate {
     }
 
     private func updateBadge(_ unread: Int) {
-        guard let section = state?.currentSection, let items = tabBar.items else { return }
-        for (index, destination) in section.bar.enumerated() where index < items.count {
+        guard let bar = state?.bar, let items = tabBar.items else { return }
+        for (index, destination) in bar.enumerated() where index < items.count {
             items[index].badgeValue = destination.id == "messages" && unread > 0 ? (unread > 99 ? "99+" : "\(unread)") : nil
         }
     }
@@ -165,8 +170,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
 
     private func stack(forKey key: String) -> FrameNavigationController {
         if let existing = stacks[key] { return existing }
-        let parts = key.split(separator: "/", maxSplits: 1).map(String.init)
-        let destination = state?.sections.first { $0.id == parts[0] }?.bar.first { $0.id == parts.last }
+        let destination = state?.bar.first { $0.id == key }
         let url = destination.flatMap { URL(string: $0.href, relativeTo: FrameConfig.baseURL)?.absoluteURL } ?? FrameConfig.baseURL
         let created = FrameNavigationController(rootViewController: WebPageController(url: url, navigator: navigator), tabKey: key)
         stacks[key] = created
@@ -223,15 +227,11 @@ final class FrameController: UIViewController, UITabBarDelegate {
         topPresenter.present(navigation, animated: true)
     }
 
-    /// A Menu item: switch to its tab if it is on the bar of its section, otherwise open it on top of where you are.
+    /// A Menu item: switch to its tab if it is on the bar, otherwise open it on top of where you are.
     private func open(_ destination: FrameDestination) {
-        guard let state else { return }
-        let target = destination.section ?? state.section
-        FrameLog.event("menu item \(destination.id) (section \(target))")
-        if let section = state.sections.first(where: { $0.id == target }), section.bar.contains(where: { $0.id == destination.id }) {
-            self.state = state.withSection(target)
-            rebuildBar(for: section)
-            select(key: "\(target)/\(destination.id)")
+        FrameLog.event("menu item \(destination.id)")
+        if state?.bar.contains(where: { $0.id == destination.id }) == true {
+            select(key: destination.id)
             if content.viewControllers.count > 1 { content.popToRootViewController(animated: false) }
         } else if let url = URL(string: destination.href, relativeTo: FrameConfig.baseURL)?.absoluteURL {
             navigator.open(url, from: currentPage)
@@ -276,22 +276,18 @@ final class FrameController: UIViewController, UITabBarDelegate {
 
     // MARK: Navigation bar buttons
 
-    /// The bell (with the unread count) and the profile menu, for the right side of a signed-in page's bar.
-    func chromeItems(for page: WebPageController) -> [UIBarButtonItem] {
-        let bell = UIBarButtonItem(title: nil, image: BellImage.make(count: notificationUnread), primaryAction: UIAction { [weak self, weak page] _ in
-            guard let self else { return }
-            self.navigator.open(FrameConfig.url(forPath: "/family-village/notifications"), from: page ?? self.currentPage)
-        }, menu: nil)
-        bell.accessibilityLabel = notificationUnread > 0 ? "Notifications, \(notificationUnread) unread" : "Notifications"
-        let menu = UIMenu(children: [
+    /// The profile button's menu in the header.
+    func profileMenu() -> UIMenu {
+        UIMenu(children: [
             UIAction(title: "Account & security", image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in self?.run(.account) },
             UIAction(title: "Customize bottom bar", image: UIImage(systemName: "slider.horizontal.3")) { [weak self] _ in self?.run(.customize) },
             UIAction(title: "Take the tour", image: UIImage(systemName: "questionmark.circle")) { [weak self] _ in self?.run(.tour) },
             UIAction(title: "Sign out", image: UIImage(systemName: "rectangle.portrait.and.arrow.right"), attributes: .destructive) { [weak self] _ in self?.run(.signOut) },
         ])
-        let profile = UIBarButtonItem(image: UIImage(systemName: "person.crop.circle"), menu: menu)
-        profile.accessibilityLabel = "Account"
-        return [profile, bell]
+    }
+
+    func openNotifications(from page: WebPageController?) {
+        navigator.open(FrameConfig.url(forPath: "/family-village/notifications"), from: page ?? currentPage)
     }
 
     func setNotificationUnread(_ count: Int) {

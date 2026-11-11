@@ -2,21 +2,12 @@ import UIKit
 
 /// What the signed-in pages tell the frame (`VVNative.post("state", ...)`, built by
 /// `buildFrameState` in lib/native-frame.ts). The web works out the person's own bar choices;
-/// the frame only draws them.
+/// the frame only draws them. There is one bar for the whole app.
 struct FrameDestination: Codable, Equatable {
     let id: String
     let label: String
     let href: String
     let icon: String
-    /// For Menu items that belong to another section (Teacher, Admin); nil means "wherever you are".
-    let section: String?
-}
-
-struct FrameSection: Codable, Equatable {
-    let id: String
-    let label: String
-    let home: String
-    let bar: [FrameDestination]
 }
 
 struct FrameMenuGroup: Codable, Equatable {
@@ -26,21 +17,44 @@ struct FrameMenuGroup: Codable, Equatable {
 
 struct FrameState: Codable, Equatable {
     let signedIn: Bool
-    let section: String
     let unread: Int
-    let sections: [FrameSection]
+    /// The first page of the portal, for the Menu's "Home" row.
+    let home: String
+    let bar: [FrameDestination]
     let menu: [FrameMenuGroup]
+
+    private enum Keys: String, CodingKey { case signedIn, unread, home, bar, menu, sections }
+    private struct LegacySection: Decodable { let id: String; let bar: [FrameDestination] }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        signedIn = try c.decode(Bool.self, forKey: .signedIn)
+        unread = try c.decodeIfPresent(Int.self, forKey: .unread) ?? 0
+        home = try c.decodeIfPresent(String.self, forKey: .home) ?? "/family-village/home"
+        menu = (try? c.decode([FrameMenuGroup].self, forKey: .menu)) ?? []
+        if let bar = try c.decodeIfPresent([FrameDestination].self, forKey: .bar) {
+            self.bar = bar
+        } else {
+            // A page from before the app had one bar for everything sends one bar per section. Use the main
+            // (Family) one, so the bar never changes with the page and an older site still works.
+            let sections = (try? c.decode([LegacySection].self, forKey: .sections)) ?? []
+            bar = (sections.first { $0.id == "home" } ?? sections.first)?.bar ?? []
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Keys.self)
+        try c.encode(signedIn, forKey: .signedIn)
+        try c.encode(unread, forKey: .unread)
+        try c.encode(home, forKey: .home)
+        try c.encode(bar, forKey: .bar)
+        try c.encode(menu, forKey: .menu)
+    }
 
     static func decode(_ payload: [String: Any]) -> FrameState? {
         guard JSONSerialization.isValidJSONObject(payload),
               let data = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
         return try? JSONDecoder().decode(FrameState.self, from: data)
-    }
-
-    var currentSection: FrameSection? { sections.first { $0.id == section } ?? sections.first }
-
-    func withSection(_ id: String) -> FrameState {
-        FrameState(signedIn: signedIn, section: id, unread: unread, sections: sections, menu: menu)
     }
 }
 

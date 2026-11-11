@@ -5,9 +5,7 @@
  * browser, the home-screen web app and the Android app it does not exist, so
  * `nativeFrame()` is null and every caller does nothing.
  */
-import {
-  availableDestinations, resolveBar, SECTION_LABELS, type Destination, type NavPrefs, type Section,
-} from "./nav-prefs";
+import { availableDestinations, resolveBar, type Destination, type NavPrefs } from "./nav-prefs";
 
 export type NativeFrame = {
   frame: true;
@@ -29,36 +27,31 @@ export function nativeFrame(): NativeFrame | null {
   return frame?.frame ? frame : null;
 }
 
-type FrameDestination = { id: string; label: string; href: string; icon: string; section?: Section };
+type FrameDestination = { id: string; label: string; href: string; icon: string };
 
-const toFrame = (d: Destination, section?: Section): FrameDestination => ({ id: d.id, label: d.label, href: d.href, icon: d.icon, ...(section ? { section } : {}) });
-
-const SECTION_HOME: Record<Section, string> = { home: "/family-village/home", teacher: "/family-village/teacher", admin: "/family-village/admin" };
+const toFrame = (d: Destination): FrameDestination => ({ id: d.id, label: d.label, href: d.href, icon: d.icon });
 
 /**
- * Everything the frame's tab bar and Menu sheet need, worked out with the same
- * functions the web bar uses (resolveBar and friends) so the person's own
- * choices, per section, are honoured and there is one definition of them.
+ * Everything the frame's tab bar and Menu sheet need, worked out with the same functions the web bar uses
+ * (resolveBar and friends), so the person's own choices are honoured and there is one definition of them.
+ *
+ * The frame has ONE bar for the whole app. On the web, Family, Teacher and Admin each keep their own bar and
+ * it changes as you move between them; in the app that read as the bar jumping around, so the frame always
+ * uses the person's main ("home") bar. Teacher and Admin pages are on it if they put them there, and are
+ * otherwise a tap away in the Menu.
  */
-export function buildFrameState(input: { prefs: NavPrefs; roles: string[]; section: Section; unread: number }) {
-  const { prefs, roles, section, unread } = input;
-  const sections: Section[] = ["home", ...(roles.includes("teacher") ? (["teacher"] as const) : []), ...(roles.includes("admin") ? (["admin"] as const) : [])];
+export function buildFrameState(input: { prefs: NavPrefs; roles: string[]; unread: number }) {
+  const { prefs, roles, unread } = input;
   const pool = availableDestinations(roles);
-  const sectionOf = (d: Destination): Section | undefined => (d.group === "Teaching" ? "teacher" : d.group === "Administration" ? "admin" : undefined);
   return {
     signedIn: true,
-    section,
     unread,
-    sections: sections.map((id) => ({
-      id,
-      label: SECTION_LABELS[id],
-      home: SECTION_HOME[id],
-      bar: resolveBar(prefs, id, roles).map((d) => toFrame(d)),
-    })),
+    home: "/family-village/home",
+    bar: resolveBar(prefs, "home", roles).map(toFrame),
     menu: (["Family", "Everywhere", "Teaching", "Administration"] as const)
       .map((group) => ({
         title: group === "Everywhere" ? "Anywhere in the portal" : group === "Teaching" ? "Teacher" : group === "Administration" ? "Admin" : group,
-        items: pool.filter((d) => d.group === group).map((d) => toFrame(d, sectionOf(d))),
+        items: pool.filter((d) => d.group === group).map(toFrame),
       }))
       .filter((g) => g.items.length > 0),
   };

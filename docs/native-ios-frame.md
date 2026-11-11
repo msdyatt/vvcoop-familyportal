@@ -136,10 +136,19 @@ installed web app never have `window.VVNative`, so none of this reaches them.
 
 `lib/nav-prefs.ts` stays the single source. A small client component in the
 page runs the same `resolveBar()` it runs today and tells the frame, through
-the bridge, the roles, the current section, the resolved bar for each section
-the person has, the Menu groups, and the unread count (`unread_message_count`,
-already polled by `useUnreadCount`). Native draws what it is told and sends
-taps back as navigations. The page does not draw its own bar in the frame.
+the bridge, the person's bar, the Menu groups and the unread count
+(`unread_message_count`, already polled by `useUnreadCount`). Native draws what it
+is told and sends taps back as navigations. The page does not draw its own bar in
+the frame.
+
+**One bar for the whole app.** The web keeps a bar per section (Family, Teacher,
+Admin) that changes as you move between them. In the first version of the frame it
+followed the page the same way, and on a phone that read as the bar jumping around.
+The frame now always uses the person's main ("home") bar. Teacher and Admin pages
+are on it if the person puts them there (the customizer in the frame edits only this
+bar and offers every destination their roles allow), and are a tap away in the Menu
+otherwise. Opening a page that is not on the bar pushes it over the current tab, and
+the bar does not change. The web and the home-screen app are unchanged.
 
 - A standalone `UITabBar` (native control, gets the system's glass look) so six
   items (five choices plus Menu) all show.
@@ -154,15 +163,19 @@ taps back as navigations. The page does not draw its own bar in the frame.
 
 ### Chrome (PR 3)
 
-Native navigation bar per page (navy, light text, over the same navy status strip as before):
-the title `AppHeader` already has (posted as `title`), a bell with the unread count, and a
-profile button whose menu has Account & security, Customize bottom bar, Take the tour and Sign
-out. The web header is hidden by `html[data-frame] .app-header`; the component stays mounted
-because it owns the account, tour and notification logic, and the frame calls into it with the
-same `action` event the Menu uses. The bell count is `NotificationBell`'s own (`notifications`
-message). The bell opens `/family-village/notifications` (a small web page listing the person's
-`notifications` rows) as a sheet; its path rule has `links: "frame"`, so tapping a notification
-closes the sheet and pushes its `link_path` over the page underneath.
+A navy strip behind the status bar (white clock on every page, as the web does in the app), then on every signed-in
+page a native copy of the web's header in the section's colours (`HeaderBand.swift`): the logo on the left, the
+notification bell with its unread count and the profile button on the right, the page's name under them in a serif, and
+the rule along the bottom. Family is the cream page with a terracotta rule, Teacher the light sage band with a sage rule,
+Admin the navy band with a light terracotta rule and the cream logo (the `--portal-band-*` values in `app/globals.css`).
+`AppHeader` tells the frame its title and which section it is (`title` message with `theme`), so a Messages page under
+Family stays Family-coloured. A back button joins the row on pushed pages. The system navigation bar is hidden on these
+pages and kept on sheets. The web header is hidden by `html[data-frame] .app-header`; the component stays mounted because it
+owns the account, tour and notification logic, and the frame calls into it with the same `action` event the Menu uses. The
+profile button's menu has Account & security, Customize bottom bar, Take the tour and Sign out. The bell opens
+`/family-village/notifications` (a small web page listing the person's `notifications` rows) as a sheet; its path rule
+has `links: "frame"`, so tapping a notification closes the sheet and pushes its `link_path` over the page underneath.
+The serif is the system one (New York); Playfair Display is a web font the app does not carry.
 
 ### Native touches (PR 4, built)
 

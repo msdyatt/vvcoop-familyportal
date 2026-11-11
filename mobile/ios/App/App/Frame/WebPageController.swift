@@ -17,10 +17,18 @@ final class WebPageController: UIViewController {
     /// True once the first load of this page has committed. Until then, redirects load in place.
     private var committed = false
     private var observers: [NSKeyValueObservation] = []
+    private let strip = UIView()
+    private let band = HeaderBandView()
+    private lazy var top = UIStackView(arrangedSubviews: [band])
     private let progress = UIProgressView(progressViewStyle: .bar)
     private let failure = FailureView()
     private let refresh = UIRefreshControl()
     private var pageTitle: String?
+    /// Light clock text on the navy strip and the admin band; dark on the lighter bands.
+    private var statusStyle: UIStatusBarStyle = .lightContent
+    override var preferredStatusBarStyle: UIStatusBarStyle { statusStyle }
+    /// Which section's colours the header wears ("home", "teacher", "admin"), when the page says.
+    private var themeName: String?
     /// The last `state` this page sent (the person's bar, section, unread count). Applied again whenever
     /// the page comes back on top, so the bar always matches the page in view.
     private(set) var reportedState: FrameState?
@@ -42,11 +50,36 @@ final class WebPageController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Brand.cream
+        buildTop()
         buildWebView()
         buildProgress()
         buildFailureView()
         buildEdgeSwipe()
         load()
+    }
+
+    /// The top of the page: the navy strip behind the status bar (white clock on every page, as on the web in the
+    /// app), then, on signed-in pages, the section header. Sheets have the system bar instead and no strip.
+    private func buildTop() {
+        strip.backgroundColor = Brand.navy
+        strip.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(strip)
+
+        top.axis = .vertical
+        top.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(top)
+        band.onBack = { [weak self] in self?.headerBack() }
+        band.onBell = { [weak self] in self?.navigator?.chromeSource?.openNotifications(from: self) }
+
+        NSLayoutConstraint.activate([
+            strip.topAnchor.constraint(equalTo: view.topAnchor),
+            strip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            strip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            strip.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            top.topAnchor.constraint(equalTo: strip.bottomAnchor),
+            top.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            top.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
     }
 
     private func buildWebView() {
@@ -79,7 +112,7 @@ final class WebPageController: UIViewController {
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            webView.topAnchor.constraint(equalTo: top.bottomAnchor),
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -112,7 +145,7 @@ final class WebPageController: UIViewController {
         progress.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(progress)
         NSLayoutConstraint.activate([
-            progress.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            progress.topAnchor.constraint(equalTo: top.bottomAnchor),
             progress.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             progress.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
@@ -124,7 +157,7 @@ final class WebPageController: UIViewController {
         failure.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(failure)
         NSLayoutConstraint.activate([
-            failure.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            failure.topAnchor.constraint(equalTo: top.bottomAnchor),
             failure.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             failure.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             failure.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -146,11 +179,42 @@ final class WebPageController: UIViewController {
         refreshChrome()
     }
 
-    /// The signed-in pages (the ones in a tab's stack) get the bell and the profile button; sheets and the
-    /// sign-in page keep what they were given.
+    /// Signed-in pages (the ones in a tab's stack) wear the section header; the sign-in page has just the strip; a
+    /// sheet has the system bar.
     func refreshChrome() {
-        guard let frame = navigator?.chromeSource, (navigationController as? FrameNavigationController)?.tabKey != nil else { return }
-        navigationItem.rightBarButtonItems = frame.chromeItems(for: self)
+        guard isViewLoaded else { return }
+        let stack = navigationController as? FrameNavigationController
+        let isHeaderPage = stack?.tabKey != nil
+        strip.isHidden = stack?.isSheet ?? false
+        band.isHidden = !isHeaderPage
+        guard isHeaderPage, let frame = navigator?.chromeSource else {
+            strip.backgroundColor = Brand.navy
+            setStatusStyle(.lightContent)
+            return
+        }
+        let path = (webView?.url ?? url).path
+        let theme = HeaderTheme.resolve(name: themeName, path: path)
+        // The header's colour runs up behind the clock, as the web header's band does under the status bar.
+        strip.backgroundColor = theme.background
+        setStatusStyle(theme.isDark ? .lightContent : .darkContent)
+        band.configure(
+            theme: theme,
+            title: pageTitle ?? Self.cleanTitle(webView?.title),
+            showBack: (stack?.viewControllers.first !== self) || hasInPageHistory,
+            unread: frame.notificationUnread,
+            menu: frame.profileMenu())
+    }
+
+    private func setStatusStyle(_ style: UIStatusBarStyle) {
+        guard style != statusStyle else { return }
+        statusStyle = style
+        setNeedsStatusBarAppearanceUpdate()
+        navigationController?.setNeedsStatusBarAppearanceUpdate()
+    }
+
+    /// The header's back button: closes what is open inside the page first, otherwise leaves the page.
+    private func headerBack() {
+        if hasInPageHistory { goBackInPage() } else { navigationController?.popViewController(animated: true) }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -195,6 +259,7 @@ final class WebPageController: UIViewController {
     /// With something open in the page, the back button closes it; with nothing open it is the
     /// navigation controller's own, which pops the page.
     private func updateBackButton() {
+        refreshChrome()
         FrameLog.event("canGoBack=\(hasInPageHistory) \(webView.url?.path ?? "?")")
         if hasInPageHistory {
             navigationItem.hidesBackButton = true
@@ -213,6 +278,7 @@ final class WebPageController: UIViewController {
     private func pageDidReportTitle(_ raw: String?) {
         guard pageTitle == nil else { return } // the page set one itself over the bridge
         navigationItem.title = Self.cleanTitle(raw)
+        refreshChrome()
     }
 
     /// Page titles read "Family | Veritas Village"; the app already says whose it is.
@@ -360,7 +426,9 @@ extension WebPageController: WKScriptMessageHandler {
 
         case "title":
             pageTitle = request.payload["title"] as? String
+            themeName = request.payload["theme"] as? String
             navigationItem.title = pageTitle
+            refreshChrome()
 
         case "navigate":
             if let text = request.payload["url"] as? String, let target = URL(string: text, relativeTo: webView.url)?.absoluteURL {
