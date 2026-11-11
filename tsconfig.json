@@ -30,6 +30,7 @@
     "supabase/functions",
     "lib/dues.test.ts",
     "lib/calendar-links.test.ts",
+    "lib/broadcast.test.ts",
     "mobile"
   ]
 }

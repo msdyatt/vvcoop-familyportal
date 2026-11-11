@@ -48,7 +48,7 @@ type Subscription = {
   id: string; user_id: string; platform: "web" | "ios" | "android";
   endpoint: string | null; p256dh: string | null; auth: string | null; device_token: string | null;
 };
-type Payload = { title: string; body: string; url: string; tag: string };
+type Payload = { title: string; body: string; url: string; tag: string; urgent?: boolean };
 
 const SUB_COLUMNS = "id,user_id,platform,endpoint,p256dh,auth,device_token";
 
@@ -75,7 +75,7 @@ async function sendOne(sub: Subscription, payload: Payload, fcm: ServiceAccount 
     await webpush.sendNotification(
       { endpoint: sub.endpoint!, keys: { p256dh: sub.p256dh!, auth: sub.auth! } },
       JSON.stringify(payload),
-      { TTL: 60 * 60 * 24, urgency: "normal" },
+      { TTL: 60 * 60 * 24, urgency: payload.urgent ? "high" : "normal" },
     );
     return "sent";
   } catch (error) {
@@ -173,7 +173,7 @@ async function handle(req: Request): Promise<Response> {
     for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
       await Promise.all(jobs.slice(i, i + BATCH_SIZE).map(async ({ n, sub }) => {
         // The link carries the notification's id so opening it counts as seeing it.
-        const result = await sendOne(sub, { title: n.title, body: n.body ?? "", url: withOpenMarker(n.link_path, n.id), tag: n.id }, fcm);
+        const result = await sendOne(sub, { title: n.title, body: n.body ?? "", url: withOpenMarker(n.link_path, n.id), tag: n.id, urgent: n.kind === "broadcast_urgent" }, fcm);
         const tally = perNotification.get(n.id) ?? { sent: 0, failed: 0 };
         if (result === "sent") { sent += 1; tally.sent += 1; } else { failed += 1; tally.failed += 1; }
         if (result === "gone") gone.add(sub.id);

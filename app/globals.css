@@ -8171,3 +8171,54 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 .notify-kinds-head { font-size:11px; color:var(--sage-text); text-align:center; }
 .notify-summary { display:flex; flex-wrap:wrap; gap:6px 18px; margin:0; padding:0; list-style:none; font-size:14px; color:var(--navy); }
 @media (max-width:560px) { .notify-kinds-row { grid-template-columns:minmax(0,1fr) 64px 64px; } }
+
+/* ---- Urgent broadcast banner (app/family-village/urgent-banner.tsx) ----
+   Deliberately unlike everything else: a solid deep-terracotta bar, cream type, a heavy cream rule
+   underneath. It is the one thing in the app that should be impossible to mistake for ordinary UI. */
+.urgent-banner-stack { position:sticky; top:0; z-index:90; display:grid; }
+.urgent-banner {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
+  background:var(--terracotta-deep); color:var(--cream);
+  border-bottom:4px solid var(--cream); box-shadow:0 4px 0 var(--terracotta);
+}
+.urgent-banner-text { min-width:0; }
+.urgent-banner-label { margin:0 0 2px; font:800 12px var(--sans); letter-spacing:2px; text-transform:uppercase; color:var(--cream); }
+.urgent-banner h2 { margin:0; font:700 20px/1.2 var(--sans); color:var(--cream); }
+.urgent-banner-body { margin:4px 0 0; font:400 15px/1.45 var(--sans); color:var(--cream); white-space:pre-line; }
+.urgent-banner-ack {
+  flex:none; min-width:96px; min-height:44px; padding:10px 20px;
+  background:var(--cream); color:var(--terracotta-deep); border:2px solid var(--cream);
+  font:800 15px var(--sans); letter-spacing:.5px; cursor:pointer;
+}
+.urgent-banner-ack:hover { background:var(--warm-tint); }
+.urgent-banner-ack:disabled { opacity:.7; cursor:default; }
+.urgent-banner-error { margin:0; padding:8px 16px; background:var(--cream); color:var(--terracotta-deep); font-size:13px; }
+@media (max-width:560px) { .urgent-banner { flex-direction:column; align-items:stretch; } .urgent-banner-ack { width:100%; } }
+
+/* ---- Admin Broadcasts (app/family-village/admin/broadcasts-tab.tsx) ---- */
+.broadcast-severity { display:grid; gap:8px; margin:0; padding:0; border:0; }
+.broadcast-severity legend { padding:0; margin-bottom:6px; color:var(--sage-text); font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+.broadcasts-tab .checkbox-field { display:grid; grid-template-columns:auto 1fr; align-items:start; column-gap:10px; row-gap:2px; flex:none; text-transform:none; letter-spacing:0; font-size:14px; font-weight:400; color:var(--navy); }
+.broadcasts-tab .checkbox-field > input { grid-row:1 / span 2; margin-top:3px; width:auto; }
+.broadcast-severity .checkbox-field { padding:10px 12px; border:1px solid rgba(var(--navy-rgb),.18); background:var(--surface); }
+.broadcast-severity .checkbox-field.on { border-color:var(--navy); box-shadow:inset 3px 0 0 var(--navy); }
+.broadcast-severity-urgent.on { border-color:var(--terracotta-deep) !important; background:var(--warm-tint) !important; box-shadow:inset 5px 0 0 var(--terracotta-deep) !important; }
+.broadcast-preview { padding:12px 14px; border:1px solid rgba(var(--navy-rgb),.2); background:var(--surface-sunken); }
+.broadcast-preview.stale { opacity:.6; }
+.broadcast-preview-headline { margin:0; font:700 20px/1.25 var(--sans); color:var(--navy); }
+.broadcast-preview ul { margin:8px 0 0; padding-left:18px; display:grid; gap:4px; font-size:14px; }
+.broadcast-people ul { margin:0; padding:0; list-style:none; display:grid; gap:2px; max-height:260px; overflow:auto; }
+.broadcast-save-template { display:flex; flex-wrap:wrap; align-items:end; gap:10px; }
+.broadcast-save-template label { flex:1; }
+.broadcast-template-list { margin:0; padding:0; list-style:none; display:grid; gap:4px; }
+.broadcast-template-list li { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.admin-form-status.broadcast-sent { font-size:18px; font-weight:700; color:var(--navy); padding:14px 16px; background:var(--panel); border-left:5px solid var(--navy); }
+.broadcast-chip { display:inline-block; padding:2px 8px; font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; background:var(--panel); color:var(--navy); }
+.broadcast-chip-urgent { background:var(--terracotta-deep); color:var(--cream); }
+.broadcast-report { display:grid; gap:10px; }
+.broadcast-report-headline { margin:0; font:700 16px var(--sans); color:var(--navy); }
+.broadcast-channels { border-collapse:collapse; font-size:14px; }
+.broadcast-channels th, .broadcast-channels td { padding:6px 12px 6px 0; text-align:left; border-bottom:1px solid rgba(var(--navy-rgb),.12); }
+.broadcast-unreached { margin:0; padding:0; list-style:none; display:grid; gap:6px; }
+.broadcast-unreached li { display:grid; gap:2px; }
