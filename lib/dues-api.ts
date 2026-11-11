@@ -9,15 +9,29 @@ export const APP_RETURN_URL = "org.veritasvillage.family://stripe-redirect";
 type StripePlugin = {
   initialize: (o: { publishableKey: string }) => Promise<void>;
   createPaymentSheet: (o: Record<string, unknown>) => Promise<void>;
+  handleURLCallback?: (o: { url: string }) => Promise<void>;
   presentPaymentSheet: () => Promise<{ paymentResult: "paymentSheetCompleted" | "paymentSheetCanceled" | "paymentSheetFailed" }>;
 };
-type CapacitorGlobal = { isPluginAvailable?: (name: string) => boolean; Plugins?: { Stripe?: StripePlugin; Browser?: { open: (o: { url: string }) => Promise<void> } } };
+type CapacitorGlobal = { isPluginAvailable?: (name: string) => boolean; Plugins?: { App?: { addListener: (e: string, cb: (o: { url: string }) => void) => unknown }; Stripe?: StripePlugin; Browser?: { open: (o: { url: string }) => Promise<void> } } };
 const capacitor = () => (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor;
 
 /** True in an app build that includes Stripe's native payment sheet; older builds use the browser sheet. */
 export function hasNativePayments(): boolean {
   const cap = capacitor();
   return isNativeApp() && Boolean(cap?.Plugins?.Stripe) && (cap?.isPluginAvailable?.("Stripe") ?? true);
+}
+
+let returnHandlerRegistered = false;
+/** A bank's page opened by Stripe sends the person back through the app's URL scheme; hand that to Stripe. */
+function registerReturnHandler() {
+  if (returnHandlerRegistered) return;
+  const cap = capacitor();
+  const stripe = cap?.Plugins?.Stripe;
+  if (!cap?.Plugins?.App || !stripe?.handleURLCallback) return;
+  returnHandlerRegistered = true;
+  cap.Plugins.App.addListener("appUrlOpen", ({ url }) => {
+    if (url.startsWith(APP_RETURN_URL.split("://")[0] + "://")) void stripe.handleURLCallback?.({ url });
+  });
 }
 
 export type EmbedInfo = { clientSecret: string; publishableKey: string; chargeId: string };
@@ -45,6 +59,7 @@ export async function startCheckout(supabase: SupabaseClient, input: { chargeId:
     // Stripe's own payment sheet, native to the phone: Apple Pay / Google Pay, bank, or card. The
     // details are entered into Stripe's sheet and never pass through this page.
     const stripe = capacitor()!.Plugins!.Stripe!;
+    registerReturnHandler();
     try {
       await stripe.initialize({ publishableKey: data.publishableKey });
       await stripe.createPaymentSheet({

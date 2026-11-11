@@ -68,6 +68,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Where a bank's own page (Stripe's bank-account linking) sends the person back to the app after payment. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>org.veritasvillage.family</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>org.veritasvillage.family</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>
