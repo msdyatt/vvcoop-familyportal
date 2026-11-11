@@ -685,3 +685,33 @@ html[data-app] dialog.child-detail-panel button:not(.child-detail-close):not(.ba
 .app-menu .app-menu-group li + li {
   border-top: 0;
 }
+
+/* ---- The header takes the colour of the screen in the apps ------------------------
+   Family, Teacher and Admin each had their own coloured band. In the apps the
+   header is the screen itself, with a hairline under it, so the top of every
+   page reads as part of the page. (A browser tab keeps the bands.) */
+html[data-app] .live-portal,
+html[data-app] .workspace-preview,
+html[data-app] .admin-live {
+  --portal-band-bg: transparent;
+  --portal-band-fg: var(--navy);
+  --portal-band-muted: var(--sage-text);
+  --portal-band-rule: rgba(var(--navy-rgb), .14);
+}
+
+html[data-app] .app-header {
+  border-bottom-width: 1px;
+}
+
+html[data-app] .app-header-lockup.on-dark {
+  display: none;
+}
+
+html[data-app] .app-header-lockup.on-light {
+  display: block;
+}
+
+/* The bell's outline needs more than the hairline now that the header has no band behind it. */
+html[data-app] .notification-bell-button {
+  border-color: rgba(var(--navy-rgb), .28);
+}

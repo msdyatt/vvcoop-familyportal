@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
-import LoadingScreen from "../loading-screen";
+import PageSkeleton from "../page-skeleton";
 import { getSignedFileUrl, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { queueFilePrintJob } from "../../../lib/print-jobs";
 import { usePortalAccess } from "../../../lib/use-portal-access";
@@ -135,7 +135,8 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
     if (!error) await loadAll(userId);
   }
 
-  if (access === "loading") return <LoadingScreen />;
+  // The header and bar stay put while the page fills in; only the content area is a placeholder.
+  if (access === "loading") return <main className="workspace-preview"><AppHeader current="teacher" roles={roles} title={TEACHER_HEADERS[view].title} subtitle={TEACHER_HEADERS[view].subtitle} /><PageSkeleton /></main>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private teacher workspace</p><h1>Teacher access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
 

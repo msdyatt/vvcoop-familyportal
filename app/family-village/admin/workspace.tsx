@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
-import LoadingScreen from "../loading-screen";
+import PageSkeleton from "../page-skeleton";
 import { useBackLayer } from "../../../lib/use-back-layer";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
@@ -74,7 +74,8 @@ export default function AdminWorkspace() {
     await loadInvitations();
   }
   async function invite(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const supabase = getSupabaseBrowserClient(); if (!supabase) return; setBusy(true); setMessage(""); const { data, error } = await supabase.functions.invoke("invite-family-admin", { body: { familyName, adminName, email, note } }); setBusy(false); if (error || data?.error) { setMessage(await functionErrorMessage(error, data, "The invitation could not be sent. Check the email service configuration and try again.")); return; } setMessage(data?.warning ?? `Invitation sent to ${email}. The link expires in 24 hours.`); setFamilyName(""); setAdminName(""); setEmail(""); setNote(""); await loadInvitations(); }
-  if (access === "loading") return <LoadingScreen />;
+  // The header and bar stay put while the page fills in; only the content area is a placeholder.
+  if (access === "loading") return <main className="admin-live"><AppHeader current="admin" roles={roles} title={"Village administration"} subtitle={"Invite families, manage rosters, and publish news."} /><PageSkeleton /></main>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
   if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private administrator workspace</p><h1>Administrator access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
   return <main className="admin-live">
