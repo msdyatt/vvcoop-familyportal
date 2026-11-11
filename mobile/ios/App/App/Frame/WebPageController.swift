@@ -379,6 +379,12 @@ extension WebPageController: WKScriptMessageHandler {
         case "share":
             share(request)
 
+        case "pay.sheet":
+            let presenter = navigator?.chromeSource?.topPresenter ?? self
+            PaymentSheetPresenter.shared.present(options: request.payload, from: presenter) { result in
+                Bridge.reply(to: request, value: ["paymentResult": result], in: self.webView)
+            }
+
         case "push.status":
             PushManager.shared.status { Bridge.reply(to: request, value: ["receive": $0], in: self.webView) }
 

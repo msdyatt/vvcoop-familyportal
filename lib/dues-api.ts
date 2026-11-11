@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { edgeFunctionUrl, functionErrorMessage } from "./supabase";
-import { shareBlob } from "./native-frame";
+import { nativeFrame, shareBlob } from "./native-frame";
 
 /** Apple's identifier for the co-op's Apple Pay merchant account (created in the Apple Developer account). */
 export const APPLE_MERCHANT_ID = "merchant.org.veritasvillage.family";
@@ -18,6 +18,8 @@ const capacitor = () => (window as unknown as { Capacitor?: CapacitorGlobal }).C
 
 /** True in an app build that includes Stripe's native payment sheet; older builds use the browser sheet. */
 export function hasNativePayments(): boolean {
+  // The iPhone app's native frame has its own Stripe payment sheet (Stripe's iOS SDK).
+  if (nativeFrame()?.capabilities?.includes("pay.sheet")) return true;
   const cap = capacitor();
   return isNativeApp() && Boolean(cap?.Plugins?.Stripe) && (cap?.isPluginAvailable?.("Stripe") ?? true);
 }
@@ -56,6 +58,21 @@ export async function startCheckout(supabase: SupabaseClient, input: { chargeId:
   const { data, error } = await supabase.functions.invoke("dues-checkout", { body: { ...input, embedded: !isNativeApp(), native } });
   if (error || data?.error) return { error: await functionErrorMessage(error, data, "The payment page could not be opened.") };
 
+  if (data?.kind === "native" && native && nativeFrame()) {
+    // iPhone frame: the same sheet, from Stripe's iOS SDK. Apple Pay, bank and card details are entered into
+    // Stripe's sheet and never pass through this page.
+    try {
+      const { paymentResult } = await nativeFrame()!.call<{ paymentResult: "completed" | "canceled" | "failed" }>("pay.sheet", {
+        publishableKey: data.publishableKey, paymentIntentClientSecret: data.paymentIntentClientSecret, merchantDisplayName: data.merchantDisplayName,
+        applePayMerchantId: APPLE_MERCHANT_ID, countryCode: "US", returnURL: APP_RETURN_URL,
+      });
+      if (paymentResult === "completed") return { completed: true };
+      if (paymentResult === "failed") return { error: "The payment did not go through. You were not charged. Please try again." };
+      return {};   // closed without paying: the attempt stays open and resumes next time
+    } catch {
+      return { error: "The payment sheet could not be opened. Please try again." };
+    }
+  }
   if (data?.kind === "native" && native) {
     // Stripe's own payment sheet, native to the phone: Apple Pay / Google Pay, bank, or card. The
     // details are entered into Stripe's sheet and never pass through this page.

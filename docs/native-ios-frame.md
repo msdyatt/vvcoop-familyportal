@@ -60,7 +60,7 @@ Hotwire Native is the obvious candidate and it was checked against its source
 | `www/` launch page that checks the connection | native "can't reach the site" screen with Try again |
 | `capacitor.config.json`, `config.xml`, `App/public`, `Main.storyboard` | removed from the iOS project |
 | `@capacitor-firebase/messaging` (PR #16) | Firebase iOS SDK called directly, same FCM tokens, same server code |
-| `@capacitor-community/stripe` (#67) | Stripe iOS SDK payment sheet behind `pay.sheet` (PR 6) |
+| `@capacitor-community/stripe` (#67) | Stripe iOS SDK payment sheet behind `pay.sheet` (PR 6, built) |
 
 ### What is kept
 
@@ -201,22 +201,23 @@ service-account key in Supabase Vault as `FCM_SERVICE_ACCOUNT`. Until then the p
 work but nothing is sent. `aps-environment` is `development` for debug builds; Xcode's automatic signing
 switches it to `production` when archiving.
 
-### Apple Pay for dues (PR 6, before the frame ships to families)
+### Apple Pay for dues (PR 6, built)
 
-Main now has a native payment sheet for dues (#66, #67): `lib/dues-api.ts` drives Stripe's
-payment sheet through `@capacitor-community/stripe` (`window.Capacitor.Plugins.Stripe`), with the
-Apple Pay entitlement and the `org.veritasvillage.family://stripe-redirect` return URL scheme. The
-frame has no `window.Capacitor`, so `hasNativePayments()` is false there and the page falls back to
-Stripe's page in the browser sheet. Payment still works; Apple Pay inside the app does not until
-this PR.
+Main's native payment sheet (#66, #67) drives Stripe's sheet through `@capacitor-community/stripe`, which the frame
+does not have (Android still does). PR 6 adds the Stripe iOS SDK (`StripePaymentSheet`, `stripe-ios-spm` 26.16.1) in
+`Frame/PaymentSheetPresenter.swift` behind a bridge call, `pay.sheet`, which takes what `dues-checkout` already returns
+for a native payment (publishable key, PaymentIntent client secret, merchant name) plus the Apple Pay merchant id and the
+return URL, and answers `completed`, `canceled` or `failed`. `lib/dues-api.ts` uses it when the frame reports the
+`pay.sheet` capability (`window.VVNative.capabilities`), with the same results as the Capacitor path, so the dues screen,
+the edge function and Android are unchanged. The amount is decided by the server; card and bank details go into Stripe's
+sheet only. `scene(_:openURLContexts:)` hands the `org.veritasvillage.family://stripe-redirect` return (bank linking) to
+Stripe. The Apple Pay entitlement and URL scheme from #67 stay in the project. The saved-customer option the Capacitor
+call passed is not used: `dues-checkout` returns no ephemeral key, so Stripe's native sheet could not use it anyway.
 
-PR 6 adds the Stripe iOS SDK (`StripePaymentSheet`, Swift package) under `Frame/Payments/` behind a
-bridge call `pay.sheet` that takes the same options the web code already passes to
-`createPaymentSheet` (client secret, customer, merchant name, Apple Pay merchant id, return URL)
-and returns `completed`, `canceled` or `failed`. `lib/dues-api.ts` gets a second backend for it, so
-the server function and the Android path do not change. The scene delegate forwards the return URL
-to `StripeAPI.handleURLCallback`. The entitlement and URL scheme stay in the project, which this
-PR keeps.
+Verified in the Simulator: the capability is advertised, `pay.sheet` reaches Stripe's SDK, which calls `api.stripe.com`, and
+the page gets `failed` back for a made-up secret. Not verified: the real sheet, Apple Pay, a test payment, bank linking
+and the return URL (all need the Apple merchant ID and Stripe's Apple Pay certificate from `docs/native-apple-pay-setup.md`,
+a signed build with the Apple Pay capability, and a test-mode charge).
 
 ## Web changes and the rule they follow
 

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pay | Veritas Village</title>
+<link rel="stylesheet" href="frame.css">
+</head>
+<body>
+<h1>pay.sheet</h1>
+<p>Calls the native payment sheet with a made-up client secret. Stripe rejects it, so the answer should be "failed". A real secret from dues-checkout shows the sheet.</p>
+<script>
+  if (window.VVNative) {
+    VVNative.post('log', { text: 'capabilities ' + JSON.stringify(VVNative.capabilities) });
+    VVNative.call('pay.sheet', { publishableKey: 'pk_test_invalid', paymentIntentClientSecret: 'pi_test_secret_invalid', merchantDisplayName: 'Veritas Village', applePayMerchantId: 'merchant.org.veritasvillage.family', countryCode: 'US', returnURL: 'org.veritasvillage.family://stripe-redirect' })
+      .then(function (v) { VVNative.post('log', { text: 'pay.sheet answered ' + JSON.stringify(v) }); }, function (e) { VVNative.post('log', { text: 'pay.sheet error ' + e.message }); });
+  }
+</script>
+</body>
+</html>
