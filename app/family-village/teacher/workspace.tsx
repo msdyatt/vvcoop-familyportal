@@ -16,8 +16,6 @@ import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../../lib/s
 type ClassRow = { id: string; title: string; description: string | null } & ClassSchedule;
 type Assignment = { class_id: string; assignment_role: string; classes: ClassRow };
 type RosterChild = { id: string; first_name: string; last_name: string | null; class_id: string; avatar_path: string | null };
-type NoteRead = { name: string; read_at: string };
-type Note = { id: string; body: string; visibility: string; created_at: string; child_id: string; class_id: string; author_user_id: string | null; author_name: string; reads: NoteRead[] };
 type Handout = { id: string; title: string; kind: string; storage_path: string; class_id: string | null; created_at: string };
 type PrintRequest = { id: string; title: string; quantity: number; status: string; storage_path: string; created_at: string; class_id: string | null };
 type ClassEvent = { id: string; class_id: string | null; title: string; description: string | null; starts_at: string; location: string | null; requires_prework: boolean; audience: string };
@@ -27,26 +25,8 @@ async function signOutToEntry() {
   window.location.assign("/family-village");
 }
 
-function noteCountLabel(count: number) {
-  if (!count) return "no notes";
-  return count === 1 ? "1 note" : `${count} notes`;
-}
-
 function formatDay(value: string) {
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
-
-/** Unlike formatDay, this is a real timestamptz -- shown in the reader's own
-    local time, not pinned to UTC, since "read at 3:15" should mean their 3:15. */
-function formatReadTime(value: string) {
-  return new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
-function summarizeReads(reads: { name: string; read_at: string }[]): string | null {
-  if (!reads.length) return null;
-  const latest = reads[reads.length - 1];
-  const rest = reads.length - 1;
-  return `Read by ${latest.name} on ${formatReadTime(latest.read_at)}${rest ? ` · +${rest} more` : ""}`;
 }
 
 /** The Teacher page shows everything; each part also has a page of its own that shows only that part. */
@@ -55,7 +35,7 @@ export type TeacherView = "home" | "news" | "classes" | "print";
 const TEACHER_HEADERS: Record<TeacherView, { title: string; subtitle: string }> = {
   home: { title: "Teacher’s Lounge", subtitle: "Your classes, roster, and resources in one place." },
   news: { title: "Teaching team news", subtitle: "Announcements for the teaching team." },
-  classes: { title: "My classes", subtitle: "Rosters, notes, class dates and files." },
+  classes: { title: "My classes", subtitle: "Rosters, messages to parents, class dates and files." },
   print: { title: "Print queue", subtitle: "Handouts waiting for the office printer." },
 };
 
@@ -67,7 +47,6 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
   const [roleByClass, setRoleByClass] = useState<Record<string, string>>({});
   const [roster, setRoster] = useState<RosterChild[]>([]);
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
-  const [notes, setNotes] = useState<Note[]>([]);
   const [handouts, setHandouts] = useState<Handout[]>([]);
   const [printQueue, setPrintQueue] = useState<PrintRequest[]>([]);
   const [classEvents, setClassEvents] = useState<ClassEvent[]>([]);
@@ -84,9 +63,8 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
     const classIds = myClasses.map((row) => row.id);
     if (!classIds.length) return;
 
-    const [{ data: enrollments }, { data: noteRows }, { data: handoutRows }, { data: printRows }, { data: eventRows }] = await Promise.all([
+    const [{ data: enrollments }, { data: handoutRows }, { data: printRows }, { data: eventRows }] = await Promise.all([
       supabase.from("enrollments").select("child_id,class_id,children(id,first_name,last_name,avatar_path)").in("class_id", classIds).eq("status", "active"),
-      supabase.from("teacher_notes").select("id,body,visibility,created_at,child_id,class_id,author_user_id").in("class_id", classIds).order("created_at", { ascending: false }).limit(60),
       supabase.from("documents").select("id,title,kind,storage_path,class_id,created_at").in("class_id", classIds).order("created_at", { ascending: false }),
       supabase.from("print_requests").select("id,title,quantity,status,storage_path,created_at,class_id").eq("requested_by_user_id", uid).is("cleared_at", null).order("created_at", { ascending: false }),
       supabase.from("events").select("id,class_id,title,description,starts_at,location,requires_prework,audience").in("class_id", classIds).order("starts_at", { ascending: true }),
@@ -97,28 +75,6 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
     const avatarPaths = rosterRows.map((row) => row.avatar_path).filter((path): path is string => !!path);
     if (avatarPaths.length) setAvatarUrls(await getSignedFileUrls(supabase, avatarPaths));
 
-    const noteBase = (noteRows ?? []) as Omit<Note, "author_name" | "reads">[];
-    const authorIds = [...new Set(noteBase.map((row) => row.author_user_id).filter((id): id is string => !!id))];
-    const noteIds = noteBase.map((row) => row.id);
-    const [{ data: authorRows }, { data: readRows }] = await Promise.all([
-      authorIds.length ? supabase.from("profiles").select("id,display_name,email").in("id", authorIds) : Promise.resolve({ data: [] }),
-      // read_at is what makes this a receipt rather than a bare tally -- a
-      // teacher asking "did the Smules see this" wants to know when, not just
-      // that someone, at some point, did.
-      noteIds.length ? supabase.from("teacher_note_reads").select("note_id,read_at,profiles(display_name,email)").in("note_id", noteIds) : Promise.resolve({ data: [] }),
-    ]);
-    const authorMap = new Map((authorRows ?? []).map((row) => [row.id, row.display_name || row.email]));
-    const reads = new Map<string, NoteRead[]>();
-    ((readRows ?? []) as unknown as { note_id: string; read_at: string; profiles: { display_name: string | null; email: string } | null }[])
-      .forEach((row) => {
-        const name = row.profiles?.display_name || row.profiles?.email || "A family member";
-        reads.set(row.note_id, [...(reads.get(row.note_id) ?? []), { name, read_at: row.read_at }]);
-      });
-    setNotes(noteBase.map((row) => ({
-      ...row, author_name: (row.author_user_id && authorMap.get(row.author_user_id)) || "Former teacher",
-      reads: (reads.get(row.id) ?? []).sort((a, b) => a.read_at.localeCompare(b.read_at)),
-    })));
-
     setHandouts((handoutRows ?? []) as Handout[]);
     setPrintQueue((printRows ?? []) as PrintRequest[]);
     setClassEvents((eventRows ?? []) as ClassEvent[]);
@@ -126,14 +82,6 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch once access resolves
   useEffect(() => { if (access === "ready" && userId) loadAll(userId); }, [access, userId]);
-
-  async function deleteNote(noteId: string) {
-    if (!confirm("Delete this note? This cannot be undone.")) return;
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const { error } = await supabase.from("teacher_notes").delete().eq("id", noteId);
-    if (!error) await loadAll(userId);
-  }
 
   // The header and bar stay put while the page fills in; only the content area is a placeholder.
   if (access === "loading") return <main className="workspace-preview"><AppHeader current="teacher" roles={roles} title={TEACHER_HEADERS[view].title} subtitle={TEACHER_HEADERS[view].subtitle} /><PageSkeleton /></main>;
@@ -157,7 +105,7 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
       <div className="workspace-main">
         {show("news") && <NewsSection classes={classes} />}
 
-        {/* Each class rolls up its own roster, notes, class dates, and files
+        {/* Each class rolls up its own roster, class dates, and files
             into one dropdown -- clicking a class is the only navigation this
             needs, instead of a separate class picker driving several
             sections further down the page. */}
@@ -174,11 +122,7 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
                 <ClassRoster
                   klass={row}
                   roster={roster.filter((child) => child.class_id === row.id)}
-                  notes={notes.filter((note) => note.class_id === row.id)}
                   avatarUrls={avatarUrls}
-                  userId={userId}
-                  onSaved={reload}
-                  onDelete={deleteNote}
                 />
                 <ClassDatesSection klass={row} isLead={isLead} events={classEvents.filter((event) => event.class_id === row.id)} onSaved={reload} />
                 <ResourcesSection klass={row} isLead={isLead} userId={userId} handouts={handouts.filter((handout) => handout.class_id === row.id)} onSaved={reload} />
@@ -193,99 +137,49 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
   </main>;
 }
 
-/** One class's roster, with a student's notes opening inline when picked. Local to this class's dropdown, so opening one class's roster never disturbs another's. */
-function ClassRoster({ klass, roster, notes, avatarUrls, userId, onSaved, onDelete }: {
-  klass: ClassRow; roster: RosterChild[]; notes: Note[]; avatarUrls: Map<string, string>; userId: string;
-  onSaved: () => void; onDelete: (id: string) => void;
+/**
+ * One class's roster. Each student is one control: "Message parents" opens
+ * the private thread between this teacher and every parent of that student
+ * who is in the portal (the same thread the parents open from their side), so
+ * tapping it again later returns to the same conversation.
+ */
+function ClassRoster({ klass, roster, avatarUrls }: {
+  klass: ClassRow; roster: RosterChild[]; avatarUrls: Map<string, string>;
 }) {
-  const [openChildId, setOpenChildId] = useState<string | null>(null);
-  const openChild = roster.find((child) => child.id === openChildId) ?? null;
+  const [busyChildId, setBusyChildId] = useState<string | null>(null);
+  const [problem, setProblem] = useState("");
+
+  async function messageParents(child: RosterChild) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setBusyChildId(child.id); setProblem("");
+    const { data, error } = await supabase.rpc("start_child_conversation", { p_child_id: child.id });
+    if (error || typeof data !== "string") {
+      setProblem(error?.message ?? "Could not open the conversation. Try again.");
+      setBusyChildId(null);
+      return;
+    }
+    window.location.assign(`/family-village/messages?c=${data}`);
+  }
 
   return <div className="class-roster">
     <p className="card-kicker">Students</p>
-    {/* Notes stay closed until a student is chosen -- one child's record
-        should not be on screen while another parent is at the desk. */}
     {roster.length
       ? <ul className="roster-list roster-pickable">
           {roster.map((child) => <li key={child.id}>
             <button
-              className={`roster-pick${child.id === openChildId ? " active" : ""}`}
-              aria-expanded={child.id === openChildId}
-              onClick={() => setOpenChildId(child.id === openChildId ? null : child.id)}>
+              className="roster-pick"
+              disabled={busyChildId !== null}
+              aria-label={`Message ${child.first_name}'s parents`}
+              onClick={() => messageParents(child)}>
               <Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} size="sm" />
               <span className="roster-pick-name">{child.first_name} {child.last_name}</span>
-              <span className="roster-note-count">{noteCountLabel(notes.filter((n) => n.child_id === child.id).length)}</span>
+              <span className="roster-note-count">{busyChildId === child.id ? "Opening…" : "Message parents"}</span>
             </button>
           </li>)}
         </ul>
-      : <p className="portal-empty">No students enrolled in this class yet.</p>}
-
-    {openChild && <StudentNotes
-      child={openChild}
-      classId={klass.id}
-      notes={notes.filter((note) => note.child_id === openChild.id)}
-      userId={userId}
-      onSaved={onSaved}
-      onDelete={onDelete}
-      onClose={() => setOpenChildId(null)}
-    />}
-  </div>;
-}
-
-/** One student's notes, plus the form to add another. Only rendered on demand. */
-function StudentNotes({ child, classId, notes, userId, onSaved, onDelete, onClose }: {
-  child: RosterChild; classId: string; notes: Note[]; userId: string;
-  onSaved: () => void; onDelete: (id: string) => void; onClose: () => void;
-}) {
-  const [body, setBody] = useState("");
-  const [visibility, setVisibility] = useState("family");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !body.trim()) return;
-    setBusy(true);
-    const { error } = await supabase.from("teacher_notes").insert({
-      child_id: child.id, class_id: classId, author_user_id: userId, body: body.trim(), visibility,
-    });
-    setBusy(false);
-    if (!error) { setBody(""); onSaved(); }
-  }
-
-  return <div className="student-notes">
-    <div className="student-notes-head">
-      <div>
-        <p className="card-kicker">Notes</p>
-        <h3>{child.first_name} {child.last_name}</h3>
-      </div>
-      <button className="ghost" onClick={onClose}>Close</button>
-    </div>
-
-    <div className="note-rules"><span>Family visible</span><span>Teaching team only</span><span>Administrators only</span></div>
-
-    <form onSubmit={submit} className="portal-form">
-      <label><span className="field-caption">Note</span>
-        <textarea required value={body} onChange={(event) => setBody(event.target.value)} placeholder="Progress, behavior, or a note home" disabled={busy} />
-      </label>
-      <label><span className="field-caption">Visible to</span>
-        <select value={visibility} onChange={(event) => setVisibility(event.target.value)}>
-          <option value="family">Family</option>
-          <option value="teachers">Teaching team only</option>
-          <option value="admins">Administrators only</option>
-        </select>
-      </label>
-      <button disabled={busy}>{busy ? "Saving…" : "Save note"}</button>
-    </form>
-
-    <div className="portal-stack">
-      {notes.map((note) => <div key={note.id} className="note-card">
-        <span className="note-meta">{note.author_name} · {note.visibility} · {formatDay(note.created_at)}{summarizeReads(note.reads) ? ` · ${summarizeReads(note.reads)}` : " · Not read yet"}</span>
-        <p>{note.body}</p>
-        {note.author_user_id === userId && <button className="danger" onClick={() => onDelete(note.id)}>Delete</button>}
-      </div>)}
-      {!notes.length && <p className="portal-empty">No notes for {child.first_name} in this class yet.</p>}
-    </div>
+      : <p className="portal-empty">No students enrolled in {klass.title} yet.</p>}
+    {problem && <p className="admin-form-status" role="status">{problem}</p>}
   </div>;
 }
 
