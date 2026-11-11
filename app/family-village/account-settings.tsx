@@ -7,6 +7,7 @@ import SubscribeLink from "./subscribe-link";
 import Avatar from "./avatar";
 import AvatarCropper from "./avatar-cropper";
 import PushSection from "./push-section";
+import NotificationPrefsSection from "./notification-prefs-section";
 import { ConfirmDeleteModal } from "./admin/admin-ui";
 import { disablePush } from "../../lib/push";
 
@@ -17,6 +18,7 @@ export default function AccountSettings({ email, onProfileUpdated }: { email: st
     <PasskeySection />
     <TwoFactorSection />
     <PushSection />
+    <NotificationPrefsSection email={email} />
     <CalendarSection />
     <DangerZone />
     <p className="portal-legal-links"><a href="/privacy">Privacy policy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></p>

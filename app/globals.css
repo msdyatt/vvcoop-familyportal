@@ -8156,3 +8156,18 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 .rollover-review ul { display:grid; gap:6px; margin:10px 0 0; padding-left:18px; }
 .rollover-returning { margin-top:12px; padding-top:6px; border-top:1px solid rgba(var(--navy-rgb),.12); }
 @media (max-width:560px) { .rollover-term { grid-template-columns:1fr; } }
+
+/* ---- Notification preferences and the admin fallback settings ---- */
+.notify-prefs .checkbox-field,
+.notification-settings-card .checkbox-field { display:grid; grid-template-columns:auto 1fr; align-items:start; column-gap:10px; row-gap:2px; flex:none; text-transform:none; letter-spacing:0; font-size:14px; font-weight:400; color:var(--navy); }
+.notify-prefs .checkbox-field > input,
+.notification-settings-card .checkbox-field > input { grid-row:1 / span 2; margin-top:3px; width:auto; }
+.notify-prefs .checkbox-field > b,
+.notification-settings-card .checkbox-field > b { font-weight:700; }
+.notify-kinds { display:grid; gap:6px; margin:0; padding:0; border:0; }
+.notify-kinds legend { padding:0; margin-bottom:6px; color:var(--sage-text); font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+.notify-kinds-row { display:grid; grid-template-columns:minmax(0,1fr) 92px 92px; align-items:center; gap:8px; font-size:14px; color:var(--navy); }
+.notify-kinds-row input { width:auto; justify-self:center; }
+.notify-kinds-head { font-size:11px; color:var(--sage-text); text-align:center; }
+.notify-summary { display:flex; flex-wrap:wrap; gap:6px 18px; margin:0; padding:0; list-style:none; font-size:14px; color:var(--navy); }
+@media (max-width:560px) { .notify-kinds-row { grid-template-columns:minmax(0,1fr) 64px 64px; } }

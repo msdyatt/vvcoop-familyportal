@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { useOutsideClick } from "../../lib/use-outside-click";
 import { nativeFrame } from "../../lib/native-frame";
+import { recordOpenFromAddress } from "../../lib/notification-open";
 
 type Notification = {
   id: string; kind: string; title: string; body: string | null;
@@ -63,6 +64,8 @@ export default function NotificationBell() {
   }
 
   useEffect(() => {
+    // Arriving from a push notification's link counts as having seen that notification.
+    void recordOpenFromAddress();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch on mount
     load();
     // This is the first setInterval-based poll in the codebase -- everywhere
