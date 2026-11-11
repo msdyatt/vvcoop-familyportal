@@ -1,3 +1,5 @@
+import { nativeFrame, shareBlob } from "./native-frame";
+
 /** Minimal CSV writer: quotes any field containing a comma, quote, or newline. */
 export function toCsv(rows: (string | number | null)[][]): string {
   const cell = (value: string | number | null) => {
@@ -10,6 +12,8 @@ export function toCsv(rows: (string | number | null)[][]): string {
 /** Triggers a browser download of `content` as `filename`. */
 export function downloadCsv(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  // The iPhone app's native frame hands the file to the phone's share sheet.
+  if (nativeFrame()) { void shareBlob(blob, filename).catch(() => {}); return; }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

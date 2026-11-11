@@ -11,6 +11,7 @@ final class MenuController: UITableViewController {
     private enum Row {
         case destination(FrameDestination)
         case action(Action, String, String)
+        case lockSwitch
     }
 
     private var groups: [(title: String?, rows: [Row])] = []
@@ -32,6 +33,7 @@ final class MenuController: UITableViewController {
             .action(.account, "Account & security", "person.crop.circle"),
             .action(.tour, "Take the tour", "questionmark.circle"),
         ]))
+        if AppLock.shared.canLock { built.append(("Privacy", [.lockSwitch])) }
         built.append((nil, [.action(.signOut, "Sign out", "rectangle.portrait.and.arrow.right")]))
         groups = built
     }
@@ -59,12 +61,22 @@ final class MenuController: UITableViewController {
             content.text = destination.label
             content.image = Symbols.image(for: destination.icon)
             cell.accessoryType = .disclosureIndicator
+        case .lockSwitch:
+            content.text = "Lock with Face ID"
+            content.secondaryText = "Ask when you come back to the app"
+            content.image = UIImage(systemName: "faceid")
+            let toggle = UISwitch()
+            toggle.isOn = AppLock.shared.isEnabled
+            toggle.onTintColor = Brand.navy
+            toggle.addAction(UIAction { [weak toggle] _ in AppLock.shared.isEnabled = toggle?.isOn ?? true }, for: .valueChanged)
+            cell.accessoryView = toggle
         case .action(let action, let text, let symbol):
             content.text = text
             content.image = UIImage(systemName: symbol)
             if action == .signOut { content.textProperties.color = .systemRed; content.imageProperties.tintColor = .systemRed }
             cell.accessoryType = .none
         }
+        if case .lockSwitch = groups[indexPath.section].rows[indexPath.row] {} else { cell.accessoryView = nil }
         if content.imageProperties.tintColor == nil { content.imageProperties.tintColor = Brand.navy }
         cell.contentConfiguration = content
         cell.backgroundColor = .white
@@ -74,8 +86,10 @@ final class MenuController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let row = groups[indexPath.section].rows[indexPath.row]
+        if case .lockSwitch = row { return }
         dismiss(animated: true) { [weak self] in
             switch row {
+            case .lockSwitch: break
             case .destination(let destination): self?.onDestination?(destination)
             case .action(let action, _, _): self?.onAction?(action)
             }

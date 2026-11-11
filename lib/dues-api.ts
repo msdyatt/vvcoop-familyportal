@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { edgeFunctionUrl, functionErrorMessage } from "./supabase";
+import { shareBlob } from "./native-frame";
 
 /** Apple's identifier for the co-op's Apple Pay merchant account (created in the Apple Developer account). */
 export const APPLE_MERCHANT_ID = "merchant.org.veritasvillage.family";
@@ -104,6 +105,8 @@ export async function downloadReceipt(supabase: SupabaseClient, paymentId: strin
     return body?.error ?? "The receipt could not be created.";
   }
   const blob = await response.blob();
+  // The iPhone app's native frame has its own share sheet (Save to Files, Print, Mail...).
+  try { if (await shareBlob(blob, `receipt-${paymentId.slice(0, 8)}.pdf`)) return null; } catch { /* fall back below */ }
   const url = URL.createObjectURL(blob);
   const nativeIos = document.documentElement.dataset.platform === "ios" && document.documentElement.dataset.shell === "native";
   if (nativeIos) {

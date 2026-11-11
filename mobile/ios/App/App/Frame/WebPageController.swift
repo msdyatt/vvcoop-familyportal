@@ -376,6 +376,9 @@ extension WebPageController: WKScriptMessageHandler {
                 navigator?.pageReportedState(self, state)
             }
 
+        case "share":
+            share(request)
+
         case "notifications":
             navigator?.chromeSource?.setNotificationUnread(request.payload["unread"] as? Int ?? 0)
 
@@ -385,6 +388,45 @@ extension WebPageController: WKScriptMessageHandler {
         default:
             Bridge.reply(to: request, error: "Unknown message type \(request.type)", in: webView)
         }
+    }
+}
+
+// MARK: - Share sheet
+
+extension WebPageController {
+    /// `VVNative.call("share", { filename, mime, base64 })`: writes the file to a temporary folder and
+    /// shows the phone's share sheet (Save to Files, Print, AirDrop, Mail ...). Answers when it closes.
+    fileprivate func share(_ request: BridgeMessage) {
+        guard let encoded = request.payload["base64"] as? String, let data = Data(base64Encoded: encoded) else {
+            Bridge.reply(to: request, error: "No file to share", in: webView)
+            return
+        }
+        let name = (request.payload["filename"] as? String).map(Self.safeFilename) ?? "file"
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("share-\(UUID().uuidString)", isDirectory: true)
+        let file = folder.appendingPathComponent(name)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: file)
+        } catch {
+            Bridge.reply(to: request, error: "Could not prepare the file", in: webView)
+            return
+        }
+        let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+        sheet.completionWithItemsHandler = { [weak self] _, completed, _, _ in
+            try? FileManager.default.removeItem(at: folder)
+            guard let self else { return }
+            Bridge.reply(to: request, value: ["completed": completed], in: self.webView)
+        }
+        // On iPad the sheet is a popover and needs somewhere to point; the middle of the page will do.
+        sheet.popoverPresentationController?.sourceView = view
+        sheet.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+        (navigator?.chromeSource?.topPresenter ?? self).present(sheet, animated: true)
+    }
+
+    private static func safeFilename(_ raw: String) -> String {
+        let cleaned = raw.components(separatedBy: CharacterSet(charactersIn: "/\\:?*\"<>|")).joined(separator: "-")
+        let trimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "file" : String(trimmed.prefix(120))
     }
 }
 

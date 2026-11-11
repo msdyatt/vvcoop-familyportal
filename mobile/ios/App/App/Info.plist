@@ -31,6 +31,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Veritas Village uses the camera when you choose Take Photo to add a picture to a message, an avatar, a receipt or the photo library.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Veritas Village uses Face ID to keep your family's information private when you come back to the app.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

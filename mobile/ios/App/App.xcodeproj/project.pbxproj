@@ -22,6 +22,7 @@
 		F4A11F6D1222EA5EB41E6645 /* FrameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E6D1222EA5EB41E6645 /* FrameState.swift */; };
 		F4A11FC1BE3F9F1444C24BC4 /* MenuController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11EC1BE3F9F1444C24BC4 /* MenuController.swift */; };
 		F4A11F18D4109C308AD7F88E /* BellImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E18D4109C308AD7F88E /* BellImage.swift */; };
+		F4A11F699AB5B3880801026D /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E699AB5B3880801026D /* AppLock.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +45,7 @@
 		F4A11E6D1222EA5EB41E6645 /* FrameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameState.swift; sourceTree = "<group>"; };
 		F4A11EC1BE3F9F1444C24BC4 /* MenuController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuController.swift; sourceTree = "<group>"; };
 		F4A11E18D4109C308AD7F88E /* BellImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BellImage.swift; sourceTree = "<group>"; };
+		F4A11E699AB5B3880801026D /* AppLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLock.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,6 +92,7 @@
 			sourceTree = "<group>";
 		};
 		F4A11E000000000000000300 /* Frame */ = {isa = PBXGroup; children = (
+				F4A11E699AB5B3880801026D /* AppLock.swift */,
 				F4A11E18D4109C308AD7F88E /* BellImage.swift */,
 				F4A11EC1BE3F9F1444C24BC4 /* MenuController.swift */,
 				F4A11E6D1222EA5EB41E6645 /* FrameState.swift */,
@@ -173,6 +176,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F4A11F699AB5B3880801026D /* AppLock.swift in Sources */,
 				F4A11F18D4109C308AD7F88E /* BellImage.swift in Sources */,
 				F4A11FC1BE3F9F1444C24BC4 /* MenuController.swift in Sources */,
 				F4A11F6D1222EA5EB41E6645 /* FrameState.swift in Sources */,

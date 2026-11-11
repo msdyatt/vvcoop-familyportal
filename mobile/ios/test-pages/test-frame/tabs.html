@@ -10,10 +10,15 @@
 <h1>Home</h1>
 <p>Section: home. First page after sign-in; becomes the Home tab without a second load.</p>
 <a href="page2.html">Push page 2 on this tab</a>
+<button id="share">Share a file (VVNative.call "share")</button>
 <pre id="out">(Menu actions show here)</pre>
 <button id="signout">Sign out (location.assign to the sign-in rule)</button>
 <div class="filler"></div><div class="filler"></div><div class="filler"></div><div class="filler"></div>
 <script src="state.js"></script>
-<script>document.getElementById('signout').onclick = function () { location.assign('/test-frame/signin.html'); };</script>
+<script>document.getElementById('signout').onclick = function () { location.assign('/test-frame/signin.html'); };document.getElementById('share').onclick = function () {
+  VVNative.call('share', { filename: 'frame-test.txt', mime: 'text/plain', base64: btoa('Shared from the frame test page.') })
+    .then(function (v) { VVNative.post('log', { text: 'share closed ' + JSON.stringify(v) }); }, function (e) { VVNative.post('log', { text: 'share failed ' + e.message }); });
+};
+</script>
 </body>
 </html>

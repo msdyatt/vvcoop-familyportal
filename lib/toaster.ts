@@ -10,6 +10,8 @@
  * announce), so the banner is hidden from them.
  */
 
+import { haptic } from "./native-frame";
+
 const MESSAGE_SELECTOR = ".admin-form-status, .setup-note, .messages-status";
 const INTERACTION_WINDOW_MS = 15_000;
 const SHOW_MS = 5_000;
@@ -51,6 +53,7 @@ export function initToaster(): () => void {
     lastShown.set(text, now);
 
     const tone = toneOf(text);
+    haptic(tone === "error" ? "error" : "success");
     const toast = document.createElement("div");
     toast.className = `vv-toast ${tone}`;
     toast.setAttribute("aria-hidden", "true");
