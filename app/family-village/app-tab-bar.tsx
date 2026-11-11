@@ -119,8 +119,8 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   // (resolved here, so the choices have one definition) and the unread count. Nothing happens elsewhere.
   const rolesKey = roles.join(",");
   useEffect(() => {
-    nativeFrame()?.post("state", buildFrameState({ prefs, roles: rolesKey ? rolesKey.split(",") : [], section, unread }));
-  }, [prefs, rolesKey, section, unread]);
+    nativeFrame()?.post("state", buildFrameState({ prefs, roles: rolesKey ? rolesKey.split(",") : [], unread }));
+  }, [prefs, rolesKey, unread]);
 
   // Menu actions the frame cannot do itself run on the existing web screens.
   const actions = useRef({ onOpenAccount, onTour, onSignOut });
@@ -167,7 +167,7 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
     </DetailModal>}
 
     {editing && <DetailModal title="Customize bottom bar" onClose={() => setEditing(false)}>
-      <BarCustomizer roles={roles} prefs={prefs} startSection={section} onSave={savePrefs} onClose={() => setEditing(false)} />
+      <BarCustomizer roles={roles} prefs={prefs} startSection={section} single={Boolean(nativeFrame())} onSave={(next) => savePrefs({ ...prefs, ...next })} onClose={() => setEditing(false)} />
     </DetailModal>}
   </>;
 }

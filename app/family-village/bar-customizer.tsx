@@ -11,14 +11,16 @@ import {
  * a teacher can have a Family bar that is mostly messages and a Teacher bar
  * that is mostly classes. Changes are held here until Save.
  */
-export default function BarCustomizer({ roles, prefs, startSection, onSave, onClose }: {
+export default function BarCustomizer({ roles, prefs, startSection, single = false, onSave, onClose }: {
   roles: string[];
   prefs: NavPrefs;
   startSection: Section;
+  /** The iPhone app has one bar for everything: edit only the main one (and offer Teacher and Admin pages on it). */
+  single?: boolean;
   onSave: (next: NavPrefs) => Promise<string>;
   onClose: () => void;
 }) {
-  const sections: Section[] = ["home", ...(roles.includes("teacher") ? (["teacher"] as const) : []), ...(roles.includes("admin") ? (["admin"] as const) : [])];
+  const sections: Section[] = single ? ["home"] : ["home", ...(roles.includes("teacher") ? (["teacher"] as const) : []), ...(roles.includes("admin") ? (["admin"] as const) : [])];
   const [section, setSection] = useState<Section>(sections.includes(startSection) ? startSection : "home");
   const [draft, setDraft] = useState<NavPrefs>(() => Object.fromEntries(sections.map((s) => [s, resolveBar(prefs, s, roles).map((d) => d.id)])) as NavPrefs);
   const [status, setStatus] = useState("");
@@ -50,13 +52,13 @@ export default function BarCustomizer({ roles, prefs, startSection, onSave, onCl
   const groups = Array.from(new Set(pool.map((d) => d.group)));
 
   return <div className="bar-customizer">
-    <p className="field-note">Choose up to {MAX_SLOTS} shortcuts for the bar at the bottom of the screen. Menu always stays at the end. Each section has its own bar.</p>
+    <p className="field-note">Choose up to {MAX_SLOTS} shortcuts for the bar at the bottom of the screen. Menu always stays at the end. {single ? "The same bar shows everywhere in the app." : "Each section has its own bar."}</p>
 
     {sections.length > 1 && <div className="bar-sections" role="tablist" aria-label="Section">
       {sections.map((s) => <button key={s} type="button" role="tab" aria-selected={s === section} className={s === section ? "active" : ""} onClick={() => { setSection(s); setStatus(""); }}>{SECTION_LABELS[s]}</button>)}
     </div>}
 
-    <h3>On the {SECTION_LABELS[section]} bar</h3>
+    <h3>{single ? "On your bar" : `On the ${SECTION_LABELS[section]} bar`}</h3>
     <ol className="bar-chosen">
       {ids.map((id, index) => <li key={id}>
         <span>{label(id)}</span>
