@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
-import { getSignedFileUrl } from "../../lib/storage";
+import DetailModal from "./detail-modal";
+import DocumentViewer from "./document-viewer";
 import DuesLink from "./dues-link";
 import { SignRequestStatus, SignerStatus, requestStatusLabel } from "../../lib/sign";
 import {
@@ -59,13 +61,14 @@ function ComplianceRow({ item, signing }: { item: ComplianceItem; signing?: Sign
   const settled = isSettled(row.status);
   const isDues = requirement.kind === "dues";
 
+  const [viewing, setViewing] = useState<string | null>(null);
+
+  // Older signed copies open inside the portal too, not in a storage link.
   async function openSignedCopy() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !row.signed_document_id) return;
     const { data } = await supabase.from("documents").select("storage_path").eq("id", row.signed_document_id).maybeSingle();
-    if (!data?.storage_path) return;
-    const url = await getSignedFileUrl(supabase, data.storage_path);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    if (data?.storage_path) setViewing(data.storage_path);
   }
 
   return <li className={`compliance-item${settled ? " settled" : " outstanding"}`}>
@@ -100,7 +103,10 @@ function ComplianceRow({ item, signing }: { item: ComplianceItem; signing?: Sign
         <span className="compliance-hint">The co-op has not sent this for signing yet. You will be notified when it arrives.</span>}
 
       {settled && !isDues && !signing && row.signed_document_id &&
-        <button className="compliance-cta ghost" onClick={openSignedCopy}>Download copy</button>}
+        <button className="compliance-cta ghost" onClick={openSignedCopy}>View signed copy</button>}
     </div>
+    {viewing && <DetailModal title={requirement.title} onClose={() => setViewing(null)}>
+      <DocumentViewer path={viewing} title={requirement.title} />
+    </DetailModal>}
   </li>;
 }
