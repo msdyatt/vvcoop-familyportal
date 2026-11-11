@@ -16,11 +16,14 @@ export type CheckoutInput = {
   autopay?: boolean;
   /** Show Stripe's form inside the page. Falls back to Stripe's own page when no publishable key is set. */
   embedded?: boolean;
+  /** The iPhone or Android app is asking: return a PaymentIntent for the native payment sheet (Apple Pay / Google Pay). */
+  native?: boolean;
 };
 
 export type CheckoutResult =
   | { ok: true; kind: "hosted"; url: string; paymentId: string }
   | { ok: true; kind: "embedded"; clientSecret: string; publishableKey: string; paymentId: string }
+  | { ok: true; kind: "native"; paymentIntentClientSecret: string; publishableKey: string; customerId: string; merchantDisplayName: string; amountCents: number; paymentId: string }
   | { ok: false; status: number; error: string; code: string };
 
 type Deps = { admin: AdminClient; stripe: StripeClient; config: Extract<StripeConfig, { ok: true }>; origin?: string; nowSeconds?: number };
@@ -52,6 +55,7 @@ export async function createDuesCheckout(deps: Deps, input: CheckoutInput): Prom
   const { admin, stripe } = deps;
   const origin = deps.origin ?? APP_ORIGIN;
   const embedded = Boolean(input.embedded) && Boolean(deps.config.publishableKey);
+  const native = Boolean(input.native) && Boolean(deps.config.publishableKey);
 
   let attempt = await begin(admin, input);
   for (let round = 0; round < 2; round++) {
@@ -61,6 +65,13 @@ export async function createDuesCheckout(deps: Deps, input: CheckoutInput): Prom
       throw new Error(`billing_begin_payment: ${attempt.error.message}`);
     }
     const started = attempt.data as any;
+
+    if (native) {
+      const outcome = await nativeFlow(deps, input, started);
+      if (outcome !== "retry") return outcome;
+      attempt = await begin(admin, input);
+      continue;
+    }
 
     if (!started.existing) return await openSession(deps, input, started, origin, embedded);
 
@@ -156,4 +167,70 @@ async function ensureCustomer(deps: Deps, familyId: string, familyName: string, 
   }, `cust_${familyId}_${config.livemode ? "live" : "test"}`);
   await admin.rpc("billing_set_customer", { p_family: familyId, p_livemode: config.livemode, p_customer_id: customer.id });
   return customer.id;
+}
+
+const IN_PROGRESS = "A payment is already being processed. Bank transfers take 1–4 business days to clear.";
+
+/**
+ * The native app pays with a PaymentIntent and Stripe's native payment sheet, which
+ * is what lets Apple Pay and Google Pay appear inside the app. The webhook handles
+ * a PaymentIntent exactly as it handles one made by Checkout, so nothing else changes.
+ */
+async function nativeFlow(deps: Deps, input: CheckoutInput, started: any): Promise<CheckoutResult | "retry"> {
+  const { admin, stripe, config } = deps;
+  const paymentId = started.payment_id as string;
+  const publishableKey = config.publishableKey!;
+
+  if (started.existing) {
+    if (started.status === "processing") return { ok: false, status: 409, code: "processing", error: IN_PROGRESS };
+    const { data: row } = await admin.from("dues_payments").select("stripe_payment_intent_id").eq("id", paymentId).maybeSingle();
+    if (row?.stripe_payment_intent_id) {
+      const pi = await stripe.get(`/v1/payment_intents/${row.stripe_payment_intent_id}`);
+      if (["requires_payment_method", "requires_confirmation", "requires_action"].includes(pi.status) && pi.client_secret) {
+        return { ok: true, kind: "native", paymentIntentClientSecret: pi.client_secret, publishableKey, customerId: pi.customer, merchantDisplayName: "Veritas Village", amountCents: started.amount_cents, paymentId };
+      }
+      if (pi.status === "canceled") {
+        await admin.rpc("billing_cancel_payment", { p_payment: paymentId, p_reason: "The payment was canceled." });
+        return "retry";
+      }
+      return { ok: false, status: 409, code: "processing", error: IN_PROGRESS };
+    }
+    if (started.checkout_session_id) {
+      // Opened as a Checkout page earlier (say on the website): close it and start the native way.
+      await stripe.post(`/v1/checkout/sessions/${started.checkout_session_id}/expire`, {}).catch(() => undefined);
+      await admin.rpc("billing_cancel_payment", { p_payment: paymentId, p_reason: "Switched to the app's payment sheet." });
+      return "retry";
+    }
+    return { ok: false, status: 409, code: "starting", error: "A payment is already starting. Give it a moment, then try again." };
+  }
+
+  try {
+    const { data: charge } = await admin.from("dues_charges")
+      .select("id,family_id,families(display_name),requirements(title),school_years(label)").eq("id", input.chargeId).single();
+    const familyName = (charge as any)?.families?.display_name ?? "Household";
+    const title = (charge as any)?.requirements?.title ?? "Dues";
+    const year = (charge as any)?.school_years?.label ?? "";
+    const customerId = await ensureCustomer(deps, started.family_id, familyName, input.userEmail);
+
+    const pi = await stripe.post("/v1/payment_intents", {
+      amount: started.amount_cents,
+      currency: "usd",
+      customer: customerId,
+      // Bank transfer first, then card. Apple Pay and Google Pay are cards in the payment sheet.
+      payment_method_types: ["us_bank_account", "card"],
+      description: `${title}${year ? ` (${year})` : ""} — ${familyName}`,
+      metadata: { payment_id: paymentId, charge_id: input.chargeId, family_id: started.family_id, installment_id: started.installment_id ?? "", source: "portal" },
+      ...(started.saved_for_autopay ? { setup_future_usage: "off_session" } : {}),
+      payment_method_options: { us_bank_account: { verification_method: "automatic", financial_connections: { permissions: ["payment_method"] } } },
+    }, paymentId);
+
+    // Remember which PaymentIntent belongs to this attempt (a pending update changes only the ids).
+    const attached = await admin.rpc("billing_apply_payment_update", { p_payment: paymentId, p_status: "pending", p_event_id: null, p_fields: { payment_intent_id: pi.id } });
+    if (attached.error) throw new Error(`billing_apply_payment_update: ${attached.error.message}`);
+    return { ok: true, kind: "native", paymentIntentClientSecret: pi.client_secret, publishableKey, customerId, merchantDisplayName: "Veritas Village", amountCents: started.amount_cents, paymentId };
+  } catch (error) {
+    await admin.rpc("billing_cancel_payment", { p_payment: paymentId, p_reason: "Could not start the payment." });
+    if (error instanceof StripeError) return { ok: false, status: 502, code: "stripe", error: "The payment could not be started. Please try again in a few minutes." };
+    throw error;
+  }
 }
