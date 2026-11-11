@@ -379,6 +379,21 @@ extension WebPageController: WKScriptMessageHandler {
         case "share":
             share(request)
 
+        case "push.status":
+            PushManager.shared.status { Bridge.reply(to: request, value: ["receive": $0], in: self.webView) }
+
+        case "push.enable":
+            PushManager.shared.enable { Bridge.reply(to: request, value: ["receive": $0], in: self.webView) }
+
+        case "push.token":
+            PushManager.shared.fetchToken { token in
+                if let token { Bridge.reply(to: request, value: ["token": token], in: self.webView) }
+                else { Bridge.reply(to: request, error: "No notification token yet", in: self.webView) }
+            }
+
+        case "push.disable":
+            PushManager.shared.disable { Bridge.reply(to: request, value: NSNull(), in: self.webView) }
+
         case "notifications":
             navigator?.chromeSource?.setNotificationUnread(request.payload["unread"] as? Int ?? 0)
 

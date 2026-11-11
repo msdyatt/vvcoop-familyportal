@@ -11,6 +11,7 @@
 <p>Section: home. First page after sign-in; becomes the Home tab without a second load.</p>
 <a href="page2.html">Push page 2 on this tab</a>
 <button id="share">Share a file (VVNative.call "share")</button>
+<button id="push">Allow notifications (VVNative.call "push.enable")</button>
 <pre id="out">(Menu actions show here)</pre>
 <button id="signout">Sign out (location.assign to the sign-in rule)</button>
 <div class="filler"></div><div class="filler"></div><div class="filler"></div><div class="filler"></div>
@@ -18,6 +19,10 @@
 <script>document.getElementById('signout').onclick = function () { location.assign('/test-frame/signin.html'); };document.getElementById('share').onclick = function () {
   VVNative.call('share', { filename: 'frame-test.txt', mime: 'text/plain', base64: btoa('Shared from the frame test page.') })
     .then(function (v) { VVNative.post('log', { text: 'share closed ' + JSON.stringify(v) }); }, function (e) { VVNative.post('log', { text: 'share failed ' + e.message }); });
+};
+document.getElementById('push').onclick = function () {
+  VVNative.call('push.status').then(function (v) { VVNative.post('log', { text: 'push status ' + JSON.stringify(v) }); return VVNative.call('push.enable'); })
+    .then(function (v) { VVNative.post('log', { text: 'push enable ' + JSON.stringify(v) }); }, function (e) { VVNative.post('log', { text: 'push failed ' + e.message }); });
 };
 </script>
 </body>

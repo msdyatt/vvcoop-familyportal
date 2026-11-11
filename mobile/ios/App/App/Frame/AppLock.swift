@@ -15,7 +15,7 @@ final class AppLock {
 
     /// Whether the lock is switched on (the Menu has the switch). On unless the person turned it off.
     var isEnabled: Bool {
-        get { UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true }
+        get { UserDefaults.standard.object(forKey: Self.enabledKey) == nil ? true : UserDefaults.standard.bool(forKey: Self.enabledKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.enabledKey) }
     }
 
@@ -42,15 +42,16 @@ final class AppLock {
         #if DEBUG
         if UserDefaults.standard.bool(forKey: "VVLockDemo") { showCover(locked: true); return }
         #endif
-        guard let cover else { return }
+        // Time away is measured from the last trip to the background (or from launch). A system alert, the
+        // share sheet or the Face ID prompt itself make the app inactive without leaving it, and must not lock.
         let away = leftAt.map { Date().timeIntervalSince($0) } ?? 0
+        leftAt = nil
         if isSignedIn(), isEnabled, canLock, away >= grace {
-            cover.setLocked(true)
+            showCover(locked: true)
             unlock()
-        } else {
+        } else if cover != nil, !evaluating {
             removeCover()
         }
-        leftAt = nil
     }
 
     private func unlock() {

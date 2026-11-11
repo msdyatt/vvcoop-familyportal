@@ -62,6 +62,8 @@ final class FrameController: UIViewController, UITabBarDelegate {
             state = cached
             rebuildBar(for: section)
             select(key: FrameStore.lastKey().flatMap { barKeys.contains($0) ? $0 : nil } ?? barKeys[0])
+            // A tap that launched the app is waiting; the cached bar is enough to open it.
+            DispatchQueue.main.async { self.openPendingPath() }
         } else {
             showSignedOut(FrameConfig.startURL)
         }
@@ -105,6 +107,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
         rebuildBar(for: section)
         selectItem(forPageIn: page.navigationController)
         updateBadge(newState.unread)
+        openPendingPath()
     }
 
     /// The first page after sign-in arrives in the sign-in stack. If it is one of the bar's own pages, it
@@ -121,6 +124,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
         }
         select(key: key ?? barKeys[0])
         updateBadge(newState.unread)
+        openPendingPath()
     }
 
     private static func sameRoot(_ href: String, _ url: URL) -> Bool {
@@ -238,6 +242,30 @@ final class FrameController: UIViewController, UITabBarDelegate {
         guard let page = currentPage else { return }
         FrameLog.event("menu action \(action.rawValue)")
         Bridge.emit("action", payload: ["name": action.rawValue], in: page.webView)
+    }
+
+    // MARK: Push
+
+    /// A notification was tapped. Waits for the frame to be signed in (a cold launch), then opens the page over
+    /// whatever tab is showing.
+    private var pendingPath: String?
+
+    func openFromPush(_ path: String) {
+        FrameLog.event("push tap: \(path)")
+        pendingPath = path
+        openPendingPath()
+    }
+
+    private func openPendingPath() {
+        guard let path = pendingPath, isSignedIn else { return }
+        pendingPath = nil
+        navigator.open(FrameConfig.url(forPath: path), from: currentPage)
+    }
+
+    /// Firebase rotated the token: the page on screen re-registers it (lib/push.ts refreshNativeToken).
+    func tokenChanged(_ token: String) {
+        guard let page = currentPage else { return }
+        Bridge.emit("pushToken", payload: ["token": token], in: page.webView)
     }
 
     /// Whether anyone is signed in (a bar is showing, or one was remembered from last time).
