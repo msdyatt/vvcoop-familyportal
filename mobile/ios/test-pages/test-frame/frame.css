@@ -1,0 +1,8 @@
+body { margin: 0; padding: 16px; font: 16px/1.4 -apple-system, system-ui, sans-serif; background: #faf7f1; color: #0b2a3d; }
+h1 { font-size: 22px; margin: 4px 0 12px; }
+h2 { font-size: 15px; margin: 22px 0 8px; text-transform: uppercase; letter-spacing: .06em; color: #8a4328; }
+a, button { display: block; width: 100%; box-sizing: border-box; margin: 6px 0; padding: 13px 14px; font: 600 16px -apple-system, system-ui, sans-serif; text-align: left; text-decoration: none; color: #0b2a3d; background: #fff; border: 1px solid rgba(11,42,61,.2); border-radius: 12px; }
+pre { margin: 8px 0; padding: 10px; font: 13px/1.35 ui-monospace, Menlo, monospace; white-space: pre-wrap; background: #fff; border-radius: 10px; }
+.layer { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(11,42,61,.55); }
+.layer > div { width: 80%; padding: 22px; background: #faf7f1; border-radius: 18px; }
+.filler { height: 90px; margin: 8px 0; border-radius: 12px; background: repeating-linear-gradient(45deg, #efe7d8, #efe7d8 10px, #f6f0e4 10px, #f6f0e4 20px); }

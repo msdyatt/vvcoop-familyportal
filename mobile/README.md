@@ -1,10 +1,16 @@
 # Veritas Village apps (iOS and Android)
 
-A native shell, built with [Capacitor](https://capacitorjs.com), around the live
-portal at `family.veritasvillage.org`. The portal is **not bundled**: it is
-server-rendered and signed-in, so every web deploy reaches the apps immediately
-with no store review. `www/` holds only a launch page that checks the
-connection and then opens the portal.
+Native apps around the live portal at `family.veritasvillage.org`. The portal
+is **not bundled**: it is server-rendered and signed-in, so every web deploy
+reaches the apps immediately with no store review.
+
+- **iPhone** is a native frame written in Swift (`ios/App/App/Frame/`): native
+  navigation, back-swipe, sheets and tab bar, with each screen's content loaded
+  from the site. It does not use Capacitor. Read
+  [`docs/native-ios-frame.md`](../docs/native-ios-frame.md) for how it works and why.
+- **Android** is a [Capacitor](https://capacitorjs.com) shell: one web view around
+  the portal. `www/` holds only a launch page that checks the connection and
+  then opens the portal.
 
 What makes it an app and not a bookmark is the native layer: push
 notifications, biometric unlock, and native sharing and camera. Apple rejects
@@ -32,12 +38,16 @@ before the first submission.
 ```
 cd mobile
 npm ci
-npx cap sync            # after changing www/ or capacitor.config.ts
+npx cap sync android    # after changing www/ or capacitor.config.ts (Android only)
 npm run assets          # after changing anything in assets/ (icon, splash)
-npx cap open ios        # Xcode
 npx cap open android    # Android Studio
+open ios/App/App.xcodeproj   # Xcode, for the iPhone app
 ```
-iOS uses Swift Package Manager (no CocoaPods). Capacitor needs Node 22 or later.
+**Do not run a bare `npx cap sync`**: it would try to regenerate the iOS project as
+a Capacitor one. The iOS project is plain Xcode with no packages. Capacitor needs
+Node 22 or later (Android only now).
+
+Testing the iPhone frame without signing in: `ios/test-pages/README.md`.
 Icons and splash come from `assets/` (the brand mark on navy); `npm run assets`
 regenerates every size. It also drops unused web icons in `mobile/icons`
 (and sometimes `www/manifest.json`); delete them, they are not part of the app.

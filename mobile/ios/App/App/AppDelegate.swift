@@ -1,76 +1,17 @@
 import UIKit
-import Capacitor
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
-    var window: UIWindow?
-
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
-        return true
-    }
-
-    func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
-    }
-
-    func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
-        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
-    }
-
-    func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
-    }
-
-    func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-    }
-
-    func applicationWillTerminate(_ application: UIApplication) {
-        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+        true
     }
 
     func application(_ application: UIApplication,
                      configurationForConnecting connectingSceneSession: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {
-        let config = UISceneConfiguration(name: "Default Configuration",
-                                          sessionRole: connectingSceneSession.role)
-        config.delegateClass = SceneDelegate.self
-        return config
-    }
-}
-
-/// The app's one screen: Capacitor's web view, with the top of the screen kept clean.
-///
-/// iOS 26 and later draws a blurred "scroll edge" effect where content slides
-/// under the status bar. On this app's header that read as a haze above the
-/// page. The page paints its own solid navy strip behind the status bar (see
-/// platform.css), so the system effect is switched off and the status bar text
-/// is light, to read on that navy.
-class ViewController: CAPBridgeViewController {
-
-    override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        removeTopEdgeEffect()
-        // The page handles swipe-back itself (lib/swipe-back.ts), so it can also close popups and
-        // go back inside a page. The system's own gesture stays off so the two never both fire.
-        webView?.allowsBackForwardNavigationGestures = false
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        removeTopEdgeEffect()
-    }
-
-    private func removeTopEdgeEffect() {
-        guard let scrollView = webView?.scrollView else { return }
-        if #available(iOS 26.0, *) {
-            scrollView.topEdgeEffect.isHidden = true
-        }
+        let configuration = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
     }
 }

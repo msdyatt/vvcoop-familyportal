@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frame test | Veritas Village</title>
+<link rel="stylesheet" href="frame.css">
+</head>
+<body>
+<h1>Frame test</h1>
+<pre id="env"></pre>
+
+<h2>Navigation</h2>
+<a href="page2.html">Push page 2 (default rule)</a>
+<a href="sheet.html">Open as a sheet (rule: sheet)</a>
+<a href="replace.html">Replace this page (rule: replace)</a>
+<a href="#anchor">Anchor on this page (stays; adds a history step)</a>
+<a href="https://example.com/" target="_blank">External site (Safari sheet)</a>
+<a href="mailto:test@example.com">mailto: (leaves the app)</a>
+<button id="assign">location.assign to page 2 (script navigation)</button>
+
+<h2>Layers (history steps)</h2>
+<button id="layer">Open a popup layer (pushState)</button>
+<button id="layer2">Open two layers</button>
+
+<h2>Bridge</h2>
+<button id="ping">call("ping") -> reply</button>
+<button id="hl">haptic light</button>
+<button id="hs">haptic success</button>
+<button id="title">Set title from the page</button>
+<button id="nav">post("navigate", page 3)</button>
+<pre id="out">(bridge replies show here)</pre>
+
+<h2 id="anchor">Scroll and pull to refresh</h2>
+<pre id="loaded"></pre>
+<div class="filler"></div><div class="filler"></div><div class="filler"></div><div class="filler"></div>
+<div class="filler"></div><div class="filler"></div><div class="filler"></div><div class="filler"></div>
+
+<script>
+  var env = document.getElementById('env'), out = document.getElementById('out');
+  env.textContent = 'VVNative: ' + (window.VVNative ? 'yes v' + VVNative.version : 'NO') +
+    '\ndata-frame: ' + document.documentElement.dataset.frame +
+    '\nUA: ' + navigator.userAgent.replace(/.*Mobile\//, 'Mobile/') +
+    '\nhistory.length: ' + history.length;
+  document.getElementById('loaded').textContent = 'Loaded at ' + new Date().toLocaleTimeString();
+
+  var layers = [];
+  function openLayer(label) {
+    var el = document.createElement('div');
+    el.className = 'layer';
+    el.innerHTML = '<div><strong>' + label + '</strong><p>Back (button or edge swipe) should close this, not leave the page.</p><button class="close">Close</button></div>';
+    document.body.appendChild(el);
+    history.pushState({ layer: label }, '');
+    layers.push(el);
+    el.querySelector('.close').onclick = function () { history.back(); };
+  }
+  window.addEventListener('popstate', function () {
+    var el = layers.pop();
+    if (el) el.remove();
+  });
+  document.getElementById('layer').onclick = function () { openLayer('Popup'); };
+  document.getElementById('layer2').onclick = function () { openLayer('Popup 1'); openLayer('Popup 2'); };
+  document.getElementById('assign').onclick = function () { location.assign('page2.html'); };
+
+  document.getElementById('ping').onclick = function () {
+    VVNative.call('ping').then(function (v) { out.textContent = 'reply: ' + JSON.stringify(v); }, function (e) { out.textContent = 'error: ' + e.message; });
+  };
+  document.getElementById('hl').onclick = function () { VVNative.post('haptic', { style: 'light' }); };
+  document.getElementById('hs').onclick = function () { VVNative.post('haptic', { style: 'success' }); };
+  document.getElementById('title').onclick = function () { VVNative.post('title', { title: 'Set by the page' }); };
+  // ?auto runs the bridge checks without taps and reports through the frame's log (see README).
+  if (location.search.indexOf('auto') >= 0 && window.VVNative) {
+    VVNative.call('ping').then(function (v) {
+      VVNative.post('log', { text: 'ping reply ' + JSON.stringify(v) });
+      VVNative.post('haptic', { style: 'success' });
+      VVNative.post('title', { title: 'Set by the page' });
+      VVNative.call('nope').catch(function (e) { VVNative.post('log', { text: 'unknown type rejected: ' + e.message }); });
+    });
+  }
+  document.getElementById('nav').onclick = function () { VVNative.post('navigate', { url: 'page3.html' }); };
+</script>
+</body>
+</html>
