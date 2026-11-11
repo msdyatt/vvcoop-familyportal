@@ -326,3 +326,9 @@ now sets `data-frame`, `data-platform`, `data-shell` and `data-app` itself, puts
 `<html>` if it is replaced), and hides `.app-header`, `.app-tabbar`, `.site-header` and `.public-header-logo` with a style sheet
 that is not part of the page's DOM. This also means the frame does not wait for a web deploy to stop doubling the header. The
 web CSS rules stay for the other platforms and as a second line. Test page: `test-frame/dup.html` strips the flags and checks.
+
+**The back swipe is the frame's own.** With the system navigation bar hidden (signed-in pages draw their own header), UIKit's built-in
+back-swipe stopped working. `FrameNavigationController` now switches it off and runs its own left-edge swipe with a sliding
+transition (`SlideBackAnimator`). The page's own edge swipe starts only when something is open inside the page
+(`gestureRecognizerShouldBegin` is `hasInPageHistory`); two edge recognizers cannot both win, and the page's used to take the touch
+even when it had nothing to close. So: popup, report, conversation or admin tab open, the swipe closes that; otherwise it leaves the page.

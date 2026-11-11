@@ -9,7 +9,7 @@ import WebKit
 /// `history.pushState`, stay in the page. Those are how popups, reports, conversations and admin
 /// tabs become history steps (lib/back-layers.ts), and the back button and back-swipe close them
 /// first: `webView.canGoBack` is true exactly while the page has one open.
-final class WebPageController: UIViewController {
+final class WebPageController: UIViewController, UIGestureRecognizerDelegate {
     let url: URL
     private(set) var webView: WKWebView!
     weak var navigator: Navigator?
@@ -180,6 +180,7 @@ final class WebPageController: UIViewController {
         let edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(edgeSwiped(_:)))
         edge.edges = .left
         edge.cancelsTouchesInView = false
+        edge.delegate = self
         view.addGestureRecognizer(edge)
     }
 
@@ -262,6 +263,10 @@ final class WebPageController: UIViewController {
         webView.goBack()
     }
 
+    /// This swipe only starts when something is open inside the page. Otherwise the navigation controller's own edge swipe
+    /// (which leaves the page) must get the touch: two edge recognizers cannot both win, and this one would take it.
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool { hasInPageHistory }
+
     @objc private func edgeSwiped(_ gesture: UIScreenEdgePanGestureRecognizer) {
         FrameLog.event("edge swipe state=\(gesture.state.rawValue) inPageHistory=\(hasInPageHistory)")
         guard gesture.state == .ended, hasInPageHistory else { return }
@@ -284,7 +289,6 @@ final class WebPageController: UIViewController {
             navigationItem.hidesBackButton = false
             navigationItem.leftBarButtonItem = nil
         }
-        navigationController?.interactivePopGestureRecognizer?.isEnabled = true
     }
 
     // MARK: Title and progress
