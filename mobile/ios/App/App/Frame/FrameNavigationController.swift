@@ -11,9 +11,12 @@ final class FrameNavigationController: UINavigationController, UIGestureRecogniz
     }
 
     private let style: Style
+    /// For a tab's stack: which tab it belongs to ("section/destination id").
+    let tabKey: String?
 
-    init(rootViewController: UIViewController, style: Style = .navy) {
+    init(rootViewController: UIViewController, style: Style = .navy, tabKey: String? = nil) {
         self.style = style
+        self.tabKey = tabKey
         super.init(rootViewController: rootViewController)
     }
 

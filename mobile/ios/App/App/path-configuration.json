@@ -2,6 +2,7 @@
   "version": 1,
   "rules": [
     { "patterns": ["^/family-village/?$"], "properties": { "presentation": "root", "role": "signin" } },
+    { "patterns": ["^/test-frame/signin"], "properties": { "presentation": "root", "role": "signin" } },
     { "patterns": ["^/test-frame/sheet"], "properties": { "presentation": "sheet", "detent": "medium" } },
     { "patterns": ["^/test-frame/replace"], "properties": { "presentation": "replace" } },
     { "patterns": [".*"], "properties": { "presentation": "push" } }

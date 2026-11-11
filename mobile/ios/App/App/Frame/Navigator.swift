@@ -37,6 +37,13 @@ final class Navigator {
         }
     }
 
+    /// A page sent its state. Only the page on screen steers the bar; the others keep it for when they appear.
+    func pageReportedState(_ page: WebPageController, _ state: FrameState) {
+        if page.viewIfLoaded?.window != nil, frame.currentPage === page { frame.apply(state, from: page) }
+    }
+
+    func pageDidAppear(_ page: WebPageController) { frame.pageDidAppear(page) }
+
     /// Closes the page: dismisses it if it is a sheet's first page, otherwise pops it.
     func close(_ page: WebPageController) {
         if let navigation = page.navigationController {

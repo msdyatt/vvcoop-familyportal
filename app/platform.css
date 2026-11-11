@@ -715,3 +715,12 @@ html[data-app] .app-header-lockup.on-light {
 html[data-app] .notification-bell-button {
   border-color: rgba(var(--navy-rgb), .28);
 }
+
+/* --- the iPhone app's native frame ------------------------------------------------
+   The frame draws the tab bar (UITabBar) below the page, so the page neither shows
+   its own nor leaves room for it. */
+html[data-frame] .app-tabbar { display: none !important; }
+
+html[data-frame][data-app] {
+  --tabbar-space: 0px;
+}

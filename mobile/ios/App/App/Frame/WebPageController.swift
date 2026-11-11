@@ -21,6 +21,9 @@ final class WebPageController: UIViewController {
     private let failure = FailureView()
     private let refresh = UIRefreshControl()
     private var pageTitle: String?
+    /// The last `state` this page sent (the person's bar, section, unread count). Applied again whenever
+    /// the page comes back on top, so the bar always matches the page in view.
+    private(set) var reportedState: FrameState?
 
     init(url: URL, navigator: Navigator?) {
         self.url = url
@@ -138,6 +141,15 @@ final class WebPageController: UIViewController {
         view.addGestureRecognizer(edge)
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        navigator?.pageDidAppear(self)
+    }
+
+    func scrollToTop() {
+        webView.scrollView.setContentOffset(CGPoint(x: 0, y: -webView.scrollView.adjustedContentInset.top), animated: true)
+    }
+
     // MARK: Loading
 
     func load() {
@@ -249,7 +261,7 @@ extension WebPageController: WKNavigationDelegate {
         if Self.sameDocument(target, webView.url) {
             if target.fragment != nil { return decisionHandler(.allow) }
             decisionHandler(.cancel)
-            webView.scrollView.setContentOffset(CGPoint(x: 0, y: -webView.scrollView.adjustedContentInset.top), animated: true)
+            scrollToTop()
             return
         }
 
@@ -345,6 +357,12 @@ extension WebPageController: WKScriptMessageHandler {
 
         case "close":
             navigator?.close(self)
+
+        case "state":
+            if let state = FrameState.decode(request.payload) {
+                reportedState = state
+                navigator?.pageReportedState(self, state)
+            }
 
         case "log":
             FrameLog.event("page: \(request.payload["text"] as? String ?? "")")

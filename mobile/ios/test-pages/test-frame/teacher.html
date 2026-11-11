@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Teaching | Veritas Village</title>
+<link rel="stylesheet" href="frame.css">
+</head>
+<body data-section="teacher">
+<h1>Teaching</h1>
+<p>Section: teacher. Opening this from the Menu swaps the bar to the Teacher bar.</p>
+<a href="page2.html">Push page 2 on this tab</a>
+<pre id="out">(Menu actions show here)</pre>
+<button id="signout">Sign out (location.assign to the sign-in rule)</button>
+<div class="filler"></div><div class="filler"></div><div class="filler"></div><div class="filler"></div>
+<script src="state.js"></script>
+<script>document.getElementById('signout').onclick = function () { location.assign('/test-frame/signin.html'); };</script>
+</body>
+</html>
