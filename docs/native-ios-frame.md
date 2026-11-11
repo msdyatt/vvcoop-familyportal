@@ -163,15 +163,19 @@ the bar does not change. The web and the home-screen app are unchanged.
 
 ### Chrome (PR 3)
 
-Native navigation bar per page (navy, light text, over the same navy status strip as before):
-the title `AppHeader` already has (posted as `title`), a bell with the unread count, and a
-profile button whose menu has Account & security, Customize bottom bar, Take the tour and Sign
-out. The web header is hidden by `html[data-frame] .app-header`; the component stays mounted
-because it owns the account, tour and notification logic, and the frame calls into it with the
-same `action` event the Menu uses. The bell count is `NotificationBell`'s own (`notifications`
-message). The bell opens `/family-village/notifications` (a small web page listing the person's
-`notifications` rows) as a sheet; its path rule has `links: "frame"`, so tapping a notification
-closes the sheet and pushes its `link_path` over the page underneath.
+A navy strip behind the status bar (white clock on every page, as the web does in the app), then on every signed-in
+page a native copy of the web's header in the section's colours (`HeaderBand.swift`): the logo on the left, the
+notification bell with its unread count and the profile button on the right, the page's name under them in a serif, and
+the rule along the bottom. Family is the cream page with a terracotta rule, Teacher the light sage band with a sage rule,
+Admin the navy band with a light terracotta rule and the cream logo (the `--portal-band-*` values in `app/globals.css`).
+`AppHeader` tells the frame its title and which section it is (`title` message with `theme`), so a Messages page under
+Family stays Family-coloured. A back button joins the row on pushed pages. The system navigation bar is hidden on these
+pages and kept on sheets. The web header is hidden by `html[data-frame] .app-header`; the component stays mounted because it
+owns the account, tour and notification logic, and the frame calls into it with the same `action` event the Menu uses. The
+profile button's menu has Account & security, Customize bottom bar, Take the tour and Sign out. The bell opens
+`/family-village/notifications` (a small web page listing the person's `notifications` rows) as a sheet; its path rule
+has `links: "frame"`, so tapping a notification closes the sheet and pushes its `link_path` over the page underneath.
+The serif is the system one (New York); Playfair Display is a web font the app does not carry.
 
 ### Native touches (PR 4, built)
 

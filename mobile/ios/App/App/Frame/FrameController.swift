@@ -24,7 +24,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
     private var stacks: [String: FrameNavigationController] = [:]
     private var barKeys: [String] = []
     private static let menuTag = -1
-    private var notificationUnread = 0
+    private(set) var notificationUnread = 0
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
     override var childForStatusBarStyle: UIViewController? { content }
@@ -276,22 +276,18 @@ final class FrameController: UIViewController, UITabBarDelegate {
 
     // MARK: Navigation bar buttons
 
-    /// The bell (with the unread count) and the profile menu, for the right side of a signed-in page's bar.
-    func chromeItems(for page: WebPageController) -> [UIBarButtonItem] {
-        let bell = UIBarButtonItem(title: nil, image: BellImage.make(count: notificationUnread), primaryAction: UIAction { [weak self, weak page] _ in
-            guard let self else { return }
-            self.navigator.open(FrameConfig.url(forPath: "/family-village/notifications"), from: page ?? self.currentPage)
-        }, menu: nil)
-        bell.accessibilityLabel = notificationUnread > 0 ? "Notifications, \(notificationUnread) unread" : "Notifications"
-        let menu = UIMenu(children: [
+    /// The profile button's menu in the header.
+    func profileMenu() -> UIMenu {
+        UIMenu(children: [
             UIAction(title: "Account & security", image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in self?.run(.account) },
             UIAction(title: "Customize bottom bar", image: UIImage(systemName: "slider.horizontal.3")) { [weak self] _ in self?.run(.customize) },
             UIAction(title: "Take the tour", image: UIImage(systemName: "questionmark.circle")) { [weak self] _ in self?.run(.tour) },
             UIAction(title: "Sign out", image: UIImage(systemName: "rectangle.portrait.and.arrow.right"), attributes: .destructive) { [weak self] _ in self?.run(.signOut) },
         ])
-        let profile = UIBarButtonItem(image: UIImage(systemName: "person.crop.circle"), menu: menu)
-        profile.accessibilityLabel = "Account"
-        return [profile, bell]
+    }
+
+    func openNotifications(from page: WebPageController?) {
+        navigator.open(FrameConfig.url(forPath: "/family-village/notifications"), from: page ?? currentPage)
     }
 
     func setNotificationUnread(_ count: Int) {

@@ -18,10 +18,38 @@ struct FrameMenuGroup: Codable, Equatable {
 struct FrameState: Codable, Equatable {
     let signedIn: Bool
     let unread: Int
-    /// The first page of the portal, for the Menu's "Family home" row.
+    /// The first page of the portal, for the Menu's "Home" row.
     let home: String
     let bar: [FrameDestination]
     let menu: [FrameMenuGroup]
+
+    private enum Keys: String, CodingKey { case signedIn, unread, home, bar, menu, sections }
+    private struct LegacySection: Decodable { let id: String; let bar: [FrameDestination] }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        signedIn = try c.decode(Bool.self, forKey: .signedIn)
+        unread = try c.decodeIfPresent(Int.self, forKey: .unread) ?? 0
+        home = try c.decodeIfPresent(String.self, forKey: .home) ?? "/family-village/home"
+        menu = (try? c.decode([FrameMenuGroup].self, forKey: .menu)) ?? []
+        if let bar = try c.decodeIfPresent([FrameDestination].self, forKey: .bar) {
+            self.bar = bar
+        } else {
+            // A page from before the app had one bar for everything sends one bar per section. Use the main
+            // (Family) one, so the bar never changes with the page and an older site still works.
+            let sections = (try? c.decode([LegacySection].self, forKey: .sections)) ?? []
+            bar = (sections.first { $0.id == "home" } ?? sections.first)?.bar ?? []
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Keys.self)
+        try c.encode(signedIn, forKey: .signedIn)
+        try c.encode(unread, forKey: .unread)
+        try c.encode(home, forKey: .home)
+        try c.encode(bar, forKey: .bar)
+        try c.encode(menu, forKey: .menu)
+    }
 
     static func decode(_ payload: [String: Any]) -> FrameState? {
         guard JSONSerialization.isValidJSONObject(payload),

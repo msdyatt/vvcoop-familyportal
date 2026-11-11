@@ -57,8 +57,8 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
 
   useOutsideClick(menuRef, () => setMenuOpen(false));
 
-  // In the iPhone app the frame's navigation bar shows the page's title (and this header is hidden).
-  useEffect(() => { nativeFrame()?.post("title", { title }); }, [title]);
+  // In the iPhone app the frame draws this header natively (logo, title, bell, profile) in the section's colours, and this one is hidden.
+  useEffect(() => { nativeFrame()?.post("title", { title, theme: current }); }, [title, current]);
 
   async function signOut() {
     // Stop pushes to this device before the session goes away, so the next

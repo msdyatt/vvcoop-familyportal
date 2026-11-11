@@ -22,9 +22,14 @@ final class FrameNavigationController: UINavigationController, UIGestureRecogniz
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
+    /// Sheets keep the system navigation bar. Everything else (the sign-in page and the signed-in pages) draws its
+    /// own top: a navy status strip, and on signed-in pages the section header (HeaderBand.swift).
+    var isSheet: Bool { style == .cream }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         interactivePopGestureRecognizer?.delegate = self
+        isNavigationBarHidden = !isSheet
 
         let foreground = style == .navy ? Brand.cream : Brand.navy
         let appearance = UINavigationBarAppearance()

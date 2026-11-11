@@ -11,6 +11,7 @@
   var photos = d('photos', 'Photos', 'photos.html', 'photos');
   var messages = d('messages', 'Messages', 'messages.html', 'messages');
   var teaching = d('teacher-home', 'Teaching', 'teacher.html', 'teach');
+  var dashboard = d('admin-dashboard', 'Dashboard', 'admin.html', 'dashboard');
   var state = {
     signedIn: true,
     unread: 3,
@@ -19,12 +20,13 @@
     menu: [
       { title: 'Family', items: [home] },
       { title: 'Anywhere in the portal', items: [photos, messages] },
-      { title: 'Teacher', items: [teaching] }
+      { title: 'Teacher', items: [teaching] },
+      { title: 'Admin', items: [dashboard] }
     ]
   };
   VVNative.post('state', state);
   VVNative.post('notifications', { unread: 2 });
-  VVNative.post('title', { title: document.title.split(' | ')[0] });
+  VVNative.post('title', { title: document.title.split(' | ')[0], theme: document.body.dataset.section || 'home' });
   VVNative.on('action', function (a) {
     VVNative.post('log', { text: 'action ' + a.name });
     var out = document.getElementById('out');
