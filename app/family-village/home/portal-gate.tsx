@@ -49,15 +49,14 @@ function toComplianceItems(rows: unknown): ComplianceItem[] {
 }
 
 /** Home shows everything; each section also has a page of its own, which shows only that section. */
-export type PortalView = "home" | "children" | "news" | "classes" | "documents" | "paperwork";
+export type PortalView = "home" | "children" | "news" | "classes" | "documents";
 
 const VIEW_HEADERS: Record<PortalView, { title: string; subtitle: string }> = {
   home: { title: "Family Village", subtitle: "Your household\u2019s week, gathered in one place." },
   children: { title: "Your children", subtitle: "Profiles, classes and enrollment." },
   news: { title: "News & notices", subtitle: "From the co-op." },
   classes: { title: "Classes", subtitle: "Dates and prep for your children\u2019s classes." },
-  documents: { title: "Handouts & documents", subtitle: "Files shared with your household." },
-  paperwork: { title: "Paperwork & dues", subtitle: "Forms, signatures and dues for this year." },
+  documents: { title: "Documents", subtitle: "Forms to sign, dues, and files shared with your household." },
 };
 
 export default function PortalGate({ view = "home" }: { view?: PortalView }) {
@@ -225,13 +224,13 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
             </li>;
           })}</ol>
         : empty(portal?.classes.length ? "Nothing scheduled in your children's classes yet." : "Classes will appear after enrollment is entered.")}</section>}
+      {show("documents") && <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">To do &amp; signed</p><h2>Forms &amp; dues</h2>
+        {portal && <FamilyCompliance familyId={portal.familyId} />}
+      </section>}
       {/* Documents that aren't a requirement -- class handouts and anything an
           administrator has shared with this household. Signed copies are
           excluded because they already appear above, against their requirement. */}
-      {show("documents") && <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other documents</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>}
-      {show("paperwork") && <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">Family records</p><h2>Paperwork &amp; dues</h2>
-        {portal && <FamilyCompliance familyId={portal.familyId} />}
-      </section>}
+      {show("documents") && <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other files</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>}
     </div>
 
     <footer className="portal-footer">

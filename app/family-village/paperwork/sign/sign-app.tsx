@@ -204,7 +204,7 @@ export default function SignApp() {
 
   return <main className="workspace-preview sign-page">
     <AppHeader current="home" roles={roles} title="Sign a document" subtitle="Read it, then sign it here." />
-    <p><a className="sign-back" href="/family-village/paperwork">← Back to paperwork</a></p>
+    <p><a className="sign-back" href="/family-village/documents">← Back to documents</a></p>
     {problem && <p className="portal-empty" role="alert">{problem}</p>}
     {!problem && !loaded && <p className="portal-empty">Loading…</p>}
     {loaded && <div className="sign-layout">

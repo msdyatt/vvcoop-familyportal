@@ -28,10 +28,15 @@ export default function DuesTab({ actorUserId }: { actorUserId: string }) {
   const [discountTypes, setDiscountTypes] = useState<DiscountType[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [years, setYears] = useState<{ id: string; label: string; is_current: boolean }[]>([]);
+  const [yearId, setYearId] = useState("");
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+    const { data: yearRows } = await supabase.from("school_years").select("id,label,is_current").order("label", { ascending: false });
+    setYears((yearRows ?? []) as { id: string; label: string; is_current: boolean }[]);
+    setYearId((chosen) => chosen || (yearRows ?? []).find((y) => y.is_current)?.id || (yearRows ?? [])[0]?.id || "");
     const [s, c, p, a, r, o, d] = await Promise.all([
       supabase.from("billing_settings").select("provider,reminder_days_before,retry_after_days,max_attempts,receipt_org_name,receipt_ein,receipt_address,receipt_note").eq("id", "dues").maybeSingle(),
       supabase.from("dues_ledger").select(CHARGE_COLUMNS).order("family_name"),
@@ -88,7 +93,12 @@ export default function DuesTab({ actorUserId }: { actorUserId: string }) {
         <button key={key} type="button" className={section === key ? "active" : ""} onClick={() => setSection(key)}>{{ ledger: "Ledger", payments: "Payments", approvals: "Approvals", settings: "Settings" }[key]}</button>)}
     </nav>
     {message && <p className="dues-flash" role="status">{message}</p>}
-    {section === "ledger" && <Ledger charges={charges} requirements={requirements} options={options} discountTypes={discountTypes} busy={busy} run={run} />}
+    {section === "ledger" && <label className="dues-year"><span className="field-caption">School year</span>
+      <select value={yearId} onChange={(e) => setYearId(e.target.value)}>
+        {years.map((y) => <option key={y.id} value={y.id}>{y.label}{y.is_current ? " (current)" : ""}</option>)}
+        {!years.length && <option value="">No school years yet</option>}
+      </select></label>}
+    {section === "ledger" && <Ledger charges={charges.filter((c) => !yearId || c.school_year_id === yearId)} requirements={requirements.filter((r) => !yearId || r.school_year_id === yearId)} options={options} discountTypes={discountTypes} busy={busy} run={run} />}
     {section === "payments" && <Payments payments={payments} provider={provider} approvals={approvals} busy={busy} run={run} callAdmin={callAdmin} onMessage={setMessage} />}
     {section === "approvals" && <Approvals approvals={approvals} actorUserId={actorUserId} busy={busy} run={run} />}
     {section === "settings" && <Settings settings={settings} approvals={approvals} actorUserId={actorUserId} busy={busy} run={run} callAdmin={callAdmin} />}

@@ -8,6 +8,7 @@ import { readPdfInfo } from "../pdf-pages";
 import FieldEditor, { Template } from "./field-editor";
 import SendPanel from "./send-panel";
 import SentList from "./sent-list";
+import DocumentStatus from "./document-status";
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const COLUMNS = "id,title,storage_path,sha256,page_count,signers_required,status,created_at";
@@ -16,12 +17,14 @@ const COLUMNS = "id,title,storage_path,sha256,page_count,signers_required,status
  * Documents for signature: upload a PDF, place fields on it for one or two
  * signers, send it to households, and follow each copy until it is sealed.
  */
-export default function DocumentsTab() {
+export default function DocumentsTab({ actorUserId }: { actorUserId: string }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [sentCounts, setSentCounts] = useState<Record<string, number>>({});
   // Which documents are required of every family for the current school year.
   const [required, setRequired] = useState<Record<string, { id: string; active: boolean; due_on: string | null }>>({});
   const [yearLabel, setYearLabel] = useState("");
+  const [years, setYears] = useState<{ id: string; label: string; is_current: boolean }[]>([]);
+  const [yearId, setYearId] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState<{ kind: "list" } | { kind: "edit" | "send"; template: Template }>({ kind: "list" });
   const [message, setMessage] = useState("");
@@ -32,7 +35,10 @@ export default function DocumentsTab() {
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { data: year } = await supabase.from("school_years").select("id,label").eq("is_current", true).maybeSingle();
+    const { data: allYears } = await supabase.from("school_years").select("id,label,is_current").order("label", { ascending: false });
+    setYears((allYears ?? []) as { id: string; label: string; is_current: boolean }[]);
+    const year = (allYears ?? []).find((y) => y.is_current) ?? null;
+    setYearId((chosen) => chosen || year?.id || (allYears ?? [])[0]?.id || "");
     const [t, r, reqs] = await Promise.all([
       supabase.from("sign_templates").select(COLUMNS).neq("status", "archived").order("created_at", { ascending: false }),
       supabase.from("sign_requests").select("template_id").neq("status", "voided"),
@@ -171,6 +177,17 @@ export default function DocumentsTab() {
           </li>;
         })}
       </ul>
+    </section>
+    <section aria-label="Who needs to sign">
+      <div className="sent-list-head">
+        <h2>Who needs to sign</h2>
+        <label><span className="field-caption">School year</span>
+          <select value={yearId} onChange={(e) => setYearId(e.target.value)}>
+            {years.map((y) => <option key={y.id} value={y.id}>{y.label}{y.is_current ? " (current)" : ""}</option>)}
+            {!years.length && <option value="">No school years yet</option>}
+          </select></label>
+      </div>
+      <DocumentStatus actorUserId={actorUserId} yearId={yearId} refreshKey={refreshKey} />
     </section>
     <SentList refreshKey={refreshKey} />
   </div>;

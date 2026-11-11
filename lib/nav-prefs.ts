@@ -35,7 +35,6 @@ export const DESTINATIONS: Destination[] = [
   { id: "children", label: "Children", href: "/family-village/children", icon: "children", group: "Family" },
   { id: "family-classes", label: "Classes", href: "/family-village/classes", icon: "classes", group: "Family" },
   { id: "documents", label: "Documents", href: "/family-village/documents", icon: "paperwork", group: "Family" },
-  { id: "paperwork", label: "Paperwork", href: "/family-village/paperwork", icon: "paperwork", group: "Family" },
   { id: "photos", label: "Photos", href: "/family-village/photos", icon: "photos", group: "Everywhere" },
   { id: "messages", label: "Messages", href: "/family-village/messages", icon: "messages", group: "Everywhere" },
   { id: "teacher-home", label: "Teaching", href: TEACHER, icon: "teach", role: "teacher", group: "Teaching" },
@@ -46,7 +45,7 @@ export const DESTINATIONS: Destination[] = [
   { id: "admin-families", label: "Families", href: `${ADMIN}?tab=families`, icon: "families", role: "admin", group: "Administration" },
   { id: "admin-classes", label: "Classes", href: `${ADMIN}?tab=classes`, icon: "classes", role: "admin", group: "Administration" },
   { id: "admin-invitations", label: "Invites", href: `${ADMIN}?tab=invitations`, icon: "invitations", role: "admin", group: "Administration" },
-  { id: "admin-compliance", label: "Forms", href: `${ADMIN}?tab=compliance`, icon: "compliance", role: "admin", group: "Administration" },
+  { id: "admin-documents", label: "Documents", href: `${ADMIN}?tab=documents`, icon: "compliance", role: "admin", group: "Administration" },
   { id: "admin-news", label: "News", href: `${ADMIN}?tab=news`, icon: "news", role: "admin", group: "Administration" },
   { id: "admin-reports", label: "Reports", href: `${ADMIN}?tab=reports`, icon: "reports", role: "admin", group: "Administration" },
   { id: "admin-activity", label: "Activity", href: `${ADMIN}?tab=activity`, icon: "activity", role: "admin", group: "Administration" },
@@ -66,6 +65,10 @@ export const DEFAULT_BARS: Record<Section, string[]> = {
 export type NavPrefs = Partial<Record<Section, string[]>>;
 
 const byId = new Map(DESTINATIONS.map((d) => [d.id, d]));
+
+/** Destinations that were merged into another. A bar saved with the old id keeps its slot under the new one. */
+const RENAMED: Record<string, string> = { paperwork: "documents", "admin-compliance": "admin-documents" };
+const current = (id: string) => RENAMED[id] ?? id;
 
 export function destination(id: string): Destination | undefined {
   return byId.get(id);
@@ -87,8 +90,9 @@ export function resolveBar(prefs: NavPrefs | null | undefined, section: Section,
     if (!Array.isArray(ids)) return [];
     const seen = new Set<string>();
     const out: Destination[] = [];
-    for (const id of ids) {
-      if (typeof id !== "string" || seen.has(id) || !allowed.has(id)) continue;
+    for (const stored of ids) {
+      const id = typeof stored === "string" ? current(stored) : "";
+      if (!id || seen.has(id) || !allowed.has(id)) continue;
       seen.add(id);
       out.push(byId.get(id)!);
       if (out.length === MAX_SLOTS) break;
@@ -105,7 +109,10 @@ export function cleanPrefs(value: unknown): NavPrefs {
   const out: NavPrefs = {};
   for (const section of ["home", "teacher", "admin"] as const) {
     const ids = (value as Record<string, unknown>)[section];
-    if (Array.isArray(ids)) out[section] = ids.filter((id): id is string => typeof id === "string" && byId.has(id)).slice(0, MAX_SLOTS);
+    if (Array.isArray(ids)) {
+      const mapped = ids.filter((id): id is string => typeof id === "string").map(current).filter((id) => byId.has(id));
+      out[section] = [...new Set(mapped)].slice(0, MAX_SLOTS);
+    }
   }
   return out;
 }
