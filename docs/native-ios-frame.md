@@ -302,3 +302,33 @@ the Face ID lock fired after a system alert, because the "fresh launch" marker w
 Not verified: a real APNs delivery and token (the Simulator has no APNs device token, so `push.token` cannot succeed
 there), `register_device_token` with a real token, FCM sending (needs Sam's APNs key in Firebase and
 `FCM_SERVICE_ACCOUNT` in Supabase Vault), the notification delegate with a real tap, and Android (CI builds it).
+
+### Loading screen, one logo, no sideways scroll
+
+- **Loading screen.** `SplashView` shows the quill mark, "Veritas Village" and "Opening your portal..." on navy from launch
+  until the first page has loaded (12 second cap), laid out like `LaunchScreen.storyboard` so the two read as one screen. It
+  replaces the web launch page the Capacitor app showed. The project's launch storyboard had still been Capacitor's blank
+  placeholder (white with a blue X); it is now navy with the same mark and name.
+- **One logo.** Public pages (Privacy, Terms, Support) carry their own logo header. In the frame the native header supplies the
+  logo and the back button, so `html[data-frame] .site-header, .public-header-logo` are hidden. A public page opened from the
+  sign-in screen is pushed (it used to replace the sign-in page, leaving no way back) and gets the header with the logo and a
+  back button but no bell or profile.
+- **No sideways scroll.** The page never pans horizontally: `alwaysBounceHorizontal` is off and a horizontal content offset is
+  put back to zero natively, and the frame sets `overflow-x: clip` on `html` and `body`. Things meant to scroll sideways (the
+  calendar grid, wide tables) scroll inside the page and are not affected. The cause on the real signed-in pages is not
+  confirmed (no signed-in session here); debug builds log each page's width against the screen (`width:` lines in the
+  frame log) to find it.
+
+**The frame sets its own flags and hides the web header itself.** A signed-in page showed the web header under the native one,
+with the web layout (no `data-frame`, no `data-app`) even though the sign-in page had both. The likely cause is React rebuilding
+`<html>` after a hydration error on that page, which takes the attributes the head script set. So the injected script (Bridge.swift)
+now sets `data-frame`, `data-platform`, `data-shell` and `data-app` itself, puts them back whenever they go missing (and follows
+`<html>` if it is replaced), and hides `.app-header`, `.app-tabbar`, `.site-header` and `.public-header-logo` with a style sheet
+that is not part of the page's DOM. This also means the frame does not wait for a web deploy to stop doubling the header. The
+web CSS rules stay for the other platforms and as a second line. Test page: `test-frame/dup.html` strips the flags and checks.
+
+**The back swipe is the frame's own.** With the system navigation bar hidden (signed-in pages draw their own header), UIKit's built-in
+back-swipe stopped working. `FrameNavigationController` now switches it off and runs its own left-edge swipe with a sliding
+transition (`SlideBackAnimator`). The page's own edge swipe starts only when something is open inside the page
+(`gestureRecognizerShouldBegin` is `hasInPageHistory`); two edge recognizers cannot both win, and the page's used to take the touch
+even when it had nothing to close. So: popup, report, conversation or admin tab open, the swipe closes that; otherwise it leaves the page.

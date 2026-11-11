@@ -735,3 +735,12 @@ html[data-frame] .app-header { display: none !important; }
 .notifications-page li + li { border-top: 1px solid rgba(var(--navy-rgb), .1); }
 .notifications-page .notification-item { width: 100%; }
 .notifications-markall { display: block; margin: 4px 0 8px auto; padding: 8px 14px; color: var(--navy); font: 600 15px var(--sans); background: none; border: 0; cursor: pointer; }
+
+/* Public pages (Privacy, Terms, Support) carry their own logo and menu; in the frame the native header supplies the logo
+   and the back button, so these would be a second logo. */
+html[data-frame] .site-header,
+html[data-frame] .public-header-logo { display: none !important; }
+
+/* The page itself never scrolls sideways in the app. Wide things (tables, the calendar grid) scroll inside the page. */
+html[data-frame],
+html[data-frame] body { overflow-x: clip; max-width: 100%; }

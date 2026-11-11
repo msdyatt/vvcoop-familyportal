@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Duplicate header | Veritas Village</title>
+<link rel="stylesheet" href="frame.css">
+</head>
+<body>
+<header class="app-header" id="webheader"><h1>WEB HEADER (should be hidden in the frame)</h1></header>
+<h1>Duplicate header test</h1>
+<p>The web header above must be invisible, even after the page strips the flags from &lt;html&gt;, as React can after a hydration error.</p>
+<script>
+  setTimeout(function () {
+    ['data-frame', 'data-platform', 'data-shell', 'data-app'].forEach(function (a) { document.documentElement.removeAttribute(a); });
+    setTimeout(function () {
+      var h = document.getElementById('webheader');
+      VVNative.post('log', { text: 'after stripping: header display=' + getComputedStyle(h).display + ' attrs=' + document.documentElement.getAttributeNames().join(',') });
+    }, 300);
+  }, 800);
+</script>
+</body>
+</html>

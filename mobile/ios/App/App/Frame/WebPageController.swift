@@ -9,7 +9,7 @@ import WebKit
 /// `history.pushState`, stay in the page. Those are how popups, reports, conversations and admin
 /// tabs become history steps (lib/back-layers.ts), and the back button and back-swipe close them
 /// first: `webView.canGoBack` is true exactly while the page has one open.
-final class WebPageController: UIViewController {
+final class WebPageController: UIViewController, UIGestureRecognizerDelegate {
     let url: URL
     private(set) var webView: WKWebView!
     weak var navigator: Navigator?
@@ -17,6 +17,7 @@ final class WebPageController: UIViewController {
     /// True once the first load of this page has committed. Until then, redirects load in place.
     private var committed = false
     private var observers: [NSKeyValueObservation] = []
+    private var offsetObserver: NSKeyValueObservation?
     private let strip = UIView()
     private let band = HeaderBandView()
     private lazy var top = UIStackView(arrangedSubviews: [band])
@@ -105,6 +106,14 @@ final class WebPageController: UIViewController {
         #endif
         removeTopEdgeEffect(webView)
 
+        // The page never pans sideways: a few pixels of overflow somewhere should not make the whole screen drag. Things that
+        // are meant to scroll sideways (a wide table, the calendar grid) scroll inside the page and are not affected.
+        webView.scrollView.alwaysBounceHorizontal = false
+        webView.scrollView.isDirectionalLockEnabled = true
+        offsetObserver = webView.scrollView.observe(\.contentOffset, options: [.new]) { scrollView, _ in
+            if scrollView.contentOffset.x != 0 { scrollView.setContentOffset(CGPoint(x: 0, y: scrollView.contentOffset.y), animated: false) }
+        }
+
         refresh.tintColor = Brand.terracotta
         refresh.addTarget(self, action: #selector(pulledToRefresh), for: .valueChanged)
         webView.scrollView.refreshControl = refresh
@@ -171,6 +180,7 @@ final class WebPageController: UIViewController {
         let edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(edgeSwiped(_:)))
         edge.edges = .left
         edge.cancelsTouchesInView = false
+        edge.delegate = self
         view.addGestureRecognizer(edge)
     }
 
@@ -184,7 +194,11 @@ final class WebPageController: UIViewController {
     func refreshChrome() {
         guard isViewLoaded else { return }
         let stack = navigationController as? FrameNavigationController
-        let isHeaderPage = stack?.tabKey != nil
+        let isTabPage = stack?.tabKey != nil
+        // A public page opened from the sign-in screen (Terms, Privacy) is not in a tab, but has no web logo of its own in
+        // the app, so it gets the header too, with the logo and a back button but no bell or profile.
+        let isPushedBeforeSignIn = stack != nil && !(stack!.isSheet) && !isTabPage && stack!.viewControllers.first !== self
+        let isHeaderPage = isTabPage || isPushedBeforeSignIn
         strip.isHidden = stack?.isSheet ?? false
         band.isHidden = !isHeaderPage
         guard isHeaderPage, let frame = navigator?.chromeSource else {
@@ -201,6 +215,7 @@ final class WebPageController: UIViewController {
             theme: theme,
             title: pageTitle ?? Self.cleanTitle(webView?.title),
             showBack: (stack?.viewControllers.first !== self) || hasInPageHistory,
+            showActions: isTabPage,
             unread: frame.notificationUnread,
             menu: frame.profileMenu())
     }
@@ -248,6 +263,10 @@ final class WebPageController: UIViewController {
         webView.goBack()
     }
 
+    /// This swipe only starts when something is open inside the page. Otherwise the navigation controller's own edge swipe
+    /// (which leaves the page) must get the touch: two edge recognizers cannot both win, and this one would take it.
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool { hasInPageHistory }
+
     @objc private func edgeSwiped(_ gesture: UIScreenEdgePanGestureRecognizer) {
         FrameLog.event("edge swipe state=\(gesture.state.rawValue) inPageHistory=\(hasInPageHistory)")
         guard gesture.state == .ended, hasInPageHistory else { return }
@@ -270,7 +289,6 @@ final class WebPageController: UIViewController {
             navigationItem.hidesBackButton = false
             navigationItem.leftBarButtonItem = nil
         }
-        navigationController?.interactivePopGestureRecognizer?.isEnabled = true
     }
 
     // MARK: Title and progress
@@ -364,12 +382,17 @@ extension WebPageController: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refresh.endRefreshing()
+        navigator?.chromeSource?.hideSplash()
+        #if DEBUG
+        probeWidth()
+        #endif
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         refresh.endRefreshing()
         if (error as NSError).code == NSURLErrorCancelled { return }
         failure.isHidden = false
+        navigator?.chromeSource?.hideSplash()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -380,6 +403,21 @@ extension WebPageController: WKNavigationDelegate {
         load()
     }
 }
+
+#if DEBUG
+extension WebPageController {
+    /// Debug builds log how wide the page is against the screen, and what sticks out, so sideways scrolling can be traced.
+    fileprivate func probeWidth() {
+        let script = """
+        (function(){var w=innerWidth,out=[];document.querySelectorAll('body *').forEach(function(e){var r=e.getBoundingClientRect();if(r.right>w+1&&out.length<6)out.push(e.tagName+'.'+String(e.className).slice(0,40)+' right='+Math.round(r.right));});
+        var vv=window.visualViewport;return JSON.stringify({htmlAttrs:document.documentElement.getAttributeNames().join(','),frame:document.documentElement.dataset.frame,app:document.documentElement.dataset.app,shell:document.documentElement.dataset.shell,vv:typeof window.VVNative,path:location.pathname,scrollW:document.documentElement.scrollWidth,clientW:document.documentElement.clientWidth,innerW:w,vvW:vv&&vv.width,scale:vv&&vv.scale,bodyScrollW:document.body.scrollWidth,sticking:out});})()
+        """
+        webView.evaluateJavaScript(script) { result, _ in
+            if let text = result as? String { FrameLog.event("width: \(text)") }
+        }
+    }
+}
+#endif
 
 // MARK: - JavaScript dialogs and new windows
 

@@ -56,6 +56,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
             tabBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
+        showSplash()
         if let cached = FrameStore.loadState(), cached.signedIn, !cached.bar.isEmpty {
             // Open straight into the bar they had last time. If the session is gone, the page redirects to
             // sign-in and the frame goes back to signed-out.
@@ -67,6 +68,30 @@ final class FrameController: UIViewController, UITabBarDelegate {
         } else {
             showSignedOut(FrameConfig.startURL)
         }
+    }
+
+    // MARK: Loading screen
+
+    private var splash: SplashView?
+
+    /// Covers everything from launch until the first page has loaded (see SplashView). A page that never finishes does
+    /// not hold it for more than a few seconds.
+    private func showSplash() {
+        let splash = SplashView()
+        splash.frame = view.bounds
+        splash.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(splash)
+        self.splash = splash
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in self?.hideSplash() }
+    }
+
+    func hideSplash() {
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "VVHoldSplash") { return } // lets the screen be looked at
+        #endif
+        guard let splash else { return }
+        self.splash = nil
+        UIView.animate(withDuration: 0.25, animations: { splash.alpha = 0 }, completion: { _ in splash.removeFromSuperview() })
     }
 
     // MARK: Signed out

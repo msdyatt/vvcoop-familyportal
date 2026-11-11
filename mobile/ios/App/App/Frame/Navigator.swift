@@ -39,7 +39,9 @@ final class Navigator {
         FrameLog.event("open \(url.path) as \(properties.presentation.rawValue)")
         switch properties.presentation {
         case .push:
-            if leavingSignIn { replace(page, with: url) } else { push(url, from: page) }
+            // Signing in replaces the sign-in page with the portal. A public page (Terms, Privacy) opened from it is pushed, so
+            // there is a way back.
+            if leavingSignIn && url.path.hasPrefix("/family-village") { replace(page, with: url) } else { push(url, from: page) }
         case .replace:
             replace(page, with: url)
         case .sheet:

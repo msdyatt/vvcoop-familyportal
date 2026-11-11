@@ -117,7 +117,7 @@ final class HeaderBandView: UIView {
         return UIFont(descriptor: descriptor, size: size)
     }
 
-    func configure(theme: HeaderTheme, title: String?, showBack: Bool, unread: Int, menu: UIMenu) {
+    func configure(theme: HeaderTheme, title: String?, showBack: Bool, showActions: Bool, unread: Int, menu: UIMenu) {
         backgroundColor = theme.background
         rule.backgroundColor = theme.rule
         logo.image = UIImage(named: theme.logo)
@@ -125,6 +125,8 @@ final class HeaderBandView: UIView {
         titleLabel.textColor = theme.foreground
         titleLabel.isHidden = (title ?? "").isEmpty
         back.isHidden = !showBack
+        bell.isHidden = !showActions
+        profile.isHidden = !showActions
         for button in [back, bell, profile] {
             button.tintColor = theme.foreground
             button.layer.borderColor = theme.rule.cgColor
