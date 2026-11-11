@@ -257,7 +257,8 @@ export default function YearRollover({ years, onSaved, onStatus }: {
               <label className="checkbox-field">
                 <input type="checkbox" checked={options[option.key] && !disabled} disabled={disabled}
                   onChange={(event) => toggleOption(option.key, event.target.checked)} />
-                <span><b>{option.label}</b><span className="sign-hint">{option.hint}</span></span>
+                <b>{option.label}</b>
+                <span className="sign-hint">{option.hint}</span>
               </label>
             </li>;
           })}
@@ -313,8 +314,8 @@ export default function YearRollover({ years, onSaved, onStatus }: {
         <ReviewSummary result={preview} options={options} />
         <label className="checkbox-field">
           <input type="checkbox" checked={makeCurrent} onChange={(event) => setMakeCurrent(event.target.checked)} />
-          <span><b>Also make {preview.target} the current school year</b>
-            <span className="sign-hint">Leave this off to keep running {preview.source} until you are ready. Reports, dues and every child&rsquo;s grade follow the current year. You can use Make current under School years any time.</span></span>
+          <b>Also make {preview.target} the current school year</b>
+          <span className="sign-hint">Leave this off to keep running {preview.source} until you are ready. Reports, dues and every child&rsquo;s grade follow the current year. You can use Make current under School years any time.</span>
         </label>
         <div className="row-actions">
           <button type="button" className="ghost" disabled={busy} onClick={() => setStep(2)}>Back</button>

@@ -8146,8 +8146,8 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 .rollover-panel { display:grid; gap:14px; }
 .rollover-options { display:grid; gap:12px; }
 .rollover-options, .rollover-households { margin:0; padding:0; list-style:none; }
-.rollover-panel .checkbox-field { display:flex; align-items:flex-start; gap:10px; }
-.rollover-panel .checkbox-field > span { display:grid; gap:2px; }
+.rollover-panel .checkbox-field { display:grid; grid-template-columns:auto 1fr; align-items:start; column-gap:10px; row-gap:2px; }
+.rollover-panel .checkbox-field > input { grid-row:1 / span 2; margin-top:3px; }
 .rollover-terms { display:grid; gap:10px; }
 .rollover-term { display:grid; grid-template-columns:minmax(80px,1fr) repeat(2,minmax(0,1fr)); gap:10px; align-items:end; }
 .rollover-households { max-height:360px; }
