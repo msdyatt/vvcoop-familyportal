@@ -724,3 +724,14 @@ html[data-frame] .app-tabbar { display: none !important; }
 html[data-frame][data-app] {
   --tabbar-space: 0px;
 }
+
+/* The frame's navigation bar replaces the page header (title, bell, profile are native). The header
+   component stays mounted: it owns the account, tour and notification logic the frame calls into. */
+html[data-frame] .app-header { display: none !important; }
+
+/* The notification list as a page in the frame's sheet. */
+.notifications-page { max-width: 640px; margin: 0 auto; padding: 8px 16px 24px; }
+.notifications-page ul { margin: 0; padding: 0; list-style: none; }
+.notifications-page li + li { border-top: 1px solid rgba(var(--navy-rgb), .1); }
+.notifications-page .notification-item { width: 100%; }
+.notifications-markall { display: block; margin: 4px 0 8px auto; padding: 8px 14px; color: var(--navy); font: 600 15px var(--sans); background: none; border: 0; cursor: pointer; }

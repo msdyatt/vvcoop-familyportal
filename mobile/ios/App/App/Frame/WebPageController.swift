@@ -141,6 +141,18 @@ final class WebPageController: UIViewController {
         view.addGestureRecognizer(edge)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        refreshChrome()
+    }
+
+    /// The signed-in pages (the ones in a tab's stack) get the bell and the profile button; sheets and the
+    /// sign-in page keep what they were given.
+    func refreshChrome() {
+        guard let frame = navigator?.chromeSource, (navigationController as? FrameNavigationController)?.tabKey != nil else { return }
+        navigationItem.rightBarButtonItems = frame.chromeItems(for: self)
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         navigator?.pageDidAppear(self)
@@ -363,6 +375,9 @@ extension WebPageController: WKScriptMessageHandler {
                 reportedState = state
                 navigator?.pageReportedState(self, state)
             }
+
+        case "notifications":
+            navigator?.chromeSource?.setNotificationUnread(request.payload["unread"] as? Int ?? 0)
 
         case "log":
             FrameLog.event("page: \(request.payload["text"] as? String ?? "")")

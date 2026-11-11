@@ -15,6 +15,7 @@ import { disablePush } from "../../lib/push";
 import AppTabBar from "./app-tab-bar";
 import { TOUR_VERSION, isReturning } from "../../lib/onboarding";
 import OnboardingTour from "./onboarding-tour";
+import { nativeFrame } from "../../lib/native-frame";
 
 type PortalKey = "home" | "admin" | "teacher";
 
@@ -55,6 +56,9 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
   useEffect(() => { loadProfile(); }, []);
 
   useOutsideClick(menuRef, () => setMenuOpen(false));
+
+  // In the iPhone app the frame's navigation bar shows the page's title (and this header is hidden).
+  useEffect(() => { nativeFrame()?.post("title", { title }); }, [title]);
 
   async function signOut() {
     // Stop pushes to this device before the session goes away, so the next

@@ -26,6 +26,8 @@
     ]
   };
   VVNative.post('state', state);
+  VVNative.post('notifications', { unread: 2 });
+  VVNative.post('title', { title: document.title.split(' | ')[0] });
   VVNative.on('action', function (a) {
     VVNative.post('log', { text: 'action ' + a.name });
     var out = document.getElementById('out');

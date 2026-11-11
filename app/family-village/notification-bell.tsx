@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { useOutsideClick } from "../../lib/use-outside-click";
+import { nativeFrame } from "../../lib/native-frame";
 
 type Notification = {
   id: string; kind: string; title: string; body: string | null;
@@ -11,7 +12,7 @@ type Notification = {
 
 const POLL_MS = 60_000;
 
-function timeAgo(iso: string): string {
+export function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(ms / 60_000);
   if (minutes < 1) return "just now";
@@ -81,6 +82,9 @@ export default function NotificationBell() {
   }, [open]);
 
   const unread = items.filter((item) => !item.read_at).length;
+
+  // The iPhone app's frame draws its own bell; it needs the count.
+  useEffect(() => { nativeFrame()?.post("notifications", { unread }); }, [unread]);
 
   async function markRead(id: string) {
     const supabase = getSupabaseBrowserClient();

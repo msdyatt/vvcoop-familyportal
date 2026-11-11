@@ -154,10 +154,15 @@ taps back as navigations. The page does not draw its own bar in the frame.
 
 ### Chrome (PR 3)
 
-Native navigation bar per page: title from the page, a bell with its unread
-count, and a profile button (account, tour, customize, sign out). The bell
-opens a short web page in a sheet (`/family-village/notifications`) that lists
-`notifications` rows and pushes `link_path` when one is tapped.
+Native navigation bar per page (navy, light text, over the same navy status strip as before):
+the title `AppHeader` already has (posted as `title`), a bell with the unread count, and a
+profile button whose menu has Account & security, Customize bottom bar, Take the tour and Sign
+out. The web header is hidden by `html[data-frame] .app-header`; the component stays mounted
+because it owns the account, tour and notification logic, and the frame calls into it with the
+same `action` event the Menu uses. The bell count is `NotificationBell`'s own (`notifications`
+message). The bell opens `/family-village/notifications` (a small web page listing the person's
+`notifications` rows) as a sheet; its path rule has `links: "frame"`, so tapping a notification
+closes the sheet and pushes its `link_path` over the page underneath.
 
 ### Native touches (PR 4)
 

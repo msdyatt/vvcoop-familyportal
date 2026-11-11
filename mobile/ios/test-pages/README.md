@@ -13,4 +13,4 @@ Tabs: start at `/test-frame/signin.html`, press Sign in; `tabs.html`, `photos.ht
 and `teacher.html` send the same `state` message the portal sends.
 
 What each page proves is listed on the page itself. `path-configuration.json` has rules for
-`/test-frame/sheet*` (opens as a sheet) and `/test-frame/replace*` (swaps the current page).
+`/test-frame/sheet*` (opens as a sheet) and `/family-village/notifications` (the bell's sheet) and `/test-frame/replace*` (swaps the current page).
