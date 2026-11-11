@@ -8,5 +8,11 @@
 	<array>
 		<string>webcredentials:family.veritasvillage.org</string>
 	</array>
+	<!-- Apple Pay for dues. The merchant ID is created in the Apple Developer account and linked to Stripe
+	     (docs/native-apple-pay-setup.md); this must match APPLE_MERCHANT_ID in lib/dues-api.ts. -->
+	<key>com.apple.developer.in-app-payments</key>
+	<array>
+		<string>merchant.org.veritasvillage.family</string>
+	</array>
 </dict>
 </plist>
