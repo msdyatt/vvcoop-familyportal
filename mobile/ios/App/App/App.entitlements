@@ -17,5 +17,10 @@
 	<array>
 		<string>merchant.org.veritasvillage.family</string>
 	</array>
+	<!-- Urgent broadcasts (closures, emergencies) are sent as time-sensitive so they get through Focus modes
+	     and the scheduled summary. The App ID needs "Time Sensitive Notifications" enabled in the Apple
+	     Developer portal, or a signed build will be rejected (docs/broadcasts.md). -->
+	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
 </dict>
 </plist>

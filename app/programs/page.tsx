@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import PublicSiteFrame from "../public-site-frame";
-import { calendarSubscribeUrl, googleCalendarAddUrl } from "../../lib/supabase";
+import { calendarSubscribeUrl, googleCalendarAddUrl } from "../../lib/calendar-links";
 
 export const metadata: Metadata = {
   title: "Programs & Schedule | Veritas Village",

@@ -18,6 +18,10 @@ self.addEventListener("push", (event) => {
     icon: "/brand/icon-192.png",
     badge: "/brand/favicon-96.png",
     tag: data.tag || undefined,
+    // An urgent alert stays on screen until it is dealt with, and buzzes again if it replaces an earlier one.
+    requireInteraction: data.urgent === true,
+    renotify: data.urgent === true && Boolean(data.tag),
+    vibrate: data.urgent === true ? [300, 150, 300, 150, 300] : undefined,
     data: { url: data.url || "/family-village/home" },
   }));
 });

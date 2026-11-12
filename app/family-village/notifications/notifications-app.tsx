@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { timeAgo } from "../notification-bell";
+import UrgentBanner from "../urgent-banner";
 
 type Notification = {
   id: string; kind: string; title: string; body: string | null;
@@ -44,6 +45,7 @@ export default function NotificationsApp() {
   const unread = (items ?? []).filter((item) => !item.read_at).length;
 
   return <main className="notifications-page">
+    <UrgentBanner />
     {items === null && <p className="portal-empty">Loading…</p>}
     {items && items.length === 0 && <p className="portal-empty">Nothing yet.</p>}
     {unread > 0 && <button type="button" className="notifications-markall" onClick={markAllRead}>Mark all read</button>}

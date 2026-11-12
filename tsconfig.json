@@ -29,6 +29,8 @@
     "node_modules",
     "supabase/functions",
     "lib/dues.test.ts",
+    "lib/calendar-links.test.ts",
+    "lib/broadcast.test.ts",
     "lib/schedule.test.ts",
     "mobile"
   ]
