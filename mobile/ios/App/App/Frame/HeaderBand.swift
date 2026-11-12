@@ -1,8 +1,8 @@
 import UIKit
 
 /// The colours of a section's header, taken from the web's `--portal-band-*` variables (app/globals.css):
-/// Family is the cream page with a terracotta rule, Teacher a light sage band with a sage rule, and Admin a
-/// navy band with a light terracotta rule.
+/// Family and Teaching (one portal, one look) are the cream page with a terracotta rule, and Admin a navy band
+/// with a light terracotta rule.
 struct HeaderTheme {
     let background: UIColor
     let foreground: UIColor
@@ -12,9 +12,6 @@ struct HeaderTheme {
     var isDark: Bool { logo == "LockupCream" }
 
     static let family = HeaderTheme(background: Brand.cream, foreground: Brand.navy, rule: Brand.terracotta, logo: "LockupNavy")
-    static let teacher = HeaderTheme(
-        background: UIColor(red: 0xE6 / 255, green: 0xE9 / 255, blue: 0xE2 / 255, alpha: 1), foreground: Brand.navy,
-        rule: UIColor(red: 0x6F / 255, green: 0x7D / 255, blue: 0x72 / 255, alpha: 1), logo: "LockupNavy")
     static let admin = HeaderTheme(
         background: Brand.navy, foreground: Brand.cream,
         rule: UIColor(red: 0xD7 / 255, green: 0xA5 / 255, blue: 0x90 / 255, alpha: 1), logo: "LockupCream")
@@ -22,11 +19,9 @@ struct HeaderTheme {
     /// `name` is what the page's header says it belongs to ("home", "teacher", "admin"); without it, the path decides.
     static func resolve(name: String?, path: String) -> HeaderTheme {
         switch name {
-        case "teacher": return .teacher
         case "admin": return .admin
-        case "home": return .family
+        case "home", "teacher": return .family
         default:
-            if path.hasPrefix("/family-village/teacher") { return .teacher }
             if path.hasPrefix("/family-village/admin") { return .admin }
             return .family
         }

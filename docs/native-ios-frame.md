@@ -141,13 +141,14 @@ the bridge, the person's bar, the Menu groups and the unread count
 is told and sends taps back as navigations. The page does not draw its own bar in
 the frame.
 
-**One bar for the whole app.** The web keeps a bar per section (Family, Teacher,
-Admin) that changes as you move between them. In the first version of the frame it
-followed the page the same way, and on a phone that read as the bar jumping around.
-The frame now always uses the person's main ("home") bar. Teacher and Admin pages
-are on it if the person puts them there (the customizer in the frame edits only this
-bar and offers every destination their roles allow), and are a tap away in the Menu
-otherwise. Opening a page that is not on the bar pushes it over the current tab, and
+**One bar for the whole app.** Family and Teaching are one portal on the web too now: one main bar
+and one flat Menu with Teaching items among the family ones (shown to anyone with a class this school
+year or the teacher role, see `lib/teaching-access.ts`). Admin keeps its own bar on the web. In the first
+version of the frame the bar followed the page, and on a phone that read as the bar jumping around, so the
+frame always uses the person's main ("home") bar. Admin pages are on it if the person puts them there (the
+customizer in the frame edits only this bar and offers every destination their roles allow), and are a tap
+away in the Menu otherwise. The Menu message is a list of groups: an untitled one with the portal's items and,
+for admins, one titled "Admin". Opening a page that is not on the bar pushes it over the current tab, and
 the bar does not change. The web and the home-screen app are unchanged.
 
 - A standalone `UITabBar` (native control, gets the system's glass look) so six
@@ -166,7 +167,7 @@ the bar does not change. The web and the home-screen app are unchanged.
 A navy strip behind the status bar (white clock on every page, as the web does in the app), then on every signed-in
 page a native copy of the web's header in the section's colours (`HeaderBand.swift`): the logo on the left, the
 notification bell with its unread count and the profile button on the right, the page's name under them in a serif, and
-the rule along the bottom. Family is the cream page with a terracotta rule, Teacher the light sage band with a sage rule,
+the rule along the bottom. Family and Teaching (one look) are the cream page with a terracotta rule,
 Admin the navy band with a light terracotta rule and the cream logo (the `--portal-band-*` values in `app/globals.css`).
 `AppHeader` tells the frame its title and which section it is (`title` message with `theme`), so a Messages page under
 Family stays Family-coloured. A back button joins the row on pushed pages. The system navigation bar is hidden on these

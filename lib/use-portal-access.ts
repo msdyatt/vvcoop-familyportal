@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "./supabase";
+import { teachesThisYear } from "./teaching-access";
 
 /**
  * Shared entry gate for the staff workspaces.
@@ -61,10 +62,14 @@ export function usePortalAccess(requiredRole: "admin" | "teacher" | "member"): P
       ]);
 
       if (cancelled) return;
-      if (profile?.status !== "active" || !role) { setState("denied"); return; }
+      // Teaching is open to the teacher role and to anyone assigned a class this year (lib/teaching-access.ts).
+      const assigned = !role && profile?.status === "active" && requiredRole === "teacher" && await teachesThisYear(supabase, data.user.id);
+      if (cancelled) return;
+      if (profile?.status !== "active" || (!role && !assigned)) { setState("denied"); return; }
 
       setUserId(data.user.id);
-      setRoles((allRoles ?? []).map((item) => item.role));
+      const held = (allRoles ?? []).map((item) => item.role);
+      setRoles(assigned && !held.includes("teacher") ? [...held, "teacher"] : held);
       setState("ready");
     }
 

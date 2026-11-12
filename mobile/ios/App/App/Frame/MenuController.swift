@@ -25,7 +25,8 @@ final class MenuController: UITableViewController {
         built.append((nil, [.destination(FrameDestination(id: "home-page", label: "Home", href: state.home, icon: "home"))]))
         for group in state.menu {
             let rows = group.items.filter { $0.id != "home" }.map { Row.destination($0) }
-            if !rows.isEmpty { built.append((group.title, rows)) }
+            // Family and Teaching items are one untitled list; only Admin has a heading.
+            if !rows.isEmpty { built.append((group.title.isEmpty ? nil : group.title, rows)) }
         }
         built.append((nil, [
             .action(.customize, "Customize bottom bar", "slider.horizontal.3"),

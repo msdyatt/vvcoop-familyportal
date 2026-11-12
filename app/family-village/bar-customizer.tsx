@@ -7,20 +7,19 @@ import {
 } from "../../lib/nav-prefs";
 
 /**
- * Edits the bottom bar of each section. Every section keeps its own list, so
- * a teacher can have a Family bar that is mostly messages and a Teacher bar
- * that is mostly classes. Changes are held here until Save.
+ * Edits the bottom bar: the main one (Family and Teaching items together) and, for admins, the Admin bar,
+ * which stays separate. Changes are held here until Save.
  */
 export default function BarCustomizer({ roles, prefs, startSection, single = false, onSave, onClose }: {
   roles: string[];
   prefs: NavPrefs;
   startSection: Section;
-  /** The iPhone app has one bar for everything: edit only the main one (and offer Teacher and Admin pages on it). */
+  /** The iPhone app has one bar for everything: edit only the main one (and offer Admin pages on it). */
   single?: boolean;
   onSave: (next: NavPrefs) => Promise<string>;
   onClose: () => void;
 }) {
-  const sections: Section[] = single ? ["home"] : ["home", ...(roles.includes("teacher") ? (["teacher"] as const) : []), ...(roles.includes("admin") ? (["admin"] as const) : [])];
+  const sections: Section[] = single || !roles.includes("admin") ? ["home"] : ["home", "admin"];
   const [section, setSection] = useState<Section>(sections.includes(startSection) ? startSection : "home");
   const [draft, setDraft] = useState<NavPrefs>(() => Object.fromEntries(sections.map((s) => [s, resolveBar(prefs, s, roles).map((d) => d.id)])) as NavPrefs);
   const [status, setStatus] = useState("");
@@ -49,16 +48,17 @@ export default function BarCustomizer({ roles, prefs, startSection, single = fal
     onClose();
   }
 
-  const groups = Array.from(new Set(pool.map((d) => d.group)));
+  // Family and Teaching are one list; Admin is set apart, and labelled only when both are on offer.
+  const areas = Array.from(new Set(pool.map((d) => d.area)));
 
   return <div className="bar-customizer">
-    <p className="field-note">Choose up to {MAX_SLOTS} shortcuts for the bar at the bottom of the screen. Menu always stays at the end. {single ? "The same bar shows everywhere in the app." : "Each section has its own bar."}</p>
+    <p className="field-note">Choose up to {MAX_SLOTS} shortcuts for the bar at the bottom of the screen. Menu always stays at the end. {sections.length > 1 ? "Admin pages have their own bar, so they are never one tap from the main one by accident." : "The same bar shows on every page."}</p>
 
     {sections.length > 1 && <div className="bar-sections" role="tablist" aria-label="Section">
       {sections.map((s) => <button key={s} type="button" role="tab" aria-selected={s === section} className={s === section ? "active" : ""} onClick={() => { setSection(s); setStatus(""); }}>{SECTION_LABELS[s]}</button>)}
     </div>}
 
-    <h3>{single ? "On your bar" : `On the ${SECTION_LABELS[section]} bar`}</h3>
+    <h3>{sections.length > 1 ? `On the ${SECTION_LABELS[section].toLowerCase()}` : "On your bar"}</h3>
     <ol className="bar-chosen">
       {ids.map((id, index) => <li key={id}>
         <span>{label(id)}</span>
@@ -73,11 +73,11 @@ export default function BarCustomizer({ roles, prefs, startSection, single = fal
 
     <h3>Add to the bar</h3>
     {full && <p className="field-note">The bar is full. Remove one to add another.</p>}
-    {groups.map((group) => {
-      const choices = pool.filter((d) => d.group === group && !ids.includes(d.id));
+    {areas.map((area) => {
+      const choices = pool.filter((d) => d.area === area && !ids.includes(d.id));
       if (!choices.length) return null;
-      return <div key={group} className="bar-group">
-        <p className="card-kicker">{group}</p>
+      return <div key={area} className="bar-group">
+        {areas.length > 1 && <p className="card-kicker">{area === "admin" ? "Admin" : "Family and teaching"}</p>}
         <div className="bar-choices">
           {choices.map((d) => <button key={d.id} type="button" className="ghost bar-choice" disabled={full} onClick={() => set([...ids, d.id])}>+ {d.label}</button>)}
         </div>
