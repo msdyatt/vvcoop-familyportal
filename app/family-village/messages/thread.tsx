@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { PRIVATE_BUCKET, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { resizeImage } from "../../../lib/image-resize";
-import { MESSAGE_COLUMNS, REACTIONS, conversationTitle, dayLabel, isChannel, postingBlock, shortTime, snippet, splitMentions, type ConversationRow, type MessageRow, type Person, type Reaction } from "../../../lib/messages";
+import { MESSAGE_COLUMNS, REACTIONS, canEditMessage, conversationTitle, dayLabel, isChannel, postingBlock, shortTime, snippet, splitMentions, type ConversationRow, type MessageRow, type Person, type Reaction } from "../../../lib/messages";
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
 import ChannelDetails from "./channel-details";
@@ -71,6 +71,8 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   // The message whose actions (react, reply, remove, report) are showing; tap a message to open them.
   const [activeId, setActiveId] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  // A message of yours being edited in place: its id and the text so far.
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [replyingTo, setReplyingTo] = useState<MessageRow | null>(null);
   // People chosen from the @ list: display name -> id. Kept only if the name is still in the text when sending.
   const [mentionIds, setMentionIds] = useState<Map<string, string>>(new Map());
@@ -257,6 +259,32 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     await onChanged();
   }
 
+  // Opening the editor puts the cursor at the end of the text.
+  const editingId = editing?.id ?? null;
+  useEffect(() => {
+    if (!editingId) return;
+    const field = document.getElementById("messages-edit-field") as HTMLTextAreaElement | null;
+    field?.focus();
+    field?.setSelectionRange(field.value.length, field.value.length);
+  }, [editingId]);
+
+  function startEdit(message: MessageRow) {
+    setEditing({ id: message.id, text: message.body ?? "" });
+    setActiveId(null); setPickerFor(null);
+  }
+
+  async function saveEdit() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !editing || busy) return;
+    setBusy(true); setStatus("");
+    const { error } = await supabase.rpc("edit_own_message", { p_message_id: editing.id, p_body: editing.text });
+    setBusy(false);
+    if (error) { setStatus(error.message); return; }
+    setEditing(null);
+    await fetchLatest();
+    await onChanged();
+  }
+
   async function submitReport() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || !reporting) return;
@@ -392,9 +420,11 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           </span>}
           <span className={`messages-meta${open ? " open" : ""}${showTime ? " timed" : ""}`}>
             {(showTime || open) && <time dateTime={message.created_at}>{shortTime(message.created_at)}</time>}
+            {message.edited_at && !message.deleted_at && <span className="messages-edited">Edited</span>}
             {!message.deleted_at && <span className="messages-actions">
               {!archivedBlock && <button type="button" onClick={() => setPickerFor(pickerFor === message.id ? null : message.id)}>React</button>}
               {!blocked && <button type="button" onClick={() => { setReplyingTo(message); setActiveId(null); composerRef.current?.focus(); }}>Reply</button>}
+              {mine && !archivedBlock && canEditMessage(message) && <button type="button" onClick={() => startEdit(message)}>Edit</button>}
               {mine && <button type="button" onClick={() => removeOwn(message)}>Remove</button>}
               {!mine && !message.system_label && <button type="button" onClick={() => { setReporting(message); setReason(""); }}>Report</button>}
             </span>}
@@ -469,14 +499,24 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
                   : <>
                       {photo}
                       {quote}
-                      {message.body && <p>{splitMentions(message.body, mentionNames).map((part, index) => part.mention
-                          ? <span key={index} className={`messages-mention${part.text === `@${myName}` ? " me" : ""}`}>{part.text}</span>
-                          : part.text)}</p>}
+                      {editing?.id === message.id
+                        ? <div className="messages-edit">
+                            <textarea value={editing.text} rows={2} maxLength={4000} id="messages-edit-field" aria-label="Edit your message" disabled={busy}
+                              onChange={(event) => setEditing({ id: message.id, text: event.target.value })}
+                              onKeyDown={(event) => { if (event.key === "Escape") setEditing(null); }} />
+                            <span className="messages-edit-actions">
+                              <button type="button" className="ghost" onClick={() => setEditing(null)} disabled={busy}>Cancel</button>
+                              <button type="button" onClick={() => void saveEdit()} disabled={busy || (!editing.text.trim() && !message.image_path)}>Save</button>
+                            </span>
+                          </div>
+                        : message.body && <p>{splitMentions(message.body, mentionNames).map((part, index) => part.mention
+                            ? <span key={index} className={`messages-mention${part.text === `@${myName}` ? " me" : ""}`}>{part.text}</span>
+                            : part.text)}</p>}
                     </>}
+                {reactionChips}
               </div>
             </div>
-            {reactionChips}
-            {meta(endsRun)}
+            {meta(endsRun || !!message.edited_at)}
           </div>
         </div>;
       })}
