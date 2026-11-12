@@ -25,9 +25,10 @@ const DocumentsTab = dynamic(() => import("./documents-tab"));
 const ReportsTab = dynamic(() => import("./reports-tab"));
 const DuesTab = dynamic(() => import("./dues-tab"));
 const ExpensesTab = dynamic(() => import("./expenses-tab"));
+const BroadcastsTab = dynamic(() => import("./broadcasts-tab"));
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-const TABS = ["dashboard", "invitations", "families", "classes", "documents", "dues", "expenses", "news", "reports", "activity", "message-reports", "integrations"] as const;
+const TABS = ["dashboard", "invitations", "families", "classes", "documents", "dues", "expenses", "news", "broadcasts", "reports", "activity", "message-reports", "integrations"] as const;
 type Tab = (typeof TABS)[number];
 
 async function signOutToEntry() {
@@ -82,7 +83,7 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
@@ -94,6 +95,7 @@ export default function AdminWorkspace() {
       <button className={tab === "dues" ? "active" : ""} onClick={() => setTab("dues")}>Dues</button>
       <button className={tab === "expenses" ? "active" : ""} onClick={() => setTab("expenses")}>Expenses</button>
       <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News &amp; calendar</button>
+      <button className={tab === "broadcasts" ? "active" : ""} onClick={() => setTab("broadcasts")}>Broadcasts</button>
       <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
       <button className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}>Activity</button>
       <button className={tab === "message-reports" ? "active" : ""} onClick={() => setTab("message-reports")}>Messaging</button>
@@ -114,6 +116,7 @@ export default function AdminWorkspace() {
     {tab === "dues" && <DuesTab actorUserId={userId} />}
     {tab === "expenses" && <ExpensesTab />}
     {tab === "news" && <NewsTab actorUserId={userId} />}
+    {tab === "broadcasts" && <BroadcastsTab />}
     {tab === "reports" && <ReportsTab />}
     {tab === "activity" && <ActivityTab />}
     {tab === "message-reports" && <MessageReportsTab />}

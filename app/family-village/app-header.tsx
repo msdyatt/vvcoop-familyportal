@@ -9,6 +9,7 @@ import DetailModal from "./detail-modal";
 import AccountSettings from "./account-settings";
 import Avatar from "./avatar";
 import NotificationBell from "./notification-bell";
+import UrgentBanner from "./urgent-banner";
 import MessagesLink from "./messages/messages-link";
 import { clearAvatarUrlCache, getSignedFileUrl } from "../../lib/storage";
 import { disablePush } from "../../lib/push";
@@ -70,6 +71,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
   }
 
   return <>
+    <UrgentBanner />
     <header className="app-header">
       <a href="/family-village/home" className="app-header-brand" aria-label="Veritas Village home">
         {/* The guide's own navigation-bar example uses the primary horizontal

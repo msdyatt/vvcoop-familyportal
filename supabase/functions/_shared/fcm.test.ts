@@ -89,3 +89,35 @@ Deno.test("sendFcm: a failed key exchange is a failure, never a thrown error", a
   assertEquals(await sendFcm(account, "t", { title: "T", body: "B", url: "/x", tag: "t" }, failing), "failed");
   await getAccessToken(account, fakeGoogle(200).fetcher).then((t) => assertEquals(t, "ya29.fake"));
 });
+
+Deno.test("buildFcmMessage: an ordinary notification carries no urgent markers at all", () => {
+  const { message } = buildFcmMessage("tok", { title: "Hi", body: "There", url: "/x", tag: "n1" });
+  assertEquals(message.apns.payload.aps, { sound: "default" });
+  assertEquals(message.android.notification, { tag: "n1" });
+  assertEquals(message.data, { url: "/x", tag: "n1" });
+});
+
+Deno.test("buildFcmMessage: an urgent alert is time-sensitive on iOS and on the high-importance channel on Android", () => {
+  const { message } = buildFcmMessage("tok", { title: "Closed", body: "Snow", url: "/family-village/home?vvn=n1", tag: "n1", urgent: true });
+  assertEquals(message.apns.payload.aps, { sound: "default", "interruption-level": "time-sensitive" });
+  assertEquals(message.apns.headers["apns-priority"], "10");
+  assertEquals(message.android.priority, "HIGH");
+  assertEquals(message.android.notification, { tag: "n1", channel_id: "urgent" });
+  assertEquals(message.data, { url: "/family-village/home?vvn=n1", tag: "n1", urgent: "1" });
+});
+
+Deno.test("sendFcm: the request that goes out for an urgent alert carries the time-sensitive level (fake network)", async () => {
+  resetTokenCache();
+  const { account } = await testAccount();
+  const bodies: unknown[] = [];
+  const fakeFetch = ((input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("oauth2")) return Promise.resolve(new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }), { status: 200 }));
+    bodies.push(JSON.parse(String(init?.body)));
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as typeof fetch;
+  const result = await sendFcm(account, "device-1", { title: "Closed", body: "Snow", url: "/x", tag: "n9", urgent: true }, fakeFetch);
+  assertEquals(result, "sent");
+  assertEquals((bodies[0] as { message: { apns: { payload: { aps: Record<string, string> } } } }).message.apns.payload.aps["interruption-level"], "time-sensitive");
+  resetTokenCache();
+});

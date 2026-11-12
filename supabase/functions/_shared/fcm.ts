@@ -8,7 +8,11 @@
  */
 
 export type ServiceAccount = { project_id: string; client_email: string; private_key: string; token_uri?: string };
-export type PushPayload = { title: string; body: string; url: string; tag: string };
+/** `urgent` is an urgent broadcast: iOS delivers it as time-sensitive, Android on its high-importance channel. */
+export type PushPayload = { title: string; body: string; url: string; tag: string; urgent?: boolean };
+
+/** The Android notification channel the app creates for urgent alerts (MainActivity.java). */
+export const URGENT_ANDROID_CHANNEL = "urgent";
 export type FcmResult = "sent" | "gone" | "failed";
 
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
@@ -56,15 +60,25 @@ export async function getAccessToken(account: ServiceAccount, fetcher: typeof fe
 
 export function resetTokenCache() { cached = null; }
 
-/** One FCM message. `url` and `tag` ride in `data`; the app routes the tap from it. */
+/**
+ * One FCM message. `url` and `tag` ride in `data`; the app routes the tap from it.
+ *
+ * Urgent adds the time-sensitive interruption level on iOS, which breaks through Focus modes and
+ * the scheduled summary (it needs the Time Sensitive Notifications capability on the App ID and
+ * in the app's entitlements), and the high-importance channel on Android.
+ */
 export function buildFcmMessage(deviceToken: string, payload: PushPayload) {
+  const urgent = payload.urgent === true;
   return {
     message: {
       token: deviceToken,
       notification: { title: payload.title, body: payload.body },
-      data: { url: payload.url, tag: payload.tag },
-      android: { priority: "HIGH", notification: { tag: payload.tag } },
-      apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
+      data: { url: payload.url, tag: payload.tag, ...(urgent ? { urgent: "1" } : {}) },
+      android: { priority: "HIGH", notification: { tag: payload.tag, ...(urgent ? { channel_id: URGENT_ANDROID_CHANNEL } : {}) } },
+      apns: {
+        headers: { "apns-priority": "10" },
+        payload: { aps: { sound: "default", ...(urgent ? { "interruption-level": "time-sensitive" } : {}) } },
+      },
     },
   };
 }
