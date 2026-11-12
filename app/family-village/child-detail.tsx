@@ -103,7 +103,9 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
       // vanish from the picker the moment terms were introduced.
       let classQuery = supabase.from("classes")
         .select(`id,title,description,is_elective,grades,${SCHEDULE_SELECT},class_terms(academic_terms(starts_on,ends_on))`)
-        .eq("active", true);
+        .eq("active", true)
+        // Classes that place themselves by grade are never offered for a family to pick.
+        .is("subject", null);
       if (period.electives_only) classQuery = classQuery.eq("is_elective", true);
 
       const [{ data: classRows2 }, { data: enrolledRows }] = await Promise.all([
