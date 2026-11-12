@@ -140,7 +140,7 @@ begin
 
   -- Problems with the classes themselves, found before anyone is placed.
   for v_subject in
-    select lower(btrim(c.subject)) as key, min(btrim(c.subject)) as label
+    select lower(btrim(c.subject)) as key, (array_agg(btrim(c.subject) order by c.title, c.id))[1] as label
     from public.classes c
     where c.school_year_id = p_year and c.active and not c.is_demo and not c.is_elective and c.subject is not null
     group by lower(btrim(c.subject))
@@ -181,7 +181,7 @@ begin
     v_grade := private.grade_for_year(v_child.birthdate, v_child.age_band_override, v_child.age_band, p_year);
 
     for v_subject in
-      select lower(btrim(c.subject)) as key, min(btrim(c.subject)) as label
+      select lower(btrim(c.subject)) as key, (array_agg(btrim(c.subject) order by c.title, c.id))[1] as label
       from public.classes c
       where c.school_year_id = p_year and c.active and not c.is_demo and not c.is_elective and c.subject is not null
       group by lower(btrim(c.subject))

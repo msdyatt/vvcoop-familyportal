@@ -196,7 +196,7 @@ insert into public.enrollment_periods (id, title, opens_at, closes_at, active, e
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
 set local role authenticated;
 select lives_ok($$select public.family_self_enroll('00000000-0000-0000-0000-0000000000f0', '00000000-0000-0000-0000-0000000000c5', '00000000-0000-0000-0000-00000000aa02')$$, 'a family can still enroll a child in an elective');
-select throws_ok($$select public.family_self_enroll('00000000-0000-0000-0000-0000000000f0', '00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-00000000aa03')$$, 'P0001', '%can''t be enrolled right now%', 'but not in a grade-assigned class, even in an open window and the right grade');
+select throws_ok($$select public.family_self_enroll('00000000-0000-0000-0000-0000000000f0', '00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-00000000aa03')$$, 'P0001', 'That class can''t be enrolled right now -- it may conflict with another class at the same time, or no longer match this child''s grade.', 'but not in a grade-assigned class, even in an open window and the right grade');
 reset role;
 
 -- ---- the class itself ---------------------------------------------------------------------------------------------------
