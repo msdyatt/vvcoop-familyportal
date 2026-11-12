@@ -17,10 +17,15 @@ import AppTabBar from "./app-tab-bar";
 import { TOUR_VERSION, isReturning } from "../../lib/onboarding";
 import OnboardingTour from "./onboarding-tour";
 import { nativeFrame } from "../../lib/native-frame";
+import { clearNavCache, readCachedTeaches, sectionOf, withTeaching, writeCachedTeaches, type PortalKey } from "../../lib/nav-prefs";
+import { teachesThisYear } from "../../lib/teaching-access";
 
-type PortalKey = "home" | "admin" | "teacher";
 
-export default function AppHeader({ current, roles, title, subtitle }: { current: PortalKey; roles: string[]; title: string; subtitle?: string }) {
+export default function AppHeader({ current, roles: held, title, subtitle }: { current: PortalKey; roles: string[]; title: string; subtitle?: string }) {
+  // Teaching shows for anyone with a class this year, not by role alone (lib/teaching-access.ts). The last answer is
+  // kept on the device so it is right from the first paint, then confirmed once the person is known.
+  const [teaches, setTeaches] = useState(() => (typeof window === "undefined" ? false : readCachedTeaches()));
+  const roles = withTeaching(held, teaches);
   const [email, setEmail] = useState("");
   const [initial, setInitial] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -35,6 +40,7 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
     if (!supabase) return;
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
+    void teachesThisYear(supabase, data.user.id).then((yes) => { setTeaches(yes); writeCachedTeaches(yes); });
     const { data: profile } = await supabase.from("profiles").select("display_name,email,avatar_path,onboarding_version,created_at").eq("id", data.user.id).single();
     const resolvedEmail = profile?.email || data.user.email || "";
     const name = profile?.display_name || resolvedEmail;
@@ -59,20 +65,21 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
   useOutsideClick(menuRef, () => setMenuOpen(false));
 
   // In the iPhone app the frame draws this header natively (logo, title, bell, profile) in the section's colours, and this one is hidden.
-  useEffect(() => { nativeFrame()?.post("title", { title, theme: current }); }, [title, current]);
+  useEffect(() => { nativeFrame()?.post("title", { title, theme: sectionOf(current) }); }, [title, current]);
 
   async function signOut() {
     // Stop pushes to this device before the session goes away, so the next
     // person to use a shared phone or computer doesn't receive them.
     await disablePush().catch(() => {});
     clearAvatarUrlCache();
+    clearNavCache();
     await getSupabaseBrowserClient()?.auth.signOut();
     window.location.assign("/family-village");
   }
 
   return <>
     <UrgentBanner />
-    <header className="app-header">
+    <header className={`app-header${current === "admin" ? " app-header-admin" : ""}`}>
       <a href="/family-village/home" className="app-header-brand" aria-label="Veritas Village home">
         {/* The guide's own navigation-bar example uses the primary horizontal
             lockup, and pairs the cream variant with dark fields -- which is
@@ -88,9 +95,9 @@ export default function AppHeader({ current, roles, title, subtitle }: { current
         {/* In the apps the header takes the colour of the screen, so Admin needs the navy lockup there too. */}
         {current === "admin" && <Image className="app-header-lockup on-light" src="/brand/lockup-horizontal-navy.png" alt="" aria-hidden="true" width={900} height={310} />}
       </a>
-      <div className="app-header-title"><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
+      <div className="app-header-title">{current === "admin" && <span className="admin-chip app-header-admin-chip">Admin</span>}<h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
       <div className="app-header-actions">
-        <PortalNav current={current} roles={roles} />
+        <PortalNav roles={roles} />
         <a className="messages-link" href="/family-village/photos">Photos</a>
         <MessagesLink />
         <NotificationBell />

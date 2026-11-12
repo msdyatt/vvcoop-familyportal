@@ -3485,6 +3485,64 @@ footer nav a:hover {
   text-transform:uppercase;
 }
 
+.portal-nav-list {
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+
+.portal-nav-list ul {
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+
+/* Admin is set apart in every menu: a navy block, so it is not confused with the family pages. */
+.app-menu-admin {
+  margin-top:6px;
+  padding:8px;
+  background:var(--navy);
+  color:var(--cream);
+}
+
+.app-menu-admin > p {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:2px 0 6px;
+  color:var(--sage-on-navy);
+  font-size:11px;
+}
+
+.portal-nav-menu .app-menu-admin a {
+  color:var(--cream);
+  font-weight:600;
+}
+
+.portal-nav-menu .app-menu-admin a:hover {
+  background:rgba(255,255,255,.1);
+}
+
+.admin-chip {
+  display:inline-block;
+  padding:2px 8px;
+  color:var(--navy);
+  font:700 10px/16px var(--sans);
+  letter-spacing:.8px;
+  text-transform:uppercase;
+  background:var(--terracotta-on-navy);
+}
+
+/* The Admin header is the only one that looks different: navy, a little tighter, and marked. */
+.app-header-admin-chip {
+  margin-bottom:6px;
+}
+
+.app-header-admin {
+  padding-top:calc(12px + env(safe-area-inset-top));
+  padding-bottom:12px;
+}
+
 .admin-tabs {
   display:flex;
   gap:8px;
@@ -4952,7 +5010,7 @@ footer nav a:hover {
    the guide asks for; they differ by the header band and one accent colour.
 
      Family   terracotta accent, cream band with a terracotta rule
-     Teacher  Hill Sage accent, sage-tinted band
+     Teacher  the same header as Family (Hill Sage stays an accent on its controls)
      Admin    navy band, reversed -- the cream lockup and the lighter
               terracotta both clear AA against navy, plain terracotta does not
               (3.4:1, which fails for text below 18.66px bold)
@@ -4970,11 +5028,11 @@ footer nav a:hover {
   --portal-band-rule:var(--terracotta);
 }
 
+/* Teaching pages keep the sage accent for their controls, but the header is the Family one (no band of its own):
+   Family and Teaching are one portal. Only Admin has a different header. */
 .workspace-preview {
   --portal-accent:var(--sage);
   --portal-accent-text:var(--sage-text);
-  --portal-band-bg:var(--panel);
-  --portal-band-rule:var(--sage);
 }
 
 .admin-live {

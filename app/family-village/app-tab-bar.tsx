@@ -3,17 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import {
-  availableDestinations, cleanPrefs, isActive, readCachedPrefs, readLastSection, resolveBar, writeCachedPrefs, writeLastSection,
-  type IconName, type NavPrefs, type Section,
+  cleanPrefs, isActive, readCachedPrefs, readLastSection, resolveBar, sectionOf, writeCachedPrefs, writeLastSection,
+  type IconName, type NavPrefs, type PortalKey, type Section,
 } from "../../lib/nav-prefs";
+import PortalMenuItems from "./portal-menu-items";
 import { useUnreadCount } from "./messages/messages-link";
 import { buildFrameState, nativeFrame } from "../../lib/native-frame";
 import BarCustomizer from "./bar-customizer";
 import DetailModal from "./detail-modal";
 
 type Props = {
-  /** The section this page belongs to. Messages and Photos belong to whichever was visited last. */
-  current: Section;
+  /** The page's own area. The Teacher pages are part of the main portal; Messages, Photos and Calendar belong to whichever bar was visited last. */
+  current: PortalKey;
+  /** What the person may use: their roles, plus "teacher" when they teach this year (AppHeader works that out). */
   roles: string[];
   onOpenAccount: () => void;
   onTour: () => void;
@@ -63,8 +65,8 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   const [search, setSearch] = useState(() => (typeof window === "undefined" ? "" : window.location.search));
 
   const crossSection = /^\/family-village\/(messages|photos)(\/|$)/.test(path);
-  const wanted: Section = crossSection ? readLastSection() : current;
-  const section: Section = wanted === "admin" && !roles.includes("admin") ? "home" : wanted === "teacher" && !roles.includes("teacher") ? "home" : wanted;
+  const wanted: Section = crossSection ? readLastSection() : sectionOf(current);
+  const section: Section = wanted === "admin" && !roles.includes("admin") ? "home" : wanted;
 
   async function loadPrefs() {
     const supabase = getSupabaseBrowserClient();
@@ -83,7 +85,7 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { void loadPrefs(); }, []);
 
-  useEffect(() => { if (!crossSection) writeLastSection(current); }, [crossSection, current]);
+  useEffect(() => { if (!crossSection) writeLastSection(sectionOf(current)); }, [crossSection, current]);
 
   useEffect(() => {
     const onChange = () => { setHash(window.location.hash); setSearch(window.location.search); };
@@ -120,7 +122,10 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
     };
   }, []);
 
-  async function savePrefs(next: NavPrefs) {
+  async function savePrefs(changes: NavPrefs) {
+    // The old Teacher bar was merged into the main one when prefs were read; it is not written back.
+    const next: NavPrefs = { ...prefs, ...changes };
+    delete next.teacher;
     setPrefs(next);
     writeCachedPrefs(next);
     const supabase = getSupabaseBrowserClient();
@@ -149,7 +154,7 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   }), []);
 
   return <>
-    <nav className={`app-tabbar${bar.length >= 5 ? " many" : ""}`} aria-label="Main">
+    <nav className={`app-tabbar${bar.length >= 5 ? " many" : ""}${section === "admin" ? " admin" : ""}`} aria-label="Main">
       {bar.map((dest) => {
         const active = isActive(dest, path, hash, search);
         const badge = dest.id === "messages" ? unread : 0;
@@ -166,15 +171,7 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
 
     {menuOpen && <DetailModal title="Menu" backLayer={false} onClose={() => setMenuOpen(false)}>
       <ul className="app-menu">
-        <li><a href="/family-village/home">Family home</a></li>
-        {(["Family", "Everywhere", "Teaching", "Administration"] as const).map((group) => {
-          const items = availableDestinations(roles).filter((d) => d.group === group && d.id !== "home");
-          if (!items.length) return null;
-          return <li key={group} className="app-menu-group">
-            <p>{group === "Everywhere" ? "Anywhere in the portal" : group === "Teaching" ? "Teacher" : group === "Administration" ? "Admin" : group}</p>
-            <ul>{items.map((d) => <li key={d.id}><a className="app-menu-sub" href={d.href}>{d.label}</a></li>)}</ul>
-          </li>;
-        })}
+        <PortalMenuItems roles={roles} />
         <li><button type="button" onClick={() => { setMenuOpen(false); setEditing(true); }}>Customize bottom bar</button></li>
         <li><button type="button" onClick={() => { setMenuOpen(false); onOpenAccount(); }}>Account &amp; security</button></li>
         <li><button type="button" onClick={() => { setMenuOpen(false); onTour(); }}>Take the tour</button></li>

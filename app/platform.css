@@ -664,35 +664,45 @@ html[data-app] dialog.child-detail-panel button:not(.child-detail-close):not(.ba
   height: 22px;
 }
 
-.app-menu .app-menu-group {
-  border-top: 1px solid rgba(var(--navy-rgb), .1);
+/* Admin in the Menu sheet: its own navy block after the family and teaching items. */
+.app-menu .app-menu-admin {
+  margin: 14px 0 6px;
+  padding: 10px 12px 6px;
+  background: var(--navy);
+  border-radius: 14px;
 }
 
-.app-menu .app-menu-group > p {
-  margin: 14px 4px 0;
-  color: var(--sage-text);
-  font: 700 11px var(--sans);
-  letter-spacing: .6px;
-  text-transform: uppercase;
+.app-menu .app-menu-admin > p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+  color: var(--sage-on-navy);
+  font: 600 12px var(--sans);
 }
 
-.app-menu .app-menu-group ul {
+.app-menu .app-menu-admin ul {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.app-menu .app-menu-group li + li {
-  border-top: 0;
+.app-menu .app-menu-admin li + li {
+  border-top: 1px solid rgba(255, 255, 255, .12);
+}
+
+.app-menu .app-menu-admin a.app-menu-sub {
+  padding: 12px 4px;
+  color: var(--cream);
+  font-size: 16px;
 }
 
 /* ---- The header takes the colour of the screen in the apps ------------------------
-   Family, Teacher and Admin each had their own coloured band. In the apps the
-   header is the screen itself, with a hairline under it, so the top of every
-   page reads as part of the page. (A browser tab keeps the bands.) */
+   Family and Teaching share one look: in the apps the header is the screen itself, with a hairline under
+   it, so the top of every page reads as part of the page. Admin keeps its navy band here too (and its
+   cream logo), so it is obvious you are in the administration area. (A browser tab keeps the bands.) */
 html[data-app] .live-portal,
-html[data-app] .workspace-preview,
-html[data-app] .admin-live {
+html[data-app] .workspace-preview {
   --portal-band-bg: transparent;
   --portal-band-fg: var(--navy);
   --portal-band-muted: var(--sage-text);
@@ -703,17 +713,14 @@ html[data-app] .app-header {
   border-bottom-width: 1px;
 }
 
-html[data-app] .app-header-lockup.on-dark {
-  display: none;
-}
-
-html[data-app] .app-header-lockup.on-light {
-  display: block;
-}
 
 /* The bell's outline needs more than the hairline now that the header has no band behind it. */
 html[data-app] .notification-bell-button {
   border-color: rgba(var(--navy-rgb), .28);
+}
+
+html[data-app] .admin-live .notification-bell-button {
+  border-color: var(--portal-band-rule);
 }
 
 /* --- the iPhone app's native frame ------------------------------------------------
@@ -744,3 +751,56 @@ html[data-frame] .public-header-logo { display: none !important; }
 /* The page itself never scrolls sideways in the app. Wide things (tables, the calendar grid) scroll inside the page. */
 html[data-frame],
 html[data-frame] body { overflow-x: clip; max-width: 100%; }
+
+/* --- Admin in the apps: denser, navy and marked -------------------------------------
+   Admin is a working area, not the family's home page: smaller type and padding to fit more, a navy header
+   and bar, and an "Admin" chip, so it is hard to be in it without knowing. */
+html[data-app] .admin-live {
+  --portal-pad: 14px;
+  font-size: 14px;
+}
+
+html[data-app] .admin-live .app-header {
+  margin-bottom: 8px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  padding-bottom: 8px;
+}
+
+html[data-app] .admin-live .app-header-title h1 {
+  font-size: 18px;
+}
+
+html[data-app] .admin-live table,
+html[data-app] .admin-live td,
+html[data-app] .admin-live th,
+html[data-app] .admin-live li {
+  font-size: 13px;
+}
+
+html[data-app] .app-tabbar.admin .app-tab {
+  color: rgba(250, 247, 241, .72);
+}
+
+html[data-app][data-platform="ios"] .app-tabbar.admin {
+  background: rgba(11, 42, 61, .9);
+  border-color: rgba(255, 255, 255, .16);
+}
+
+html[data-app][data-platform] .app-tabbar.admin .app-tab.active {
+  color: #fff;
+  background: rgba(255, 255, 255, .16);
+  box-shadow: none;
+}
+
+html[data-app][data-platform="android"] .app-tabbar.admin {
+  background: var(--navy);
+}
+
+html[data-app][data-platform="android"] .app-tabbar.admin .app-tab.active {
+  background: none;
+}
+
+html[data-app][data-platform="android"] .app-tabbar.admin .app-tab.active .app-tab-icon {
+  color: var(--navy);
+  background: var(--terracotta-on-navy);
+}
