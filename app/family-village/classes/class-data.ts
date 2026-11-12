@@ -216,6 +216,13 @@ export type ClassPageData = {
   /** How the person stands to this class. A person who is none of these is shown nothing. */
   isLead: boolean;
   isAssistant: boolean;
+  /**
+   * Acting as the co-op's administrator on this class. Only true for an administrator with no link of their
+   * own to it: one who teaches the class has the lead or assistant powers, and one whose child is enrolled
+   * sees it as a parent does. Being an administrator somewhere never turns a parent's view of their own
+   * child's class into a teacher's (adding files and dates, starting the class chat, messaging other
+   * families); that belongs to the class's teachers.
+   */
   isAdmin: boolean;
   /** Their own children enrolled here (any viewer). */
   kids: Kid[];
@@ -267,7 +274,7 @@ export async function loadClassPage(supabase: SupabaseClient, userId: string, cl
     : { data: [] };
 
   // A parent is shown their own children and nobody else's, whatever else came back.
-  const seesWholeClass = !!mine || isAdmin;
+  const seesWholeClass = !!mine || (isAdmin && !kids.length);
   const roster = (seesWholeClass ? everyone : everyone.filter((child) => ownIds.has(child.id)))
     .map((child) => ({ id: child.id, name: [child.first_name, child.last_name].filter(Boolean).join(" "), avatarPath: child.avatar_path, grade: child.age_band }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -276,7 +283,7 @@ export async function loadClassPage(supabase: SupabaseClient, userId: string, cl
     klass: core(classRow as unknown as RawClass, today),
     isLead: mine?.assignment_role === "lead",
     isAssistant: mine?.assignment_role === "assistant",
-    isAdmin,
+    isAdmin: isAdmin && !mine && !kids.length,
     kids,
     teachers: allTeachers.map(teacherFromRow).filter((teacher) => teacher.name).sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === "lead" ? -1 : 1)),
     roster,
