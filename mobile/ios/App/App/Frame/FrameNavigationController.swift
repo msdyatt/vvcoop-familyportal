@@ -41,10 +41,10 @@ final class FrameNavigationController: UINavigationController, UINavigationContr
         edge.edges = .left
         view.addGestureRecognizer(edge)
 
-        let foreground = style == .navy ? Brand.cream : Brand.navy
+        let foreground = style == .navy ? Brand.cream : Brand.ink
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = style == .navy ? Brand.navy : Brand.cream
+        appearance.backgroundColor = style == .navy ? Brand.band : Brand.canvas
         appearance.shadowColor = .clear
         appearance.titleTextAttributes = [.foregroundColor: foreground, .font: UIFont.systemFont(ofSize: 17, weight: .semibold)]
         navigationBar.standardAppearance = appearance
@@ -83,7 +83,7 @@ final class FrameNavigationController: UINavigationController, UINavigationContr
     /// Pages choose their own clock colour (it depends on the header's colour); sheets use the bar's.
     override var childForStatusBarStyle: UIViewController? { isSheet ? nil : topViewController }
 
-    override var preferredStatusBarStyle: UIStatusBarStyle { style == .navy ? .lightContent : .darkContent }
+    override var preferredStatusBarStyle: UIStatusBarStyle { style == .navy ? .lightContent : .default }
 
     // MARK: Transition
 

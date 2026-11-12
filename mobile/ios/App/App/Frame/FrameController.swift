@@ -33,14 +33,15 @@ final class FrameController: UIViewController, UITabBarDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = Brand.cream
+        Brand.applyStoredTheme()
+        view.backgroundColor = Brand.canvas
 
         container.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(container)
 
         tabBar.translatesAutoresizingMaskIntoConstraints = false
         tabBar.delegate = self
-        tabBar.tintColor = Brand.navy
+        tabBar.tintColor = Brand.selection
         tabBar.isHidden = true
         view.addSubview(tabBar)
 

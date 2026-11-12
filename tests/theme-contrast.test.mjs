@@ -11,17 +11,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const strip = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "");
+const css = strip(readFileSync(new URL("../app/globals.css", import.meta.url), "utf8"));   // the roles, for the light theme
+const themeCss = strip(readFileSync(new URL("../app/theme.css", import.meta.url), "utf8")); // dark, and paper
 
 /** Body of the first top-level-or-nested block whose selector text is exactly `selector`. */
-function blockBody(selector, from = 0) {
-  const at = css.indexOf(selector + " {", from) >= 0 ? css.indexOf(selector + " {", from) : css.indexOf(selector + "{", from);
+function blockBody(source, selector, from = 0) {
+  const at = source.indexOf(selector + " {", from) >= 0 ? source.indexOf(selector + " {", from) : source.indexOf(selector + "{", from);
   if (at < 0) return null;
-  const open = css.indexOf("{", at);
+  const open = source.indexOf("{", at);
   let depth = 0;
-  for (let i = open; i < css.length; i++) {
-    if (css[i] === "{") depth++;
-    else if (css[i] === "}" && --depth === 0) return css.slice(open + 1, i);
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === "{") depth++;
+    else if (source[i] === "}" && --depth === 0) return source.slice(open + 1, i);
   }
   return null;
 }
@@ -33,10 +35,12 @@ function props(body) {
   return out;
 }
 
-const light = props(blockBody(":root"));
-const darkAttr = blockBody('html[data-theme="dark"]');
-const mediaAt = css.indexOf("@media (prefers-color-scheme: dark)");
-const darkMedia = mediaAt >= 0 ? blockBody('html:not([data-theme])', mediaAt) : null;
+const light = props(blockBody(css, ":root"));
+const darkAttr = blockBody(themeCss, 'html[data-theme="dark"]');
+const mediaAt = themeCss.indexOf("@media (prefers-color-scheme: dark)");
+const darkMedia = mediaAt >= 0 ? blockBody(themeCss, "html:not([data-theme])", mediaAt) : null;
+const PAPER = [".pdf-page", ".email-paper", ".report-sheet", ".printable-report", ".roster-print-sheet", ".sign-pad", ".sign-preview"];
+const paperBody = blockBody(themeCss, PAPER.join(",\n"));
 
 function resolve(name, vars, depth = 0) {
   let v = vars[name];
@@ -139,3 +143,18 @@ if (darkAttr) {
     assert.equal(norm(props(darkMedia)), norm(props(darkAttr)));
   });
 }
+
+test("paper keeps the light roles: every role the dark theme changes is put back, to the light value", () => {
+  assert.ok(paperBody, "missing the Paper block in app/theme.css");
+  const paper = props(paperBody);
+  const dark = { ...light, ...props(darkAttr) };
+  // Roles that only matter on bands, glass bars, the calendar or the Android bar never appear inside a document.
+  const notInDocuments = /^--(glass-|m3-|cal-|ink-surface|canvas-rgb|panel-rgb)/;
+  for (const name of Object.keys(props(darkAttr))) {
+    if (name === "--cal-coop" || notInDocuments.test(name)) continue;
+    const lightValue = resolve(name, light), darkValue = resolve(name, dark);
+    if (lightValue === darkValue) continue;
+    assert.ok(name in paper, `${name} changes in the dark theme but paper does not put it back`);
+    assert.equal(resolve(name, { ...light, ...paper }), lightValue, `paper's ${name} is not the light value`);
+  }
+});

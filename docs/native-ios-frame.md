@@ -333,3 +333,21 @@ back-swipe stopped working. `FrameNavigationController` now switches it off and 
 transition (`SlideBackAnimator`). The page's own edge swipe starts only when something is open inside the page
 (`gestureRecognizerShouldBegin` is `hasInPageHistory`); two edge recognizers cannot both win, and the page's used to take the touch
 even when it had nothing to close. So: popup, report, conversation or admin tab open, the swipe closes that; otherwise it leaves the page.
+
+## Dark mode (Light / Dark / System)
+
+The person chooses Light, Dark or System in Account settings or the Menu (web, `lib/theme.ts`). The page tells the frame with
+`post("theme", { choice, theme })` on every load and whenever the choice changes; the frame ignores the resolved `theme` and uses
+`choice` (`Brand.setTheme`, FrameConfig.swift), because System must keep following the phone. It stores the choice in UserDefaults
+(`vv.theme`) so the next launch is dressed correctly from the first frame, and sets `overrideUserInterfaceStyle` on the windows
+(`.unspecified` for System). The web view follows the same style, so the page's `prefers-color-scheme` agrees with the native bars.
+
+Everything native that was cream or navy is now a dynamic colour role on `Brand` (`canvas`, `ink`, `band`, `surface`, `action`,
+`selection`), mirroring the web's role tokens, so UIKit re-colours the navigation bar, tab bar, Menu sheet, the header band and the
+failure screen by itself. The status-bar style over a canvas-coloured header is `.default` (dark text on light, light on dark).
+`LockupNavy` has a dark-appearance variant (the cream lockup) in the asset catalog. Deliberately left as they were: the splash and
+launch screen (navy), the Face ID lock screen (navy), the Safari view controller's navy bar, and the admin header band (a dark band
+in both themes). Capability `theme` is advertised so the page can tell a build that knows the message.
+
+Not verified on a device: this was written and syntax-checked, not run on a phone. Check on a phone: toggle Dark in Account
+settings and look at the navigation bar, tab bar, Menu sheet and a sheet page; then switch back to System with the phone in Dark.

@@ -68,7 +68,8 @@
   --surface-sunken:#f2eee5;   /* inset fields: inputs, selects, textareas */
   --panel:#e6e9e2;
   --panel-rgb:230,233,226;            /* sage-tinted panel, replaces Morning Mist */
-  --warm-tint:#f4e4dc;        /* terracotta wash, for pills and soft callouts */
+  --terracotta-wash:#f4e4dc;  /* the light terracotta wash; constant, for fills that stay light in both themes */
+  --warm-tint:var(--terracotta-wash);  /* terracotta wash, for pills and soft callouts (themed) */
 
   /* Reversed variants, for use on the navy field. Both clear AA against navy:
      terracotta itself is only 3.4:1 there, which fails for small text. */
@@ -3578,7 +3579,7 @@ footer nav a:hover {
 .admin-chip {
   display:inline-block;
   padding:2px 8px;
-  color:var(--text);
+  color:var(--navy);
   font:700 10px/16px var(--sans);
   letter-spacing:.8px;
   text-transform:uppercase;
@@ -5073,7 +5074,7 @@ footer nav a:hover {
 :root {
   --portal-pad:clamp(28px,5vw,70px);
   --portal-accent:var(--terracotta);
-  --portal-accent-text:var(--terracotta-text);
+  --portal-accent-text:var(--text-accent);
   --portal-band-bg:transparent;
   --portal-band-fg:var(--text);
   --portal-band-muted:var(--text-soft);
@@ -5084,7 +5085,7 @@ footer nav a:hover {
    Family and Teaching are one portal. Only Admin has a different header. */
 .workspace-preview {
   --portal-accent:var(--sage);
-  --portal-accent-text:var(--sage-text);
+  --portal-accent-text:var(--text-muted);
 }
 
 .admin-live {
@@ -8151,7 +8152,7 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
   place-items:center;
   width:38px;
   height:38px;
-  color:var(--text);
+  color:var(--navy);
   font:800 22px var(--sans);
   background:var(--cream);
   border-radius:50%;
@@ -8296,12 +8297,12 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 .urgent-banner-body { margin:4px 0 0; font:400 15px/1.45 var(--sans); color:var(--cream); white-space:pre-line; }
 .urgent-banner-ack {
   flex:none; min-width:96px; min-height:44px; padding:10px 20px;
-  background:var(--cream); color:var(--danger-text); border:2px solid var(--cream);
+  background:var(--cream); color:var(--terracotta-deep); border:2px solid var(--cream);
   font:800 15px var(--sans); letter-spacing:.5px; cursor:pointer;
 }
-.urgent-banner-ack:hover { background:var(--warm-tint); }
+.urgent-banner-ack:hover { background:var(--terracotta-wash); }
 .urgent-banner-ack:disabled { opacity:.7; cursor:default; }
-.urgent-banner-error { margin:0; padding:8px 16px; background:var(--cream); color:var(--danger-text); font-size:13px; }
+.urgent-banner-error { margin:0; padding:8px 16px; background:var(--cream); color:var(--terracotta-deep); font-size:13px; }
 @media (max-width:560px) { .urgent-banner { flex-direction:column; align-items:stretch; } .urgent-banner-ack { width:100%; } }
 
 /* ---- Admin Broadcasts (app/family-village/admin/broadcasts-tab.tsx) ---- */

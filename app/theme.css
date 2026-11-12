@@ -1,0 +1,215 @@
+/* Dark theme, paper, and the theme switch's look (docs/theming.md).
+
+   The role tokens are defined for the light theme on :root in globals.css. This file redefines them for
+   dark, in two places that must stay identical (tests/theme-contrast.test.mjs checks that they are):
+
+     html[data-theme="dark"]                      the choice in force, set before first paint by lib/theme.ts
+     @media (prefers-color-scheme: dark)          System, for the moment before that script runs and for
+       html:not([data-theme])                     browsers with JavaScript off
+
+   Loaded after the other stylesheets (app/layout.tsx). Palette: Ink Navy ground, Parchment Cream text,
+   Terracotta for accents and the primary fill, Antique Gold (lifted) as the lantern's warmth. */
+
+html[data-theme="dark"] {
+  /* Ground: Ink Navy, deepened toward night, never neutral grey */
+  --canvas:#08202f;
+  --canvas-rgb:8,32,47;
+  --surface:#0e3045;                     /* raised cards */
+  --surface-sunken:#061a27;              /* inputs and inset areas */
+  --panel:#143a45;                       /* the sage panel, as a deep sage-teal */
+  --panel-rgb:20,58,69;
+  --warm-tint:#3a2730;                   /* terracotta wash, as a warm dusk */
+  --field-bg:#0b2a3d;
+  --ink-surface:#0d3a57;                 /* bands: a lit lantern-blue, clearly above the canvas */
+  --ink-surface-rgb:13,58,87;
+
+  /* Text: Parchment Cream, with the on-navy variants for secondary and accent */
+  --text:var(--cream);
+  --text-muted:var(--sage-on-navy);
+  --text-soft:#9aa99e;
+  --text-accent:var(--terracotta-on-navy);
+  --accent-ink:#e8a98d;
+  --danger-text:#f3c6b3;
+
+  /* Fills: a deeper terracotta that still carries cream text at 4.5:1, a hotter one for alerts */
+  --action:#a85539;
+  --accent-fill:#a85539;
+  --danger-fill:#c4472d;
+  --cal-coop:#2b6a8f;
+  --cal-class:#a85539;
+  --gold:#e0b56a;                        /* Antique Gold, lifted for night: focus rings and the lantern glow */
+
+  /* Lines, washes and shadows */
+  --line-strong:#d9d3c4;
+  --fg-rgb:var(--cream-rgb);
+  --shadow-rgb:2,10,16;
+  --scrim-rgb:2,10,16;
+
+  --glass-bg:rgba(8,32,47,.78);
+  --glass-bg-thin:rgba(8,32,47,.55);
+  --glass-edge:rgba(255,255,255,.14);
+  --glass-highlight:rgba(255,255,255,.12);
+  --glass-lens:rgba(255,255,255,.14);
+  --glass-lens-ring:rgba(255,255,255,.2);
+
+  --m3-surface-container:#12384d;
+  --m3-secondary-container:#5b3324;
+  --m3-on-secondary-container:#f6d9cb;
+
+  color-scheme:dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    /* Ground: Ink Navy, deepened toward night, never neutral grey */
+    --canvas:#08202f;
+    --canvas-rgb:8,32,47;
+    --surface:#0e3045;                     /* raised cards */
+    --surface-sunken:#061a27;              /* inputs and inset areas */
+    --panel:#143a45;                       /* the sage panel, as a deep sage-teal */
+    --panel-rgb:20,58,69;
+    --warm-tint:#3a2730;                   /* terracotta wash, as a warm dusk */
+    --field-bg:#0b2a3d;
+    --ink-surface:#0d3a57;                 /* bands: a lit lantern-blue, clearly above the canvas */
+    --ink-surface-rgb:13,58,87;
+
+    /* Text: Parchment Cream, with the on-navy variants for secondary and accent */
+    --text:var(--cream);
+    --text-muted:var(--sage-on-navy);
+    --text-soft:#9aa99e;
+    --text-accent:var(--terracotta-on-navy);
+    --accent-ink:#e8a98d;
+    --danger-text:#f3c6b3;
+
+    /* Fills: a deeper terracotta that still carries cream text at 4.5:1, a hotter one for alerts */
+    --action:#a85539;
+    --accent-fill:#a85539;
+    --danger-fill:#c4472d;
+    --cal-coop:#2b6a8f;
+    --cal-class:#a85539;
+    --gold:#e0b56a;                        /* Antique Gold, lifted for night: focus rings and the lantern glow */
+
+    /* Lines, washes and shadows */
+    --line-strong:#d9d3c4;
+    --fg-rgb:var(--cream-rgb);
+    --shadow-rgb:2,10,16;
+    --scrim-rgb:2,10,16;
+
+    --glass-bg:rgba(8,32,47,.78);
+    --glass-bg-thin:rgba(8,32,47,.55);
+    --glass-edge:rgba(255,255,255,.14);
+    --glass-highlight:rgba(255,255,255,.12);
+    --glass-lens:rgba(255,255,255,.14);
+    --glass-lens-ring:rgba(255,255,255,.2);
+
+    --m3-surface-container:#12384d;
+    --m3-secondary-container:#5b3324;
+    --m3-on-secondary-container:#f6d9cb;
+
+    color-scheme:dark;
+  }
+}
+
+/* ---- Paper stays light ------------------------------------------------------------------------------------
+   Documents are paper: the PDF viewer, the signing overlay, the invitation email preview and report sheets keep
+   the light roles inside the dark UI, so what a family signs or prints looks like what they will receive.
+   Re-declaring the roles on the container makes every child that uses a role stay light with no extra rules.
+   (The test checks this block against the light values.) */
+.pdf-page,
+.email-paper,
+.report-sheet,
+.printable-report,
+.roster-print-sheet,
+.sign-pad,
+.sign-preview {
+  --canvas:var(--cream);
+  --canvas-rgb:var(--cream-rgb);
+  --surface:#fffdf9;
+  --surface-sunken:#f2eee5;
+  --panel:#e6e9e2;
+  --panel-rgb:230,233,226;
+  --warm-tint:var(--terracotta-wash);
+  --field-bg:white;
+  --text:var(--navy);
+  --text-muted:var(--sage-text);
+  --text-soft:var(--sage);
+  --text-accent:var(--terracotta-text);
+  --accent-ink:var(--terracotta);
+  --danger-text:var(--terracotta-deep);
+  --action:var(--navy);
+  --accent-fill:var(--terracotta-deep);
+  --danger-fill:var(--terracotta-deep);
+  --gold:var(--antique-gold);
+  --line-strong:var(--navy);
+  --fg-rgb:var(--navy-rgb);
+  --shadow-rgb:var(--navy-rgb);
+  --scrim-rgb:var(--navy-rgb);
+  color-scheme:light;
+}
+
+/* The paper's own text colour: inherited text colour is already computed by the time a role is re-declared. */
+.pdf-page,
+.email-paper,
+.printable-report,
+.roster-print-sheet,
+.sign-pad,
+.sign-preview {
+  color:var(--text);
+}
+
+/* ---- Page ground ------------------------------------------------------------------------------------------ */
+html { background-color:var(--canvas); }
+
+/* A faint lantern glow at the top of the page at night. Only bare ground shows it; every card and band covers it. */
+html[data-theme="dark"] {
+  background-image:radial-gradient(85% 100% at 50% 0,rgba(224,181,106,.13),transparent 70%),radial-gradient(60% 80% at 100% 0,rgba(187,97,65,.12),transparent 70%);
+  background-repeat:no-repeat;
+  background-size:100% 520px;
+}
+html[data-theme="dark"] body { background:transparent; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    background-image:radial-gradient(85% 100% at 50% 0,rgba(224,181,106,.13),transparent 70%),radial-gradient(60% 80% at 100% 0,rgba(187,97,65,.12),transparent 70%);
+    background-repeat:no-repeat;
+    background-size:100% 520px;
+  }
+  html:not([data-theme]) body { background:transparent; }
+}
+
+/* ---- Logos: the navy lockup on light, the cream lockup on dark (app/brand-lockup.tsx) ---------------------- */
+.logo-on-dark { display:none; }
+html[data-theme="dark"] .logo-on-light { display:none; }
+html[data-theme="dark"] .logo-on-dark { display:block; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .logo-on-light { display:none; }
+  html:not([data-theme]) .logo-on-dark { display:block; }
+}
+
+/* ---- The Light / Dark / System control (app/family-village/theme-choice.tsx) --------------------------------- */
+.theme-choice {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin:10px 0 0;
+}
+.theme-choice button {
+  display:grid;
+  gap:2px;
+  min-height:44px;
+  padding:10px 8px;
+  background:transparent;
+  color:var(--text);
+  font:600 14px var(--sans);
+  text-align:center;
+  border:1px solid rgba(var(--fg-rgb),.3);
+  border-radius:2px;
+  cursor:pointer;
+}
+.theme-choice button small { color:var(--text-muted); font:400 12px/1.3 var(--sans); }
+.theme-choice button[aria-checked="true"] { background:var(--action); border-color:var(--action); color:var(--cream); }
+.theme-choice button[aria-checked="true"] small { color:var(--cream); }
+.theme-choice button:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+.app-menu .theme-choice { margin:0; padding:10px 20px 14px; }
+.app-menu .theme-choice button { min-height:40px; padding:8px 6px; font-size:15px; }
+.app-menu .theme-choice small { display:none; }
+.app-menu-theme-label { margin:0; padding:10px 20px 0; color:var(--text-muted); font:600 12px var(--sans); letter-spacing:1px; text-transform:uppercase; }

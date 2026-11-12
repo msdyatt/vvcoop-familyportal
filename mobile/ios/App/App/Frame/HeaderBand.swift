@@ -11,9 +11,9 @@ struct HeaderTheme {
     /// Whether the band is dark, so the clock above it is drawn light.
     var isDark: Bool { logo == "LockupCream" }
 
-    static let family = HeaderTheme(background: Brand.cream, foreground: Brand.navy, rule: Brand.terracotta, logo: "LockupNavy")
+    static let family = HeaderTheme(background: Brand.canvas, foreground: Brand.ink, rule: Brand.terracotta, logo: "LockupNavy")  // LockupNavy has a cream variant for dark
     static let admin = HeaderTheme(
-        background: Brand.navy, foreground: Brand.cream,
+        background: Brand.band, foreground: Brand.cream,
         rule: UIColor(red: 0xD7 / 255, green: 0xA5 / 255, blue: 0x90 / 255, alpha: 1), logo: "LockupCream")
 
     /// `name` is what the page's header says it belongs to ("home", "teacher", "admin"); without it, the path decides.

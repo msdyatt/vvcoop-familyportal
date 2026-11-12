@@ -1,4 +1,4 @@
-import Image from "next/image";
+import BrandLockup from "../brand-lockup";
 
 export const metadata = {
   title: "Terms & Conditions | Veritas Village",
@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function Terms() { return <>
   {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next/link's RSC prefetch errors in this vinext runtime; the rest of the site deliberately uses plain <a> for every route, this included */}
-  <header className="site-header"><a href="/" className="mini-brand" aria-label="Veritas Village"><Image src="/brand/lockup-horizontal-navy.png" alt="Veritas Village" width={900} height={310} priority/></a><nav aria-label="Main navigation"><a href="/">Home</a></nav><a className="header-link" href="https://family.veritasvillage.org/family-village">Family sign in</a></header>
+  <header className="site-header"><a href="/" className="mini-brand" aria-label="Veritas Village"><BrandLockup priority /></a><nav aria-label="Main navigation"><a href="/">Home</a></nav><a className="header-link" href="https://family.veritasvillage.org/family-village">Family sign in</a></header>
 
   <main className="legal-page">
     <p className="eyebrow">Terms &amp; Conditions</p>

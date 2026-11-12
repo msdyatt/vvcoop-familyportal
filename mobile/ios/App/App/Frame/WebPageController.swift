@@ -50,7 +50,7 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = Brand.cream
+        view.backgroundColor = Brand.canvas
         buildTop()
         buildWebView()
         buildProgress()
@@ -62,7 +62,7 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate {
     /// The top of the page: the navy strip behind the status bar (white clock on every page, as on the web in the
     /// app), then, on signed-in pages, the section header. Sheets have the system bar instead and no strip.
     private func buildTop() {
-        strip.backgroundColor = Brand.navy
+        strip.backgroundColor = Brand.band
         strip.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(strip)
 
@@ -98,8 +98,8 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate {
         // so the two never both fire.
         webView.allowsBackForwardNavigationGestures = false
         webView.isOpaque = false
-        webView.backgroundColor = Brand.cream
-        webView.scrollView.backgroundColor = Brand.cream
+        webView.backgroundColor = Brand.canvas
+        webView.scrollView.backgroundColor = Brand.canvas
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         #if DEBUG
         if #available(iOS 16.4, *) { webView.isInspectable = true }
@@ -202,7 +202,7 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate {
         strip.isHidden = stack?.isSheet ?? false
         band.isHidden = !isHeaderPage
         guard isHeaderPage, let frame = navigator?.chromeSource else {
-            strip.backgroundColor = Brand.navy
+            strip.backgroundColor = Brand.band
             setStatusStyle(.lightContent)
             return
         }
@@ -210,7 +210,7 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate {
         let theme = HeaderTheme.resolve(name: themeName, path: path)
         // The header's colour runs up behind the clock, as the web header's band does under the status bar.
         strip.backgroundColor = theme.background
-        setStatusStyle(theme.isDark ? .lightContent : .darkContent)
+        setStatusStyle(theme.isDark ? .lightContent : .default)
         band.configure(
             theme: theme,
             title: pageTitle ?? Self.cleanTitle(webView?.title),
@@ -462,6 +462,10 @@ extension WebPageController: WKScriptMessageHandler {
         case "haptic":
             Haptics.play(request.payload["style"] as? String ?? "selection")
 
+        case "theme":
+            // The person's Light / Dark / System choice (lib/theme.ts). Re-colours the native bars, Menu and sheets.
+            if let choice = request.payload["choice"] as? String { Brand.setTheme(choice) }
+
         case "title":
             pageTitle = request.payload["title"] as? String
             themeName = request.payload["theme"] as? String
@@ -566,25 +570,25 @@ final class FailureView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = Brand.cream
+        backgroundColor = Brand.canvas
 
         let title = UILabel()
         title.text = "Can't reach Veritas Village"
         title.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-        title.textColor = Brand.navy
+        title.textColor = Brand.ink
         title.textAlignment = .center
         title.numberOfLines = 0
 
         let detail = UILabel()
         detail.text = "Check your connection and try again."
         detail.font = UIFont.preferredFont(forTextStyle: .body)
-        detail.textColor = Brand.navy.withAlphaComponent(0.7)
+        detail.textColor = Brand.ink.withAlphaComponent(0.7)
         detail.textAlignment = .center
         detail.numberOfLines = 0
 
         var configuration = UIButton.Configuration.filled()
         configuration.title = "Try again"
-        configuration.baseBackgroundColor = Brand.navy
+        configuration.baseBackgroundColor = Brand.action
         configuration.baseForegroundColor = Brand.cream
         configuration.cornerStyle = .capsule
         let retry = UIButton(configuration: configuration, primaryAction: UIAction { [weak self] _ in self?.onRetry?() })
