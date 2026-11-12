@@ -22,7 +22,7 @@ Deno.test("buildReceiptPdf: a well-formed one-page PDF with the receipt facts an
   const startxref = Number(/startxref\n(\d+)/.exec(out)![1]);
   assertEquals(out.slice(startxref, startxref + 4), "xref");
   const entries = [...out.slice(startxref).matchAll(/(\d{10}) 00000 n /g)].map((m) => Number(m[1]));
-  assertEquals(entries.length, 6);
+  assertEquals(entries.length, 9);
   entries.forEach((offset, index) => assertEquals(out.slice(offset, offset + `${index + 1} 0 obj`.length), `${index + 1} 0 obj`));
 });
 

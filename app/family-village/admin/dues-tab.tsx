@@ -298,9 +298,10 @@ function Settings({ settings, approvals, actorUserId, busy, run, callAdmin }: { 
   const goLive = approvals.find((a) => a.action === "enable_livemode" && a.status === "approved" && a.approved_by !== actorUserId && new Date(a.expires_at) > new Date());
 
   async function check() {
-    const data = await callAdmin({ action: "status" }, "") as { provider: string; keyConfigured: boolean; problem: string | null; webhookSecretConfigured: boolean; account?: { name: string | null; id: string; chargesEnabled: boolean } } | null;
+    const data = await callAdmin({ action: "status" }, "") as { provider: string; keyConfigured: boolean; problem: string | null; webhookSecretConfigured: boolean; publishableKeyConfigured?: boolean | null; account?: { name: string | null; id: string; chargesEnabled: boolean } } | null;
     if (!data) return;
-    setStatus(data.problem ? data.problem : `Connected to ${data.account?.name ?? data.account?.id} (${data.provider === "stripe_live" ? "live" : "test"} key). ${data.webhookSecretConfigured ? "Webhook secret is set." : "The webhook secret is NOT set yet, so payments will never be marked paid."}`);
+    const suffix = data.provider === "stripe_live" ? "LIVE" : "TEST";
+    setStatus(data.problem ? data.problem : `Connected to ${data.account?.name ?? data.account?.id} (${data.provider === "stripe_live" ? "live" : "test"} key). ${data.webhookSecretConfigured ? "Webhook secret is set." : "The webhook secret is NOT set yet, so payments will never be marked paid."} ${data.publishableKeyConfigured ? "Publishable key is set, so the payment form shows inside the app and the website." : `The publishable key is NOT set: add STRIPE_PUBLISHABLE_KEY_${suffix} (pk_${suffix.toLowerCase()}_...) to Supabase Vault, or families are sent to Stripe's page in a browser instead of the in-app sheet.`}`);
   }
   return <div className="dues-settings">
     <section><h3>Mode</h3>
