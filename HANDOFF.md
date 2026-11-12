@@ -48,6 +48,21 @@ it is in version control now. Do not "simplify" the guard call out of `worker/in
 
 To test locally, put throwaway values in `.dev.vars` (gitignored) -- never the real password.
 
+## Calendar subscription links live on the co-op's own domain
+Families subscribe to `https://family.veritasvillage.org/calendar/feed?scope=...` (Apple gets the `webcal://` form of the
+same address; Google's "Add by URL" gets the https one). The Worker route in `worker/calendar-feed.ts` is answered **ahead of
+the password gate** (calendar apps cannot sign in) and passes the request through to the `calendar-feed` Supabase edge
+function. It forwards only `scope`, `id` and `token`, rejects anything else with 400, sends none of the caller's headers or
+cookies, does not follow redirects, times out after 10 s, and never logs the query string (a personal feed's `token` is a
+bearer credential).
+- Moving the backend later means changing the upstream only: set the Worker var `SUPABASE_URL` (falls back to
+  `NEXT_PUBLIC_SUPABASE_URL`, then the current project URL). Subscribed calendars keep working untouched.
+- The address in the links is `NEXT_PUBLIC_SITE_URL` at build time (default `https://family.veritasvillage.org`), built by
+  `lib/calendar-links.ts`. It is never taken from `window.location`: previews and the iPhone app load pages from other hosts.
+- The Supabase function is unchanged, so subscriptions made before this route existed (`...supabase.co/functions/v1/calendar-feed?...`) still work.
+- **Cloudflare dashboard**: no WAF rule, Bot Fight/Super Bot Fight challenge, or caching rule should apply to `/calendar/feed`.
+  Google fetches feeds from its own servers; a challenge page would silently break "Add to Google Calendar".
+
 ## Deploy command (exact)
 ```
 npm run build

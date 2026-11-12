@@ -81,7 +81,7 @@ jobs:
       - name: Unit tests
         run: |
           cd supabase/functions
-          deno test --node-modules-dir=none --config invite-family-admin/deno.json _shared/ calendar-feed/ ../../lib/dues.test.ts
+          deno test --node-modules-dir=none --allow-env=NEXT_PUBLIC_SITE_URL --config invite-family-admin/deno.json _shared/ calendar-feed/ ../../lib/dues.test.ts ../../lib/calendar-links.test.ts
 
   # Replays every migration into a fresh local Supabase, then runs the pgTAP
   # tests in supabase/tests/database. Proves two things at once: that the

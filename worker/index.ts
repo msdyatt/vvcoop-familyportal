@@ -3,6 +3,7 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { APPLE_APP_SITE_ASSOCIATION_PATH, guardRequest } from "./site-password";
 import { httpsRedirect, withSecurityHeaders } from "./security-headers";
+import { CALENDAR_FEED_PATH, handleCalendarFeed, type CalendarFeedEnv } from "./calendar-feed";
 
 // Minimal shape of the Workers runtime's Fetcher binding -- just enough to
 // type-check this file's own use of it (ASSETS.fetch(...)), same call as
@@ -11,7 +12,7 @@ interface Fetcher {
   fetch(request: Request | string, init?: RequestInit): Promise<Response>;
 }
 
-interface Env {
+interface Env extends CalendarFeedEnv {
   ASSETS: Fetcher;
   SITE_PASSWORD?: string;
   SITE_AUTH_SECRET?: string;
@@ -54,6 +55,14 @@ const worker = {
       return new Response(JSON.stringify({ webcredentials: { apps: ["VQUCJB5C7M.org.veritasvillage.family"] } }), {
         headers: { "content-type": "application/json", "cache-control": "public, max-age=3600" },
       });
+    }
+
+    // Calendar subscriptions. Also answered ahead of the gate: Apple/Google
+    // calendar apps cannot enter a password, and a private feed is protected
+    // by its own unguessable token (checked by the Supabase edge function).
+    // See worker/calendar-feed.ts.
+    if (url.pathname === CALENDAR_FEED_PATH) {
+      return withSecurityHeaders(await handleCalendarFeed(request, env));
     }
 
     const gated = await guardRequest(request, env);

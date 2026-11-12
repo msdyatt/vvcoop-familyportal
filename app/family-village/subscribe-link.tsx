@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { calendarSubscribeUrl, getSupabaseBrowserClient, googleCalendarAddUrl } from "../../lib/supabase";
+import { calendarSubscribeUrl, googleCalendarAddUrl } from "../../lib/calendar-links";
+import { getSupabaseBrowserClient } from "../../lib/supabase";
 
 /**
  * A calendar feed's two subscribe actions, styled identically since they're
