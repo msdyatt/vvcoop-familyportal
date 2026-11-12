@@ -1,0 +1,355 @@
+/* Class pages: the class list (teachers and families) and the class page itself.
+   Phone first. Plain cards, the existing colour tokens, no decoration. Kept in its
+   own file so it does not collide with edits to globals.css; every selector starts
+   with .cls- so nothing here can reach another page. */
+
+.cls-page {
+  --cls-gap: 16px;
+  --cls-line: rgba(var(--navy-rgb), .12);
+}
+
+.cls-wrap {
+  display: grid;
+  gap: var(--cls-gap);
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+/* --- buttons ------------------------------------------------------------- */
+.cls-page :is(button, a).cls-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  background: var(--navy);
+  color: var(--cream);
+  font: 600 14px var(--sans);
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  border: 1px solid var(--navy);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.cls-page :is(button, a).cls-btn:disabled { opacity: .55; cursor: default; }
+
+.cls-page :is(button, a).cls-btn.quiet {
+  background: transparent;
+  color: var(--navy);
+  border-color: rgba(var(--navy-rgb), .3);
+}
+
+.cls-page :is(button, a).cls-btn.quiet:hover:not(:disabled) { background: var(--panel); }
+
+.cls-page :is(button, a).cls-btn.small { min-height: 36px; padding: 0 12px; font-size: 13px; }
+
+.cls-page :is(button, a).cls-btn.remove {
+  background: transparent;
+  color: var(--terracotta-deep);
+  border-color: transparent;
+}
+
+.cls-page :is(button, a).cls-btn.remove:hover:not(:disabled) { background: var(--warm-tint); }
+
+/* --- small pieces ---------------------------------------------------------- */
+.cls-back {
+  justify-self: start;
+  color: var(--sage-text);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.cls-back:hover { color: var(--navy); text-decoration: underline; }
+
+.cls-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cls-chip {
+  padding: 3px 9px;
+  background: var(--panel);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  border-radius: 999px;
+}
+
+.cls-chip.warm { background: var(--warm-tint); color: var(--terracotta-deep); }
+
+.cls-muted { color: var(--sage-text); font-size: 14px; }
+
+.cls-note {
+  margin: 0;
+  color: var(--sage-text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.cls-status { margin: 0; min-height: 1.4em; color: var(--sage-text); font-size: 14px; }
+.cls-status.bad { color: var(--terracotta-deep); }
+
+.cls-section-title {
+  margin: 0;
+  color: var(--navy);
+  font: 700 12px var(--sans);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+
+/* --- the list of classes --------------------------------------------------- */
+.cls-list {
+  display: grid;
+  gap: var(--cls-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cls-group { display: grid; gap: 12px; }
+
+.cls-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--cls-line);
+}
+
+.cls-card-head { display: grid; gap: 6px; }
+
+.cls-card-title {
+  margin: 0;
+  color: var(--navy);
+  font: 700 20px/1.25 var(--serif);
+}
+
+.cls-card-title a { color: inherit; text-decoration: none; }
+.cls-card-title a:hover { text-decoration: underline; }
+
+.cls-facts {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: var(--navy);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cls-facts div { display: flex; gap: 8px; }
+.cls-facts dt { flex: 0 0 74px; color: var(--sage-text); }
+.cls-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+.cls-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.cls-card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cls-card-actions .cls-btn:first-child { grid-column: 1 / -1; }
+
+.cls-earlier summary {
+  min-height: 44px;
+  padding: 10px 0;
+  color: var(--sage-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cls-earlier[open] summary { margin-bottom: 8px; }
+
+.cls-empty {
+  padding: 28px 20px;
+  background: var(--surface);
+  border: 1px dashed rgba(var(--navy-rgb), .25);
+  color: var(--sage-text);
+  text-align: center;
+}
+
+.cls-empty b { display: block; margin-bottom: 4px; color: var(--navy); font-weight: 600; }
+
+/* --- the class page --------------------------------------------------------- */
+.cls-hero {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--cls-line);
+}
+
+.cls-hero h2 {
+  margin: 0;
+  color: var(--navy);
+  font: 700 clamp(24px, 6vw, 32px)/1.15 var(--serif);
+}
+
+.cls-hero p { margin: 0; }
+
+.cls-description { color: var(--navy); font-size: 15px; line-height: 1.6; max-width: 62ch; }
+
+.cls-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--cls-line);
+  overflow-x: auto;
+}
+
+.cls-tab {
+  flex: 1 1 0;
+  min-height: 46px;
+  padding: 0 14px;
+  background: transparent;
+  color: var(--sage-text);
+  font: 600 14px var(--sans);
+  white-space: nowrap;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+
+.cls-tab[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--terracotta); }
+.cls-tab:hover { color: var(--navy); }
+
+.cls-tab-count { margin-left: 6px; color: var(--sage-text); font-weight: 500; }
+
+.cls-panel {
+  display: grid;
+  gap: var(--cls-gap);
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--cls-line);
+}
+
+.cls-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* --- rows (files, dates, people) ----------------------------------------------- */
+.cls-rows { display: grid; margin: 0; padding: 0; list-style: none; }
+
+.cls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--cls-line);
+}
+
+.cls-row:first-child { border-top: 0; }
+
+.cls-row-main { flex: 1 1 0%; min-width: 0; display: grid; gap: 2px; }
+.cls-row-title { color: var(--navy); font-weight: 600; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.cls-row-sub { color: var(--sage-text); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.cls-row-actions { display: flex; flex: 0 0 auto; gap: 6px; }
+
+.cls-filetype {
+  flex: 0 0 auto;
+  width: 42px;
+  padding: 7px 0;
+  background: var(--panel);
+  color: var(--navy);
+  font: 700 11px var(--sans);
+  letter-spacing: .5px;
+  text-align: center;
+  border-radius: 2px;
+}
+
+.cls-datebox {
+  flex: 0 0 auto;
+  width: 52px;
+  padding: 6px 0;
+  background: var(--panel);
+  color: var(--navy);
+  text-align: center;
+  border-radius: 2px;
+}
+
+.cls-datebox b { display: block; font: 700 20px/1.1 var(--serif); }
+.cls-datebox span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; }
+
+.cls-date-prep { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
+
+.cls-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cls-check input { width: 18px; height: 18px; margin: 0; }
+
+.cls-subhead { margin: 6px 0 0; color: var(--sage-text); font-size: 13px; font-weight: 600; }
+
+.cls-search { max-width: 360px; }
+
+/* --- add form (a plain disclosure, closed until asked for) ----------------------- */
+.cls-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--cls-line);
+}
+
+.cls-field { display: grid; gap: 6px; }
+.cls-field > span { color: var(--navy); font-size: 13px; font-weight: 600; }
+.cls-field > span i { margin-left: 6px; color: var(--sage-text); font-style: normal; font-weight: 400; }
+.cls-field-row { display: grid; gap: 14px; }
+
+.cls-radios { display: grid; gap: 8px; }
+
+.cls-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--cls-line);
+  cursor: pointer;
+}
+
+.cls-radio input { margin-top: 3px; }
+.cls-radio b { display: block; font-size: 14px; }
+.cls-radio small { display: block; color: var(--sage-text); font-size: 13px; line-height: 1.4; }
+
+/* --- people ------------------------------------------------------------------------- */
+.cls-person { align-items: center; }
+.cls-person-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+
+/* The viewer inside the dialog is a long column; give it the room the dialog has. */
+.cls-viewer-meta { margin: 0 0 14px; color: var(--sage-text); font-size: 14px; }
+
+@media (min-width: 640px) {
+  .cls-card-actions { display: flex; flex-wrap: wrap; }
+  .cls-card-actions .cls-btn:first-child { grid-column: auto; }
+  .cls-field-row { grid-template-columns: 1fr 1fr; }
+  .cls-hero, .cls-panel { padding: 24px; }
+}
+
+@media (max-width: 520px) {
+  /* The text gets the full width; the buttons drop to a line of their own under it. */
+  .cls-row { flex-wrap: wrap; align-items: flex-start; }
+  .cls-row-actions { flex: 1 0 100%; justify-content: flex-start; padding-left: 54px; }
+  .cls-person { align-items: center; }
+  .cls-person-actions { flex: 1 0 100%; justify-content: flex-start; }
+  .cls-datebox + .cls-row-main + .cls-row-actions { padding-left: 64px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cls-page * { scroll-behavior: auto; transition: none !important; }
+}
+
+/* Inside the teacher section's two-column layout the list may use the whole column. */
+.cls-wrap.wide { max-width: none; margin: 0; }
+.workspace-main > section.cls-home-classes { display: grid; gap: var(--cls-gap); padding: 0; background: none; border: 0; }

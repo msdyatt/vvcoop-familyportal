@@ -29,6 +29,7 @@
     "node_modules",
     "supabase/functions",
     "lib/dues.test.ts",
+    "lib/schedule.test.ts",
     "mobile"
   ]
 }

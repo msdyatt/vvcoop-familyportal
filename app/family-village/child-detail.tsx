@@ -313,7 +313,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
         <section>
           <p className="card-kicker">Classes</p>
           {classes.length ? <ul className="child-detail-list">{classes.map((row) => <li key={row.id}>
-            <b>{row.title}</b>
+            <b><a href={`/family-village/classes/view?id=${row.id}`}>{row.title}</a></b>
             <span>{row.schedule}{row.teachers.length ? ` · ${row.teachers.map((teacher) => teacher.name).join(", ")}` : ""}</span>
             {row.teachers.length > 0 && <div className="row-actions">
               {row.teachers.map((teacher) => <button key={teacher.id} type="button" className="ghost" disabled={messagingTeacherId !== null} onClick={() => messageTeacher(teacher)}>

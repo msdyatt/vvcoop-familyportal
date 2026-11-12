@@ -1,5 +1,5 @@
-import PortalGate from "../home/portal-gate";
+import ClassesOverview from "./class-cards";
 
 export const metadata = { title: "Classes | Family Village" };
 
-export default function FamilyClassesPage() { return <PortalGate view="classes" />; }
+export default function FamilyClassesPage() { return <ClassesOverview scope="family" />; }

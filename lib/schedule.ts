@@ -91,3 +91,51 @@ export function describeSchedule(row: Partial<ClassSchedule>, fallback = "Schedu
 
 /** The columns every schedule-aware select needs. Kept here so they cannot drift. */
 export const SCHEDULE_SELECT = "class_blocks(label,starts_at,ends_at,day_of_week),rooms(name)";
+
+/** A date-only value as "YYYY-MM-DD" in a plain calendar, with no timezone attached. */
+function toDay(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * The next day a weekly class meets, on or after `from`.
+ *
+ * A class meets on its block's weekday during its terms. A class with no term
+ * assigned runs all year (the same convention the enrollment clash check uses),
+ * and a class whose terms have all ended has no next meeting. The co-op has no
+ * holiday calendar to subtract, so this is "the next scheduled day", not a
+ * promise that nothing cancels it; a dated class event says what happens that day.
+ *
+ * Returns "YYYY-MM-DD", or null when the class has no weekday set or is over.
+ */
+export function nextMeetingDay(
+  dayOfWeek: number | null | undefined,
+  terms: { starts_on: string; ends_on: string }[],
+  from: Date = new Date(),
+): string | null {
+  if (typeof dayOfWeek !== "number" || dayOfWeek < 0 || dayOfWeek > 6) return null;
+  const today = toDay(from);
+  const candidate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  candidate.setDate(candidate.getDate() + ((dayOfWeek - candidate.getDay() + 7) % 7));
+  if (!terms.length) return toDay(candidate);
+
+  let best: string | null = null;
+  for (const term of terms) {
+    if (term.ends_on < today) continue;
+    // The first meeting at or after the later of today and the term's start.
+    const start = term.starts_on > today ? term.starts_on : today;
+    const [year, month, day] = start.split("-").map(Number);
+    const first = new Date(year, month - 1, day);
+    first.setDate(first.getDate() + ((dayOfWeek - first.getDay() + 7) % 7));
+    const found = toDay(first);
+    if (found > term.ends_on) continue;
+    if (best === null || found < best) best = found;
+  }
+  return best;
+}
+
+/** "Fri, Nov 13", from a "YYYY-MM-DD" day. */
+export function formatDayShort(day: string) {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(year, month - 1, date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
