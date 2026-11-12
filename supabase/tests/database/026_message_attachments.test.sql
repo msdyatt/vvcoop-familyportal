@@ -2,7 +2,7 @@
 -- of C1, P1 and P1b one household in C1, P2 in C1, P3 only in C2. Everyone is in
 -- the shared General channel, which is where these tests talk.
 begin;
-select plan(17);
+select plan(16);
 
 insert into auth.users (id, email, aud, role) values
   ('00000000-0000-0000-0000-0000000000a1', 'admin@t.test', 'authenticated', 'authenticated'),
@@ -93,12 +93,16 @@ select throws_ok($$select public.send_message(current_setting('test.general')::u
 select throws_ok($$select public.send_message(current_setting('test.general')::uuid, null)$$, 'P0001', 'Write a message or add a photo or file.', 'a message still needs something in it');
 
 -- files with no words: allowed, and the list and the notification say what was sent
+reset role;
 delete from public.notifications;
+set local role authenticated;
 select lives_ok($$select public.send_message(current_setting('test.general')::uuid, null, null, null, '{}',
   jsonb_build_array(
     jsonb_build_object('path', current_setting('test.p') || 'c.pdf', 'name', 'c.pdf', 'mime', 'application/pdf', 'size', 100),
     jsonb_build_object('path', current_setting('test.p') || 'd.pdf', 'name', 'd.pdf', 'mime', 'application/pdf', 'size', 100)))$$, 'two files with no words can be sent');
 reset role;
+-- a transaction has one clock, so put this message clearly last
+update public.messages set created_at = now() + interval '1 minute' where body is null and has_attachments;
 select is((select body from public.notifications where recipient_user_id = '00000000-0000-0000-0000-0000000000a1' and title like '%p1' limit 1), 'Sent 2 files', 'the notification says what was sent');
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
