@@ -363,7 +363,7 @@ function AddChildForm({ familyId, onAdded }: { familyId: string; onAdded: () => 
   return <form onSubmit={submit} className="household-form" style={{ marginTop: 18 }}>
     <label>Add a child<input value={firstName} onChange={(event) => setFirstName(event.target.value)} placeholder="First name" disabled={busy} /></label>
     <button disabled={busy}>{busy ? "Adding…" : "Add child"}</button>
-    <button type="button" onClick={() => { setAdding(false); setFirstName(""); }} style={{ background: "transparent", color: "var(--ink)", border: "1px solid rgba(7,43,73,.25)" }}>Cancel</button>
+    <button type="button" onClick={() => { setAdding(false); setFirstName(""); }} style={{ background: "transparent", color: "var(--text)", border: "1px solid rgba(var(--fg-rgb),.25)" }}>Cancel</button>
     <p className="admin-form-status" role="status">{status}</p>
   </form>;
 }
