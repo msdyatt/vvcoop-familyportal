@@ -39,6 +39,11 @@ Deno.test("checkout: the amount comes from the database, bank transfer is offere
   assertEquals(session.params["payment_intent_data[metadata][payment_id]"], "pay-1");
   assertEquals(session.params["payment_intent_data[setup_future_usage]"], undefined, "no card is saved unless the household agreed to automatic payments");
   assertEquals(session.headers["Idempotency-Key"], "pay-1");
+  // Stripe's page wears the Veritas Village brand, logo included on the full hosted page.
+  assertEquals(session.params["branding_settings[background_color]"], "#faf7f1");
+  assertEquals(session.params["branding_settings[button_color]"], "#0b2a3d");
+  assertEquals(session.params["branding_settings[display_name]"], "Veritas Village");
+  assertEquals(session.params["branding_settings[logo][url]"], "https://family.veritasvillage.org/brand/lockup-horizontal-navy.png");
   assertStringIncludes(session.params["success_url"], "https://family.veritasvillage.org/family-village/dues");
   assertEquals(Number(session.params["expires_at"]) - 1_790_000_000, 31 * 60);
   assertEquals(admin.called("billing_attach_checkout")[0].args, { p_payment: "pay-1", p_session_id: "cs_1" });
@@ -126,6 +131,8 @@ Deno.test("checkout: on the website the form is embedded, with return_url and no
   const session = stripe.requests.find((r) => r.path === "/v1/checkout/sessions")!;
   assertEquals(session.params["ui_mode"], "embedded");
   assertEquals(session.params["redirect_on_completion"], "if_required");
+  assertEquals(session.params["branding_settings[button_color]"], "#0b2a3d");
+  assertEquals(session.params["branding_settings[logo][url]"], undefined, "the embedded form shows no logo, so none is sent");
   assertStringIncludes(session.params["return_url"], "/family-village/dues?checkout=success");
   assertEquals(session.params["success_url"], undefined, "embedded sessions take return_url, not success_url");
   assertEquals(session.params["line_items[0][price_data][unit_amount]"], "60000", "the amount still comes from the database");

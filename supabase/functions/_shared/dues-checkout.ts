@@ -102,6 +102,25 @@ export async function createDuesCheckout(deps: Deps, input: CheckoutInput): Prom
   return { ok: false, status: 409, code: "busy", error: "Could not start a payment right now. Please try again." };
 }
 
+/**
+ * Stripe's own checkout page, dressed as Veritas Village (the brand tokens in app/globals.css): cream page,
+ * navy button, Inter, rounded corners. Stripe offers only preset fonts and no Playfair, so the serif is left
+ * to the site. The logo and icon show on the full hosted page only; the embedded form ignores them.
+ */
+export function checkoutBranding(origin: string, embedded: boolean) {
+  return {
+    display_name: "Veritas Village",
+    background_color: "#faf7f1",
+    button_color: "#0b2a3d",
+    font_family: "inter",
+    border_style: "rounded",
+    ...(embedded ? {} : {
+      logo: { type: "url", url: `${origin}/brand/lockup-horizontal-navy.png` },
+      icon: { type: "url", url: `${origin}/brand/icon-512.png` },
+    }),
+  };
+}
+
 async function openSession(deps: Deps, input: CheckoutInput, started: any, origin: string, embedded: boolean): Promise<CheckoutResult> {
   const { admin, stripe } = deps;
   const paymentId = started.payment_id as string;
@@ -139,6 +158,7 @@ async function openSession(deps: Deps, input: CheckoutInput, started: any, origi
       payment_method_options: {
         us_bank_account: { verification_method: "automatic", financial_connections: { permissions: ["payment_method"] } },
       },
+      branding_settings: checkoutBranding(origin, embedded),
       ...(embedded
         ? { ui_mode: "embedded", return_url: `${origin}/family-village/dues?checkout=success`, redirect_on_completion: "if_required" }
         : { success_url: `${origin}/family-village/dues?checkout=success`, cancel_url: `${origin}/family-village/dues?checkout=canceled` }),
