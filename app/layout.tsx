@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./platform.css";
 import "./public-site.css";
+import "./class-pages.css";
 import { PLATFORM_SCRIPT } from "../lib/platform";
 import ErrorReporter from "./error-reporter";
 import SwipeBack from "./swipe-back";
