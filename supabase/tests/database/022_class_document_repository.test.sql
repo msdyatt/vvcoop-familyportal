@@ -5,6 +5,11 @@
 begin;
 select plan(21);
 
+-- Runs a statement as whoever is current and says how many rows it touched (row level security applies).
+create function public.t_rows(q text) returns bigint language plpgsql as $$
+declare n bigint; begin execute q; get diagnostics n = row_count; return n; end $$;
+grant execute on function public.t_rows(text) to authenticated;
+
 insert into auth.users (id, email, aud, role) values
   ('00000000-0000-0000-0000-0000000000a1', 'admin@t.test', 'authenticated', 'authenticated'),
   ('00000000-0000-0000-0000-0000000000a2', 'lead1@t.test', 'authenticated', 'authenticated'),
@@ -50,7 +55,7 @@ insert into public.documents (id, class_id, kind, title, storage_path, uploaded_
 -- Two papers that belong to a family, not to a class (the old rule is unchanged for these).
 insert into public.documents (id, family_id, kind, title, uploaded_by_user_id) values
   ('00000000-0000-0000-0000-00000000d004', '00000000-0000-0000-0000-0000000000f1', 'letter', 'Family paper one', '00000000-0000-0000-0000-0000000000a2'),
-  ('00000000-0000-0000-0000-00000000d005', '00000000-0000-0000-0000-0000000000f1', 'letter', 'Family paper two', '00000000-0000-0000-0000-0000000000a2');
+  ('00000000-0000-0000-0000-00000000d005', '00000000-0000-0000-0000-0000000000f1', 'letter', 'Family paper two', '00000000-0000-0000-0000-0000000000b1');
 insert into storage.objects (bucket_id, name) values
   ('family-village-private', 'handouts/h.pdf'),
   ('family-village-private', 'handouts/c.pdf');
@@ -62,7 +67,7 @@ select is((select count(*) from public.documents where id = '00000000-0000-0000-
 select is((select count(*) from public.documents where id = '00000000-0000-0000-0000-00000000d002'), 0::bigint, 'a parent does not see curriculum');
 select is((select count(*) from storage.objects where name = 'handouts/h.pdf'), 1::bigint, 'a parent can read the handout file');
 select is((select count(*) from storage.objects where name = 'handouts/c.pdf'), 0::bigint, 'a parent cannot read the curriculum file, even knowing its path');
-select is((with gone as (delete from public.documents where id = '00000000-0000-0000-0000-00000000d001' returning 1) select count(*) from gone), 0::bigint, 'a parent cannot remove a file');
+select is(public.t_rows($$delete from public.documents where id = '00000000-0000-0000-0000-00000000d001'$$), 0::bigint, 'a parent cannot remove a file');
 reset role;
 
 -- ---- a parent whose child is in another class ---------------------------------------------
@@ -85,27 +90,27 @@ set local role authenticated;
 select is((select count(*) from public.documents where id = '00000000-0000-0000-0000-00000000d002'), 1::bigint, 'an assistant sees curriculum');
 select is((select count(*) from storage.objects where name = 'handouts/c.pdf'), 1::bigint, 'and can read its file');
 select throws_ok($$insert into public.documents (class_id, kind, title, storage_path, uploaded_by_user_id) values ('00000000-0000-0000-0000-0000000000d1', 'handout', 'Nope', 'handouts/nope.pdf', '00000000-0000-0000-0000-0000000000a4')$$, '42501', null, 'an assistant cannot add a file');
-select is((with gone as (delete from public.documents where id = '00000000-0000-0000-0000-00000000d001' returning 1) select count(*) from gone), 0::bigint, 'an assistant cannot remove a lead''s file');
-select is((with gone as (delete from public.documents where id = '00000000-0000-0000-0000-00000000d003' returning 1) select count(*) from gone), 0::bigint, 'nor one they uploaded themselves while they led, now they only assist');
+select is(public.t_rows($$delete from public.documents where id = '00000000-0000-0000-0000-00000000d001'$$), 0::bigint, 'an assistant cannot remove a lead''s file');
+select is(public.t_rows($$delete from public.documents where id = '00000000-0000-0000-0000-00000000d003'$$), 0::bigint, 'nor one they uploaded themselves while they led, now they only assist');
 reset role;
 
 -- ---- a lead teacher ------------------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a3","role":"authenticated"}', true);
 set local role authenticated;
 select lives_ok($$insert into public.documents (class_id, kind, title, storage_path, uploaded_by_user_id) values ('00000000-0000-0000-0000-0000000000d1', 'handout', 'New', 'handouts/new.pdf', '00000000-0000-0000-0000-0000000000a3')$$, 'a lead teacher can add a file');
-select is((with gone as (delete from public.documents where id = '00000000-0000-0000-0000-00000000d002' returning 1) select count(*) from gone), 1::bigint, 'a lead can remove a file the other lead uploaded');
-select is((with gone as (delete from public.documents where id = '00000000-0000-0000-0000-00000000d004' returning 1) select count(*) from gone), 0::bigint, 'but not a family''s paper they did not upload');
+select is(public.t_rows($$delete from public.documents where id = '00000000-0000-0000-0000-00000000d002'$$), 1::bigint, 'a lead can remove a file the other lead uploaded');
+select is(public.t_rows($$delete from public.documents where id = '00000000-0000-0000-0000-00000000d004'$$), 0::bigint, 'but not a family''s paper they did not upload');
 reset role;
 
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a2","role":"authenticated"}', true);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
 set local role authenticated;
-select is((with gone as (delete from public.documents where id = '00000000-0000-0000-0000-00000000d005' returning 1) select count(*) from gone), 1::bigint, 'a paper that is not in a class can still be removed by whoever uploaded it');
+select is(public.t_rows($$delete from public.documents where id = '00000000-0000-0000-0000-00000000d005'$$), 1::bigint, 'a paper that is not in a class can still be removed by the household member who uploaded it');
 reset role;
 
 -- ---- an administrator ------------------------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-select is((with gone as (delete from public.documents where id = '00000000-0000-0000-0000-00000000d001' returning 1) select count(*) from gone), 1::bigint, 'an administrator can remove any file');
+select is(public.t_rows($$delete from public.documents where id = '00000000-0000-0000-0000-00000000d001'$$), 1::bigint, 'an administrator can remove any file');
 reset role;
 
 -- ---- the policies themselves (storage deletes go through the Storage API) -----------------------------------
