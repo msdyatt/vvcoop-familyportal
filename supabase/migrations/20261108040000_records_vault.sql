@@ -191,6 +191,10 @@ begin
   end loop;
 end $$;
 
+-- Nothing is writable by browsers; only the three record tables are readable, and facts
+-- and grants not at all. (A new table inherits broad default privileges locally, so say so.)
+revoke all on public.org_records, public.org_record_files, public.org_record_revisions, public.org_record_file_grants,
+  public.org_facts, public.org_fact_revisions from public, anon, authenticated;
 grant select on public.org_records, public.org_record_files, public.org_record_revisions to authenticated;
 
 -- --- storage: records/ in the private bucket --------------------------------------------------

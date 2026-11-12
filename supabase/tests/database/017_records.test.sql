@@ -93,11 +93,11 @@ select throws_ok($$delete from public.org_record_revisions$$, '23000', null, 'no
 
 -- ---- files: versions, never overwritten ----------------------------------------------------------
 insert into storage.objects (bucket_id, name, owner_id, created_at, metadata)
-select 'family-village-private', 'records/' || (select id from rec)::text || '/00000000-0000-0000-0000-0000000000f1.pdf', '00000000-0000-0000-0000-0000000000a1', now() - interval '1 hour', '{"size": 2048, "mimetype": "application/pdf"}'
+select 'family-village-private', 'records/' || (select id from rec)::text || '/00000000-0000-0000-0000-0000000000f1.pdf', '00000000-0000-0000-0000-0000000000a1', now() - interval '1 hour', '{"size": 2048, "mimetype": "application/pdf"}'::jsonb
 union all
-select 'family-village-private', 'records/' || (select id from rec)::text || '/00000000-0000-0000-0000-0000000000f2.pdf', '00000000-0000-0000-0000-0000000000a1', now() - interval '1 hour', '{"size": 4096, "mimetype": "application/pdf"}'
+select 'family-village-private', 'records/' || (select id from rec)::text || '/00000000-0000-0000-0000-0000000000f2.pdf', '00000000-0000-0000-0000-0000000000a1', now() - interval '1 hour', '{"size": 4096, "mimetype": "application/pdf"}'::jsonb
 union all
-select 'family-village-private', 'records/' || (select id from rec)::text || '/00000000-0000-0000-0000-0000000000f3.docx', '00000000-0000-0000-0000-0000000000a1', now() - interval '1 hour', '{"size": 10, "mimetype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}';
+select 'family-village-private', 'records/' || (select id from rec)::text || '/00000000-0000-0000-0000-0000000000f3.docx', '00000000-0000-0000-0000-0000000000a1', now() - interval '1 hour', '{"size": 10, "mimetype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}'::jsonb;
 
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
@@ -188,7 +188,7 @@ set local role authenticated;
 create temp table rec2 as select public.admin_create_record('Lease', 'lease', 'Landlord LLC', null, null, null, null, null, null, null, null) as id;
 reset role;
 insert into storage.objects (bucket_id, name, owner_id, created_at, metadata)
-select 'family-village-private', 'records/' || (select id from rec2)::text || '/00000000-0000-0000-0000-0000000000e6.pdf', '00000000-0000-0000-0000-0000000000a2', now() - interval '1 hour', '{"size": 100, "mimetype": "application/pdf"}';
+select 'family-village-private', 'records/' || (select id from rec2)::text || '/00000000-0000-0000-0000-0000000000e6.pdf', '00000000-0000-0000-0000-0000000000a2', now() - interval '1 hour', '{"size": 100, "mimetype": "application/pdf"}'::jsonb;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a2","role":"authenticated"}', true);
 set local role authenticated;
 select public.admin_add_record_file((select id from rec2), '00000000-0000-0000-0000-0000000000e6', 'records/' || (select id from rec2)::text || '/00000000-0000-0000-0000-0000000000e6.pdf', 'lease.pdf', null, null);
