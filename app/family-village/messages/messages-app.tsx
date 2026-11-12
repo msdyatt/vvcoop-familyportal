@@ -8,7 +8,8 @@ import { usePortalAccess } from "../../../lib/use-portal-access";
 import { useBackLayer } from "../../../lib/use-back-layer";
 import { conversationTitle, isChannel, shortTime, type ConversationRow } from "../../../lib/messages";
 import AppHeader from "../app-header";
-import Avatar from "../avatar";
+import ConversationAvatar from "./conversation-avatar";
+import { conversationFlavour, conversationTone } from "../../../lib/message-colors";
 import MfaChallengeScreen from "../mfa-challenge";
 import Thread from "./thread";
 import NewConversation from "./new-conversation";
@@ -84,19 +85,21 @@ export default function MessagesApp() {
 
   function renderRow(row: ConversationRow) {
     const title = conversationTitle(row);
-    const channel = isChannel(row);
+    const unread = row.unread_count > 0 && !row.muted && !row.archived_at;
     return <li key={row.id}>
-      <button type="button" className={`messages-row${row.id === selectedId ? " active" : ""}`} onClick={() => select(row.id)}>
-        {channel
-          ? <span className="avatar avatar-md avatar-channel" aria-hidden="true">#</span>
-          : <Avatar url={row.other_avatar_path ? avatarUrls.get(row.other_avatar_path) ?? null : null} label={title.slice(0, 1).toUpperCase()} size="md" />}
+      <button type="button" className={`messages-row pc-${conversationTone(row)} flavour-${conversationFlavour(row)}${row.id === selectedId ? " active" : ""}${unread ? " unread" : ""}`} onClick={() => select(row.id)}>
+        {unread && <span className="messages-unread-dot" aria-hidden="true" />}
+        <ConversationAvatar conversation={row} photoUrl={row.other_avatar_path ? avatarUrls.get(row.other_avatar_path) ?? null : null} />
         <span className="messages-row-text">
-          <span className="messages-row-top"><b>{title}</b><time>{shortTime(row.last_message_at)}</time></span>
-          <span className="messages-row-preview">
-            {row.last_preview ? `${row.kind !== "direct" && row.last_sender_name ? `${row.last_sender_name}: ` : ""}${row.last_preview}` : row.topic ?? "No messages yet"}
+          <span className="messages-row-top"><b>{isChannel(row) ? `# ${title}` : title}</b><time>{shortTime(row.last_message_at)}</time></span>
+          <span className="messages-row-bottom">
+            <span className="messages-row-preview">
+              {row.last_preview ? `${row.kind !== "direct" && row.last_sender_name ? `${row.last_sender_name}: ` : ""}${row.last_preview}` : row.topic ?? "No messages yet"}
+            </span>
+            {row.muted && <svg className="messages-muted" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Muted"><path d="M6 8a6 6 0 0 1 9.5-4.9M18 9c0 4 1.5 6 2 7H4.5M10 20a2 2 0 0 0 4 0M3 3l18 18" /></svg>}
+            {unread && <span className="messages-badge" aria-label={`${row.unread_count} unread`}>{row.unread_count}</span>}
           </span>
         </span>
-        {row.unread_count > 0 && !row.muted && !row.archived_at && <span className="messages-badge" aria-label={`${row.unread_count} unread`}>{row.unread_count}</span>}
       </button>
     </li>;
   }
@@ -115,11 +118,13 @@ export default function MessagesApp() {
     <div className="messages-shell" data-view={selected ? "thread" : "list"}>
       <aside className="messages-list" aria-label="Conversations">
         <div className="messages-list-head">
-          <b>Conversations</b>
-          <button type="button" onClick={() => setCreating(true)}>New</button>
+          <h2>Conversations</h2>
+          <button type="button" onClick={() => setCreating(true)}>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>New
+          </button>
         </div>
         {!loaded && <p className="portal-empty">Loading…</p>}
-        {loaded && !conversations.length && <p className="portal-empty">Nothing here yet. Choose New to message a teacher or another family.</p>}
+        {loaded && !conversations.length && <p className="portal-empty messages-list-empty">Nothing here yet. Choose New to message a teacher or another family.</p>}
         {sections.map((section) => section.rows.length > 0 && <div key={section.key} className="messages-section">
           {section.key === "archived"
             ? <details>
@@ -136,7 +141,10 @@ export default function MessagesApp() {
       <section className="messages-thread-pane">
         {selected
           ? <Thread key={selected.id} conversation={selected} userId={userId} roles={roles} tick={tick} onBack={() => select(null)} onChanged={loadConversations} />
-          : <div className="messages-empty"><p className="portal-empty">Select a conversation, or start a new one.</p></div>}
+          : <div className="messages-empty">
+              <span className="messages-empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4h0A2.5 2.5 0 0 1 4 13.5z" /></svg></span>
+              <p className="portal-empty">Select a conversation, or start a new one.</p>
+            </div>}
       </section>
     </div>
 

@@ -303,9 +303,9 @@ html[data-app][data-platform="ios"] dialog.child-detail-panel::backdrop {
 
 /* Capsule controls with a comfortable touch target. */
 html[data-app][data-platform="ios"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab):not(.report-picker button),
-html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-bubble button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
+html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-msg button):not(.messages-field button):not(.messages-emoji-tray button):not(.messages-people button):not(.messages-tabs button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
 html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab):not(.report-picker button),
-html[data-app][data-platform="ios"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn) {
+html[data-app][data-platform="ios"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn):not(.messages-people button):not(.messages-tabs button) {
   min-height: 44px;
   padding: 10px 20px;
   font-size: 15px;
@@ -322,14 +322,6 @@ html[data-app][data-platform="ios"] textarea {
 html[data-app][data-platform="ios"] .photos-pending {
   border-radius: 22px;
   overflow: hidden;
-}
-
-html[data-app][data-platform="ios"] .messages-bubble {
-  border-radius: 20px 20px 20px 6px;
-}
-
-html[data-app][data-platform="ios"] .messages-bubble.mine {
-  border-radius: 20px 20px 6px 20px;
 }
 
 html[data-app][data-platform="ios"] .photos-thumb {
@@ -397,9 +389,9 @@ html[data-app][data-platform="android"] dialog.child-detail-panel::before {
 }
 
 html[data-app][data-platform="android"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab):not(.report-picker button),
-html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-bubble button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
+html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-msg button):not(.messages-field button):not(.messages-emoji-tray button):not(.messages-people button):not(.messages-tabs button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
 html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab):not(.report-picker button),
-html[data-app][data-platform="android"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn) {
+html[data-app][data-platform="android"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn):not(.messages-people button):not(.messages-tabs button) {
   min-height: 48px;
   padding: 10px 24px;
   font-size: 14px;
@@ -423,14 +415,6 @@ html[data-app][data-platform="android"] .messages-shell,
 html[data-app][data-platform="android"] .photos-pending {
   border-radius: 28px;
   overflow: hidden;
-}
-
-html[data-app][data-platform="android"] .messages-bubble {
-  border-radius: 20px 20px 20px 6px;
-}
-
-html[data-app][data-platform="android"] .messages-bubble.mine {
-  border-radius: 20px 20px 6px 20px;
 }
 
 html[data-app][data-platform="android"] .photos-thumb {

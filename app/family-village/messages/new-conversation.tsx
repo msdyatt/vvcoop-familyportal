@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import type { Person } from "../../../lib/messages";
 import DetailModal from "../detail-modal";
+import Avatar from "../avatar";
+import { roleRing, toneFor } from "../../../lib/message-colors";
 
 type ClassChoice = { id: string; title: string };
 type Tab = "direct" | "group" | "class" | "channel";
@@ -103,7 +105,7 @@ export default function NewConversation({ roles, userId, canCreateChannel, onOpe
       {tab === "direct" && <ul className="messages-people">
         {shown.map((person) => <li key={person.user_id}>
           <button type="button" disabled={busy} onClick={() => supabase && run(() => supabase.rpc("start_direct_conversation", { p_other: person.user_id }))}>
-            <span>{person.display_name}</span>{label(person) && <i>{label(person)}</i>}
+            <Avatar url={null} label={person.display_name} size="sm" tone={toneFor(person.user_id)} ring={roleRing(person)} /><span>{person.display_name}</span>{label(person) && <i>{label(person)}</i>}
           </button>
         </li>)}
       </ul>}
@@ -116,6 +118,7 @@ export default function NewConversation({ roles, userId, canCreateChannel, onOpe
               if (event.target.checked) next.add(person.user_id); else next.delete(person.user_id);
               setChosen(next);
             }} />
+            <Avatar url={null} label={person.display_name} size="sm" tone={toneFor(person.user_id)} ring={roleRing(person)} />
             <span>{person.display_name}</span>{label(person) && <i>{label(person)}</i>}
           </label>
         </li>)}

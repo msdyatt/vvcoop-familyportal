@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { conversationTitle, managesChannel, type ConversationRow, type Person } from "../../../lib/messages";
+import { FLAVOUR_LABEL, conversationFlavour, conversationTone, roleRing, toneFor } from "../../../lib/message-colors";
+import Avatar from "../avatar";
+import ConversationAvatar from "./conversation-avatar";
 
 type ClassChoice = { id: string; title: string };
 
@@ -61,7 +64,16 @@ export default function ChannelDetails({ conversation, userId, roles, people, on
   const memberIds = new Set(people.map((p) => p.user_id));
   const candidates = addable.filter((p) => !memberIds.has(p.user_id));
 
-  return <div className="channel-details portal-form">
+  const flavour = conversationFlavour(conversation);
+  return <div className={`channel-details portal-form pc-${conversationTone(conversation)}`}>
+    <div className="channel-hero">
+      <ConversationAvatar conversation={conversation} photoUrl={null} size="lg" />
+      <div>
+        <span className="messages-flavour">{FLAVOUR_LABEL[flavour]}</span>
+        <h3>{conversationTitle(conversation)}</h3>
+        <p>{people.length} {people.length === 1 ? "person" : "people"}{archived ? " · Archived" : ""}{conversation.muted ? " · Muted" : ""}</p>
+      </div>
+    </div>
     {conversation.topic && !manager && <p>{conversation.topic}</p>}
     {builtIn && <p className="field-note">This is a built-in channel. {conversation.audience === "everyone" ? "Every member is in it automatically." : ""}{conversation.audience === "admins" ? "Only administrators are in it, and they are added and removed automatically. Reports land here; the actual decisions are made on the Messaging tab of the Admin page." : ""}</p>}
     {conversation.kind === "class" && <p className="field-note">This channel follows its class. Its members are the class&rsquo;s teachers and the adults of every enrolled child.</p>}
@@ -100,7 +112,8 @@ export default function ChannelDetails({ conversation, userId, roles, people, on
       <h3>{people.length} {people.length === 1 ? "person" : "people"}</h3>
       <ul className="messages-members">
         {people.map((person) => <li key={person.user_id}>
-          <span>{person.display_name}{person.is_teacher && <i>Teacher</i>}{person.is_admin && <i>Admin</i>}</span>
+          <span className="messages-member"><Avatar url={null} label={person.display_name} size="sm" tone={toneFor(person.user_id)} ring={roleRing(person)} />
+            <span>{person.display_name}{person.is_teacher && <i>Teacher</i>}{person.is_admin && <i>Admin</i>}</span></span>
           {manager && inviteOnly && person.user_id !== userId && <button type="button" className="ghost" disabled={busy}
             onClick={() => run(`Removed ${person.display_name}.`, () => supabase.rpc("remove_channel_member", { p_id: conversation.id, p_user: person.user_id }))}>Remove</button>}
         </li>)}

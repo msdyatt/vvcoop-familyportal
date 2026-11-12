@@ -8,27 +8,36 @@ import { MESSAGE_COLUMNS, REACTIONS, conversationTitle, dayLabel, isChannel, pos
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
 import ChannelDetails from "./channel-details";
+import ConversationAvatar from "./conversation-avatar";
+import { FLAVOUR_LABEL, conversationFlavour, conversationTone, roleRing, toneFor } from "../../../lib/message-colors";
 
 const PAGE = 50;
 
 /**
- * Pairs each message with its day label, and whether it starts a run: the
- * first of a day, or a different sender, or a gap of ten minutes. Only the
- * first message of a run shows a name and a photo, as in a text conversation.
+ * Pairs each message with its day label, and where it sits in a run: a run is
+ * the messages one person sends in a row, with under ten minutes between them
+ * and none on another day. The first of a run carries the name, the last
+ * carries the photo and the time, and the bubbles in between sit close
+ * together, as in a text conversation. News and system cards stand alone.
  */
 function withDaySeparators(messages: MessageRow[]) {
   let previousDay = "";
   let previous: MessageRow | null = null;
-  return messages.map((message) => {
+  const items = messages.map((message) => {
     const day = dayLabel(message.created_at);
     const showDay = day !== previousDay;
-    const startsRun = showDay || !previous || previous.sender_id !== message.sender_id || previous.post_id !== message.post_id
+    const card = isCard(message);
+    const startsRun = showDay || !previous || card || isCard(previous) || previous.sender_id !== message.sender_id || previous.post_id !== message.post_id
       || new Date(message.created_at).getTime() - new Date(previous.created_at).getTime() > RUN_MS;
     previousDay = day;
     previous = message;
-    return { message, day, showDay, startsRun };
+    return { message, day, showDay, startsRun, card };
   });
+  return items.map((item, index) => ({ ...item, endsRun: item.card || index === items.length - 1 || items[index + 1].startsRun }));
 }
+
+/** News posts and system messages (a report, say) are shown as cards, not bubbles. */
+const isCard = (message: MessageRow) => (!!message.post_id || !!message.system_label) && !message.deleted_at;
 
 const RUN_MS = 10 * 60_000;
 
@@ -59,6 +68,9 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  // The message whose actions (react, reply, remove, report) are showing; tap a message to open them.
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<MessageRow | null>(null);
   // People chosen from the @ list: display name -> id. Kept only if the name is still in the text when sending.
   const [mentionIds, setMentionIds] = useState<Map<string, string>>(new Map());
@@ -282,6 +294,23 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     onBack();
   }
 
+  // The field grows with what is typed, up to a few lines, and shrinks back after sending.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }, [draft]);
+
+  function insertEmoji(emoji: string) {
+    const el = composerRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? start;
+    setDraft(draft.slice(0, start) + emoji + draft.slice(end));
+    setEmojiOpen(false);
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(start + emoji.length, start + emoji.length); });
+  }
+
   const needle = (mentionQuery ?? "").toLowerCase();
   const mentionMatches = mentionQuery === null ? [] : [...people.values()]
     .filter((person) => person.user_id !== userId && person.display_name.toLowerCase().includes(needle)).slice(0, 5);
@@ -296,16 +325,21 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   }
 
   const rows = withDaySeparators(messages);
-  return <div className="messages-thread">
+  const flavour = conversationFlavour(conversation);
+  const tone = conversationTone(conversation);
+  const flavourLabel = FLAVOUR_LABEL[flavour];
+  const headerPhoto = conversation.other_avatar_path ? avatarUrls.get(conversation.other_avatar_path) ?? null : null;
+  return <div className={`messages-thread pc-${tone} flavour-${flavour}`}>
     <header className="messages-thread-head">
       <button type="button" className="messages-icon-btn messages-back" onClick={onBack} aria-label="Back to conversations">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
       </button>
+      <ConversationAvatar conversation={conversation} photoUrl={headerPhoto} />
       <div className="messages-thread-title">
-        <b>{channel ? `# ${title}` : title}</b>
+        {flavourLabel && <span className="messages-flavour">{flavourLabel}</span>}
+        <h2>{channel ? `# ${title}` : title}</h2>
         <span className="messages-topic">
-          {channel ? conversation.topic ?? `${conversation.member_count} people` : conversation.kind === "direct" ? "" : `${conversation.member_count} people`}
-          {conversation.muted ? " · Muted" : ""}
+          {[channel ? conversation.topic ?? `${conversation.member_count} people` : conversation.kind === "direct" ? "" : `${conversation.member_count} people`, conversation.muted ? "Muted" : ""].filter(Boolean).join(" · ")}
         </span>
       </div>
       <button type="button" className="messages-icon-btn" onClick={() => setShowMembers(true)} aria-label="Conversation details">
@@ -323,78 +357,126 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
       })()}
     </p>}
 
-    <div className="messages-scroll" ref={listRef} onScroll={(event) => {
+    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- a tap on the empty space closes open message actions; nothing here needs a keyboard */}
+    <div className="messages-scroll" ref={listRef} onClick={(event) => { if (event.target === event.currentTarget) { setActiveId(null); setPickerFor(null); } }} onScroll={(event) => {
       const el = event.currentTarget;
       stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     }}>
       {hasMore && <button type="button" className="ghost messages-earlier" onClick={loadEarlier}>Earlier messages</button>}
-      {!messages.length && <p className="portal-empty">Say hello.</p>}
-      {rows.map(({ message, day, showDay, startsRun }) => {
+      {!messages.length && <div className="messages-hello">
+        <span className="messages-empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4h0A2.5 2.5 0 0 1 4 13.5z" /></svg></span>
+        <p className="portal-empty">Say hello.</p>
+      </div>}
+      {rows.map(({ message, day, showDay, startsRun, endsRun, card }) => {
         const mine = message.sender_id === userId;
         const sender = message.sender_id ? people.get(message.sender_id) : undefined;
         const url = message.image_path ? imageUrls.get(message.image_path) : undefined;
         const group = conversation.kind !== "direct";
-        const announcement = !!message.post_id && !message.deleted_at;
         const system = !!message.system_label && !message.deleted_at;
         const [headline, ...rest] = (message.body ?? "").split("\n");
         const own = reactions.filter((r) => r.message_id === message.id);
         const chips = REACTIONS.map((emoji) => ({ emoji, count: own.filter((r) => r.emoji === emoji).length, mine: own.some((r) => r.emoji === emoji && r.user_id === userId) })).filter((chip) => chip.count > 0);
-        return <div key={message.id} id={`msg-${message.id}`}>
+        const open = activeId === message.id || pickerFor === message.id;
+        const senderName = sender?.display_name ?? message.system_label ?? "Former member";
+        const personTone = card ? tone : toneFor(message.sender_id);
+
+        const reactionChips = chips.length > 0 && !message.deleted_at && <span className="messages-reactions">
+          {chips.map((chip) => <button key={chip.emoji} type="button" className={`messages-chip${chip.mine ? " mine" : ""}`} onClick={() => void react(message.id, chip.emoji)}
+            aria-label={`${chip.emoji} ${chip.count}${chip.mine ? ", you reacted" : ""}`} aria-pressed={chip.mine}><span aria-hidden="true">{chip.emoji}</span>{chip.count}</button>)}
+        </span>;
+
+        // The small line under a message: its time, and when the message is tapped (or focused), what can be done with it.
+        const meta = (showTime: boolean) => <>
+          {pickerFor === message.id && !message.deleted_at && <span className="messages-picker" role="group" aria-label="Choose a reaction">
+            {REACTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => void react(message.id, emoji)} aria-label={`React ${emoji}`}>{emoji}</button>)}
+          </span>}
+          <span className={`messages-meta${open ? " open" : ""}${showTime ? " timed" : ""}`}>
+            {(showTime || open) && <time dateTime={message.created_at}>{shortTime(message.created_at)}</time>}
+            {!message.deleted_at && <span className="messages-actions">
+              {!archivedBlock && <button type="button" onClick={() => setPickerFor(pickerFor === message.id ? null : message.id)}>React</button>}
+              {!blocked && <button type="button" onClick={() => { setReplyingTo(message); setActiveId(null); composerRef.current?.focus(); }}>Reply</button>}
+              {mine && <button type="button" onClick={() => removeOwn(message)}>Remove</button>}
+              {!mine && !message.system_label && <button type="button" onClick={() => { setReporting(message); setReason(""); }}>Report</button>}
+            </span>}
+          </span>
+        </>;
+
+        // Tapping the message itself (not a link or button inside it) shows or hides its actions.
+        const toggle = (event: React.MouseEvent) => {
+          if ((event.target as HTMLElement).closest("a,button")) return;
+          if (window.getSelection()?.toString()) return;
+          setActiveId(activeId === message.id ? null : message.id);
+          if (pickerFor && pickerFor !== message.id) setPickerFor(null);
+        };
+
+        const quote = !message.deleted_at && message.reply_to && message.reply && <a className="messages-quote" href={`#msg-${message.reply.id}`}>
+          <b>{message.reply.sender_id === userId ? "You" : people.get(message.reply.sender_id ?? "")?.display_name ?? "Former member"}</b>
+          <span>{snippet(message.reply)}</span>
+        </a>;
+        const photo = !message.deleted_at && <>
+          {url && <button type="button" className="messages-photo" onClick={() => setViewing(url)} aria-label="Open photo">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage; next/image can't optimize it */}
+            <img src={url} alt="Attachment" loading="lazy" />
+          </button>}
+          {message.image_path && !url && <span className="messages-photo-loading">Loading photo…</span>}
+        </>;
+
+        if (card) {
+          return <div key={message.id} id={`msg-${message.id}`} className="messages-msg">
+            {showDay && <div className="messages-day"><span>{day}</span></div>}
+            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- tapping is a convenience; the same buttons are reachable by keyboard */}
+            <article className={`messages-card pc-${personTone}${system ? " is-system" : " is-news"}`} onClick={toggle}>
+              <header>
+                <span className="messages-announce-tag">{system ? message.system_label : "News"}</span>
+                <time dateTime={message.created_at}>{shortTime(message.created_at)}</time>
+              </header>
+              <h3>{headline}</h3>
+              {photo}
+              {quote}
+              {system
+                ? rest.map((line, index) => line && <p key={index}>{line}</p>)
+                : rest.length > 0 && <p>{rest.join("\n")}</p>}
+              <div className="messages-card-foot">
+                {system
+                  ? (message.link_path ? <a className="messages-announce-link" href={message.link_path}>Open in review<span aria-hidden="true"> →</span></a> : <span />)
+                  : <a className="messages-announce-link" href="/family-village/news">Read in News<span aria-hidden="true"> →</span></a>}
+                {!system && sender && <span className="messages-card-by">Posted by {sender.display_name}</span>}
+                {reactionChips}
+              </div>
+              {meta(false)}
+            </article>
+          </div>;
+        }
+
+        const showName = !mine && group && startsRun;
+        const showAvatar = group && !mine;
+        const hasPhoto = !!message.image_path && !message.deleted_at;
+        return <div key={message.id} id={`msg-${message.id}`} className="messages-msg">
           {showDay && <div className="messages-day"><span>{day}</span></div>}
-          <div className={`messages-bubble-row${mine ? " mine" : ""}${startsRun ? " run-start" : ""}`}>
-            {group && !mine && (startsRun
-              ? <Avatar url={sender?.avatar_path ? avatarUrls.get(sender.avatar_path) ?? null : null} label={(sender?.display_name ?? message.system_label ?? "?").slice(0, 1)} size="md" />
-              : <span className="messages-avatar-gap" aria-hidden="true" />)}
-            <div className={`messages-bubble${mine ? " mine" : ""}${message.deleted_at ? " removed" : ""}${announcement || system ? " announcement" : ""}`}>
-              {!mine && group && startsRun && <span className="messages-sender">
-                {sender?.display_name ?? message.system_label ?? "Former member"}
-                {sender?.is_teacher && <i>Teacher</i>}{sender?.is_admin && <i>Admin</i>}
-              </span>}
-              {message.deleted_at
-                ? <em>Message removed</em>
-                : <>
-                    {url && <button type="button" className="messages-photo" onClick={() => setViewing(url)} aria-label="Open photo">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage; next/image can't optimize it */}
-                      <img src={url} alt="Attachment" loading="lazy" />
-                    </button>}
-                    {message.image_path && !url && <span className="messages-photo-loading">Loading photo…</span>}
-                    {message.reply_to && message.reply && <a className="messages-quote" href={`#msg-${message.reply.id}`}>
-                      <b>{message.reply.sender_id === userId ? "You" : people.get(message.reply.sender_id ?? "")?.display_name ?? "Former member"}</b>
-                      <span>{snippet(message.reply)}</span>
-                    </a>}
-                    {system
-                      ? <>
-                          <span className="messages-announce-tag">{message.system_label}</span>
-                          <p><b>{headline}</b></p>
-                          {rest.map((line, index) => <p key={index}>{line}</p>)}
-                          {message.link_path && <a className="messages-announce-link" href={message.link_path}>Open in review</a>}
-                        </>
-                      : announcement
-                      ? <>
-                          <span className="messages-announce-tag">News</span>
-                          <p><b>{headline}</b></p>
-                          {rest.length > 0 && <p>{rest.join("\n")}</p>}
-                          <a className="messages-announce-link" href="/family-village/news">Read in News</a>
-                        </>
-                      : message.body && <p>{splitMentions(message.body, mentionNames).map((part, index) => part.mention
+          <div className={`messages-bubble-row pc-${personTone}${mine ? " mine" : ""}${startsRun ? " run-start" : ""}${endsRun ? " run-end" : ""}${chips.length ? " has-reactions" : ""}${showAvatar ? " with-avatar" : ""}`}>
+            {showName && <span className="messages-sender">
+              {senderName}
+              {sender?.is_teacher && <i>Teacher</i>}{sender?.is_admin && <i>Admin</i>}
+            </span>}
+            <div className="messages-line">
+              {showAvatar && (endsRun
+                ? <Avatar url={sender?.avatar_path ? avatarUrls.get(sender.avatar_path) ?? null : null} label={senderName} size="sm" tone={personTone} ring={roleRing(sender)} />
+                : <span className="messages-avatar-gap" aria-hidden="true" />)}
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- tapping is a convenience; the same buttons are reachable by keyboard */}
+              <div className={`messages-bubble${mine ? " mine" : ""}${message.deleted_at ? " removed" : ""}${hasPhoto ? " has-photo" : ""}${hasPhoto && !message.body && !message.reply ? " photo-only" : ""}${open ? " open" : ""}`} onClick={toggle}>
+                {message.deleted_at
+                  ? <em>Message removed</em>
+                  : <>
+                      {photo}
+                      {quote}
+                      {message.body && <p>{splitMentions(message.body, mentionNames).map((part, index) => part.mention
                           ? <span key={index} className={`messages-mention${part.text === `@${myName}` ? " me" : ""}`}>{part.text}</span>
                           : part.text)}</p>}
-                  </>}
-              {chips.length > 0 && !message.deleted_at && <span className="messages-reactions">
-                {chips.map((chip) => <button key={chip.emoji} type="button" className={`messages-chip${chip.mine ? " mine" : ""}`} onClick={() => void react(message.id, chip.emoji)}
-                  aria-label={`${chip.emoji} ${chip.count}${chip.mine ? ", you reacted" : ""}`} aria-pressed={chip.mine}>{chip.emoji} {chip.count}</button>)}
-              </span>}
-              {pickerFor === message.id && <span className="messages-picker" role="group" aria-label="Choose a reaction">
-                {REACTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => void react(message.id, emoji)} aria-label={`React ${emoji}`}>{emoji}</button>)}
-              </span>}
-              <span className="messages-meta">
-                <time>{shortTime(message.created_at)}</time>
-                {!message.deleted_at && !archivedBlock && <button type="button" onClick={() => setPickerFor(pickerFor === message.id ? null : message.id)}>React</button>}
-                {!message.deleted_at && !blocked && <button type="button" onClick={() => { setReplyingTo(message); composerRef.current?.focus(); }}>Reply</button>}
-                {!message.deleted_at && mine && <button type="button" onClick={() => removeOwn(message)}>Remove</button>}
-                {!message.deleted_at && !mine && !message.system_label && <button type="button" onClick={() => { setReporting(message); setReason(""); }}>Report</button>}
-              </span>
+                    </>}
+              </div>
             </div>
+            {reactionChips}
+            {meta(endsRun)}
           </div>
         </div>;
       })}
@@ -415,30 +497,42 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
 
     {mentionQuery !== null && !blocked && mentionMatches.length > 0 && <ul className="messages-suggest" role="listbox" aria-label="Mention someone">
       {mentionMatches.map((person) => <li key={person.user_id}>
-        <button type="button" role="option" aria-selected="false" onClick={() => chooseMention(person)}>{person.display_name}{person.is_teacher && <i>Teacher</i>}{person.is_admin && <i>Admin</i>}</button>
+        <button type="button" role="option" aria-selected="false" onClick={() => chooseMention(person)}>
+          <Avatar url={person.avatar_path ? avatarUrls.get(person.avatar_path) ?? null : null} label={person.display_name} size="sm" tone={toneFor(person.user_id)} ring={roleRing(person)} />
+          <span>{person.display_name}</span>{person.is_teacher && <i>Teacher</i>}{person.is_admin && <i>Admin</i>}
+        </button>
       </li>)}
     </ul>}
 
-    {blocked ? <p className="messages-readonly" role="note">{blocked}</p> : <form className="messages-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}>
+    {emojiOpen && !blocked && <div className="messages-emoji-tray" role="group" aria-label="Insert an emoji">
+      {REACTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => insertEmoji(emoji)} aria-label={`Insert ${emoji}`}>{emoji}</button>)}
+    </div>}
+
+    {blocked ? <p className="messages-readonly" role="note">{blocked}</p> : <form className="messages-composer" onSubmit={(event) => { event.preventDefault(); setEmojiOpen(false); void send(); }}>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => chooseFile(event.target.files?.[0])} />
       <button type="button" className="messages-icon-btn messages-attach-button" onClick={() => fileRef.current?.click()} disabled={busy} aria-label="Add a photo">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="3" /><circle cx="12" cy="12.5" r="3.5" /><path d="M8.5 5 9.7 3h4.6l1.2 2" /></svg>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
       </button>
-      <textarea
-        ref={composerRef}
-        value={draft} rows={1} maxLength={4000} placeholder="Write a message"
-        onChange={(event) => {
-          const value = event.target.value;
-          setDraft(value);
-          // An @ at the start of a word opens the list of people to mention.
-          const token = /(?:^|\s)@([^\s@]{0,30})$/.exec(value.slice(0, event.target.selectionStart ?? value.length));
-          setMentionQuery(token && conversation.kind !== "direct" ? token[1] : null);
-        }}
-        onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && window.matchMedia("(min-width: 761px)").matches) { event.preventDefault(); void send(); } }}
-        aria-label="Message" disabled={busy}
-      />
+      <div className="messages-field">
+        <textarea
+          ref={composerRef}
+          value={draft} rows={1} maxLength={4000} placeholder="Write a message"
+          onChange={(event) => {
+            const value = event.target.value;
+            setDraft(value);
+            // An @ at the start of a word opens the list of people to mention.
+            const token = /(?:^|\s)@([^\s@]{0,30})$/.exec(value.slice(0, event.target.selectionStart ?? value.length));
+            setMentionQuery(token && conversation.kind !== "direct" ? token[1] : null);
+          }}
+          onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && window.matchMedia("(min-width: 761px)").matches) { event.preventDefault(); void send(); } }}
+          aria-label="Message" disabled={busy}
+        />
+        <button type="button" className="messages-emoji-button" onClick={() => setEmojiOpen(!emojiOpen)} disabled={busy} aria-label="Emoji" aria-expanded={emojiOpen}>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M8.5 14.2c.9 1.1 2 1.6 3.5 1.6s2.6-.5 3.5-1.6" /><path d="M9 9.6h.01M15 9.6h.01" strokeWidth="2.6" /></svg>
+        </button>
+      </div>
       <button type="submit" className="messages-icon-btn send" disabled={busy || (!draft.trim() && !photo)} aria-label={busy ? "Sending" : "Send"}>
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6" /></svg>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6" /></svg>
       </button>
     </form>}
 
@@ -475,7 +569,10 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
 
     {showMembers && !channel && <DetailModal title={title} onClose={() => setShowMembers(false)}>
       {conversation.kind !== "direct" && <ul className="messages-members">
-        {[...people.values()].map((person) => <li key={person.user_id}>{person.display_name}{person.is_teacher && <i>Teacher</i>}{person.is_admin && <i>Admin</i>}</li>)}
+        {[...people.values()].map((person) => <li key={person.user_id}>
+          <Avatar url={person.avatar_path ? avatarUrls.get(person.avatar_path) ?? null : null} label={person.display_name} size="sm" tone={toneFor(person.user_id)} ring={roleRing(person)} />
+          <span>{person.display_name}{person.is_teacher && <i>Teacher</i>}{person.is_admin && <i>Admin</i>}</span>
+        </li>)}
       </ul>}
       <div className="bar-footer">
         <button type="button" className="ghost" onClick={() => { setShowMembers(false); void toggleMute(); }}>{conversation.muted ? "Unmute" : "Mute"}</button>
