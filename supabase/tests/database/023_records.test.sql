@@ -148,9 +148,9 @@ set local role authenticated;
 select lives_ok($$insert into storage.objects (bucket_id, name, owner_id) values ('family-village-private', 'records/00000000-0000-0000-0000-0000000000e1/00000000-0000-0000-0000-0000000000e2.pdf', '00000000-0000-0000-0000-0000000000a1')$$, 'an administrator can upload to the right path');
 select is((select count(*)::int from storage.objects where name = 'records/00000000-0000-0000-0000-0000000000e1/00000000-0000-0000-0000-0000000000e2.pdf'), 1, 'and can read back what they just uploaded');
 select throws_ok($$insert into storage.objects (bucket_id, name, owner_id) values ('family-village-private', 'records/loose.pdf', '00000000-0000-0000-0000-0000000000a1')$$, '42501', null, 'but not to a path of the wrong shape');
-select lives_ok($$do $x$ declare n int; begin update storage.objects set metadata = '{}' where name like 'records/%'; get diagnostics n = row_count; if n <> 0 then raise exception 'changed %', n; end if; end $x$$$, 'nobody can change a stored file');
-select lives_ok($$do $x$ declare n int; begin delete from storage.objects where name like 'records/%/00000000-0000-0000-0000-0000000000f%'; get diagnostics n = row_count; if n <> 0 then raise exception 'deleted %', n; end if; end $x$$$, 'nobody can delete a file a record points at');
-select lives_ok($$do $x$ declare n int; begin delete from storage.objects where name = 'records/00000000-0000-0000-0000-0000000000e1/00000000-0000-0000-0000-0000000000e2.pdf'; get diagnostics n = row_count; if n <> 1 then raise exception 'deleted %', n; end if; end $x$$$, 'but an upload nothing points at can be cleared away');
+select lives_ok($q$do $x$ declare n int; begin update storage.objects set metadata = '{}' where name like 'records/%'; get diagnostics n = row_count; if n <> 0 then raise exception 'changed %', n; end if; end $x$ $q$, 'nobody can change a stored file');
+select lives_ok($q$do $x$ declare n int; begin delete from storage.objects where name like 'records/%/00000000-0000-0000-0000-0000000000f%'; get diagnostics n = row_count; if n <> 0 then raise exception 'deleted %', n; end if; end $x$ $q$, 'nobody can delete a file a record points at');
+select lives_ok($q$do $x$ declare n int; begin delete from storage.objects where name = 'records/00000000-0000-0000-0000-0000000000e1/00000000-0000-0000-0000-0000000000e2.pdf'; get diagnostics n = row_count; if n <> 1 then raise exception 'deleted %', n; end if; end $x$ $q$, 'but an upload nothing points at can be cleared away');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
 set local role authenticated;
@@ -208,7 +208,7 @@ select is((select count(*)::int from public.org_record_files where record_id = (
 select ok(exists (select 1 from public.audit_log where action = 'record_erased' and subject_id = (select id from rec)::text and detail ->> 'title' = 'General liability policy'), 'the audit log keeps who erased what, and why');
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-select lives_ok($$do $x$ declare n int; begin delete from storage.objects where name like 'records/' || (select id from rec)::text || '/%'; get diagnostics n = row_count; if n <> 3 then raise exception 'deleted %', n; end if; end $x$$$, 'after the erasure its files can be cleared from storage');
+select lives_ok($q$do $x$ declare n int; begin delete from storage.objects where name like 'records/' || (select id from rec)::text || '/%'; get diagnostics n = row_count; if n <> 3 then raise exception 'deleted %', n; end if; end $x$ $q$, 'after the erasure its files can be cleared from storage');
 reset role;
 
 -- ---- key facts -------------------------------------------------------------------------------------------
