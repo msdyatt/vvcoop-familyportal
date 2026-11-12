@@ -83,6 +83,8 @@ export type NavPrefs = {
   admin?: string[];
   teacher?: string[];
   legacy?: { home?: string[]; teacher?: string[] };
+  /** Light, Dark or System (lib/theme.ts). Not a bar setting, but it lives in the same small per-person record. */
+  theme?: "system" | "light" | "dark";
 };
 
 const byId = new Map(DESTINATIONS.map((d) => [d.id, d]));
@@ -161,6 +163,7 @@ export function cleanPrefs(value: unknown): NavPrefs {
     out.home = home.slice(0, MAX_SLOTS);
   }
   if (Array.isArray(raw.admin)) out.admin = known(raw.admin).slice(0, MAX_SLOTS);
+  if (raw.theme === "system" || raw.theme === "light" || raw.theme === "dark") out.theme = raw.theme;
 
   // Carry the earlier lists along, untouched by later saves.
   const legacy = raw.legacy;

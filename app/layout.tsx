@@ -2,8 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./platform.css";
 import "./public-site.css";
+import "./theme.css";
 import "./class-pages.css";
 import { PLATFORM_SCRIPT } from "../lib/platform";
+import { THEME_COLORS, THEME_SCRIPT } from "../lib/theme";
+import ThemeSync from "./theme-sync";
 import ErrorReporter from "./error-reporter";
 import SwipeBack from "./swipe-back";
 import Toaster from "./toaster";
@@ -11,7 +14,14 @@ import GlobalErrorBoundary from "./global-error-boundary";
 import NativePushRouter from "./native-push-router";
 
 export const viewport: Viewport = {
-  themeColor: "#0b2a3d",
+  // One tag per scheme, so the browser's bar follows the device when the choice is System. THEME_SCRIPT rewrites
+  // both when the person has chosen Light or Dark (lib/theme.ts). The installed app's manifest cannot change
+  // with the theme, so its splash and icon stay navy, which suits both.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+  ],
+  colorScheme: "light dark",
   // Lets the portal run edge to edge on notched phones once installed.
   viewportFit: "cover",
 };
@@ -55,6 +65,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <head>
       {/* Marks the page as iOS/Android and app/installed/browser before it paints, so platform styling never flashes in. */}
       <script dangerouslySetInnerHTML={{ __html: PLATFORM_SCRIPT }} />
+      {/* Light, Dark or System, decided from the device's saved choice and setting before the first paint, so there is no flash of the wrong theme. */}
+      <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       {/* Playfair Display carries the high-contrast display serif the brand
           guide specifies for headings. Inter is the body face; the CSS stack
           falls through to the platform UI sans, which the guide allows. Both
@@ -66,6 +78,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <body>
       <ErrorReporter />
       <Toaster />
+      <ThemeSync />
       <SwipeBack />
       <NativePushRouter />
       <GlobalErrorBoundary>{children}</GlobalErrorBoundary>

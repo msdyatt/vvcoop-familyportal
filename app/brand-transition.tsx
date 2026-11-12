@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import BrandLockup from "./brand-lockup";
 import { useEffect, useState } from "react";
 
 export default function BrandTransition() {
@@ -25,14 +25,7 @@ export default function BrandTransition() {
       className={`brand-transition${compact ? " is-compact" : ""}`}
       aria-label="Veritas Village"
     >
-      <Image
-        src="/brand/lockup-horizontal-navy.png"
-        alt="Veritas Village"
-        width={900}
-        height={310}
-        priority
-        sizes="(max-width: 520px) 54vw, 360px"
-      />
+      <BrandLockup priority sizes="(max-width: 520px) 54vw, 360px" />
     </a>
   );
 }

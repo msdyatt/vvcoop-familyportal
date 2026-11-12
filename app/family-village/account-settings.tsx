@@ -10,10 +10,12 @@ import PushSection from "./push-section";
 import NotificationPrefsSection from "./notification-prefs-section";
 import { ConfirmDeleteModal } from "./admin/admin-ui";
 import { disablePush } from "../../lib/push";
+import ThemeChoiceControl from "./theme-choice";
 
 export default function AccountSettings({ email, onProfileUpdated }: { email: string; onSignOut?: () => void; onProfileUpdated?: () => void }) {
   return <div className="account-settings">
     <ContactSection onProfileUpdated={onProfileUpdated} />
+    <AppearanceSection />
     <PasswordSection email={email} />
     <PasskeySection />
     <TwoFactorSection />
@@ -22,6 +24,14 @@ export default function AccountSettings({ email, onProfileUpdated }: { email: st
     <CalendarSection />
     <DangerZone />
     <p className="portal-legal-links"><a href="/privacy">Privacy policy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></p>
+  </div>;
+}
+
+function AppearanceSection() {
+  return <div className="settings-block">
+    <p className="card-kicker">Appearance</p>
+    <p className="portal-empty">Light, dark, or follow this device’s setting. Dark is easier on the eyes in the evening.</p>
+    <ThemeChoiceControl />
   </div>;
 }
 
@@ -268,7 +278,7 @@ function PasskeySection() {
     <p className="card-kicker">Passkeys</p>
     <p className="portal-empty">Sign in with your device’s biometrics or security key instead of typing a password.</p>
     {passkeys.map((key) => <div className="member-row" key={key.id}>
-      <div><b>{key.friendly_name || "Passkey"}</b><span style={{ display: "block", fontSize: 11, color: "var(--sage)" }}>Added {new Date(key.created_at).toLocaleDateString()}{key.last_used_at ? ` · last used ${new Date(key.last_used_at).toLocaleDateString()}` : ""}</span></div>
+      <div><b>{key.friendly_name || "Passkey"}</b><span style={{ display: "block", fontSize: 11, color: "var(--text-muted)" }}>Added {new Date(key.created_at).toLocaleDateString()}{key.last_used_at ? ` · last used ${new Date(key.last_used_at).toLocaleDateString()}` : ""}</span></div>
       <div className="row-actions"><button className="danger" onClick={() => removePasskey(key.id)} disabled={busy}>Remove</button></div>
     </div>)}
     <button onClick={addPasskey} disabled={busy} style={{ marginTop: passkeys.length ? 14 : 0 }}>{busy ? "Working…" : "Add a passkey"}</button>

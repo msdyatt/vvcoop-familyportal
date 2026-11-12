@@ -9,7 +9,9 @@ import {
 import PortalMenuItems from "./portal-menu-items";
 import { useUnreadCount } from "./messages/messages-link";
 import { buildFrameState, nativeFrame } from "../../lib/native-frame";
+import { applyTheme, readStoredChoice } from "../../lib/theme";
 import BarCustomizer from "./bar-customizer";
+import ThemeChoiceControl from "./theme-choice";
 import DetailModal from "./detail-modal";
 
 type Props = {
@@ -79,6 +81,8 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
       const fresh = cleanPrefs(data.prefs);
       setPrefs(fresh);
       writeCachedPrefs(fresh);
+      // A device that has never had a theme chosen takes the one on the account (lib/theme.ts).
+      if (fresh.theme && readStoredChoice() === null) applyTheme(fresh.theme, { persist: true });
     }
   }
 
@@ -126,6 +130,9 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
     // The old Teacher bar was merged into the main one when prefs were read; it is not written back.
     const next: NavPrefs = { ...prefs, ...changes };
     delete next.teacher;
+    // Saving the bar rewrites the whole record; keep the theme that is in force on this device in it.
+    const device = readStoredChoice();
+    if (device) next.theme = device;
     setPrefs(next);
     writeCachedPrefs(next);
     const supabase = getSupabaseBrowserClient();
@@ -174,6 +181,7 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
         <PortalMenuItems roles={roles} />
         <li><button type="button" onClick={() => { setMenuOpen(false); setEditing(true); }}>Customize bottom bar</button></li>
         <li><button type="button" onClick={() => { setMenuOpen(false); onOpenAccount(); }}>Account &amp; security</button></li>
+        <li className="app-menu-theme"><p className="app-menu-theme-label">Appearance</p><ThemeChoiceControl compact /></li>
         <li><button type="button" onClick={() => { setMenuOpen(false); onTour(); }}>Take the tour</button></li>
         <li><button type="button" onClick={onSignOut}>Sign out</button></li>
       </ul>

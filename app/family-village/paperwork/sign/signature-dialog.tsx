@@ -33,7 +33,9 @@ export default function SignatureDialog({ kind, defaultName, onAdopt, onCancel }
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = getComputedStyle(document.body).color;
+    // Ink for paper: navy in both themes. The drawing is stamped onto a white PDF page, so it must never take the
+    // page's text colour (cream in the dark theme).
+    ctx.strokeStyle = "#0b2a3d";
   }, [mode]);
 
   function point(event: React.PointerEvent<HTMLCanvasElement>) {
