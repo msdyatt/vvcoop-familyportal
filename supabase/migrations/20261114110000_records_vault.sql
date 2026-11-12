@@ -430,7 +430,11 @@ begin
   delete from public.org_record_revisions where record_id = p_record;
   delete from public.org_records where id = p_record;
   perform set_config('records.erasing', 'off', true);
+  -- Storage can only delete what the caller can also read, so the erasing administrator gets
+  -- ten minutes on exactly these paths to clear the files away (the erase is logged below).
   delete from public.org_record_file_grants where storage_path = any (v_paths);
+  insert into public.org_record_file_grants (storage_path, admin_id, expires_at)
+  select p, v_actor, now() + interval '10 minutes' from unnest(v_paths) as p;
   insert into public.audit_log (actor_user_id, action, subject_type, subject_id, detail)
   values (v_actor, 'record_erased', 'org_record', p_record::text,
           jsonb_build_object('title', o.title, 'category', o.category, 'files', cardinality(v_paths), 'reason', btrim(p_reason)));

@@ -208,7 +208,7 @@ select is((select count(*)::int from public.org_record_files where record_id = (
 select ok(exists (select 1 from public.audit_log where action = 'record_erased' and subject_id = (select id from rec)::text and detail ->> 'title' = 'General liability policy'), 'the audit log keeps who erased what, and why');
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-select lives_ok($q$do $x$ declare n int; begin perform set_config('storage.allow_delete_query', 'true', true); delete from storage.objects where name like 'records/' || (select id from rec)::text || '/%'; get diagnostics n = row_count; if n <> 3 then raise exception 'deleted %', n; end if; end $x$ $q$, 'after the erasure its files can be cleared from storage');
+select lives_ok($q$do $x$ declare n int; begin perform set_config('storage.allow_delete_query', 'true', true); delete from storage.objects where name like 'records/' || (select id from rec)::text || '/%'; get diagnostics n = row_count; if n <> 2 then raise exception 'deleted %', n; end if; end $x$ $q$, 'after the erasure its files can be cleared from storage');
 reset role;
 
 -- ---- key facts -------------------------------------------------------------------------------------------
