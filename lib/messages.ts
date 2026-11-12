@@ -18,6 +18,8 @@ export type MessageRow = {
   body: string | null; image_path: string | null; created_at: string; deleted_at: string | null;
   /** Set when the sender changed the words after sending. */
   edited_at: string | null;
+  /** True when photos or files are attached; they are loaded separately (message_attachments). */
+  has_attachments: boolean;
   post_id: string | null; reply_to: string | null;
   /** Set on messages the system posted (a report card, say): who it is "from", and where its link goes. */
   system_label: string | null; link_path: string | null;
@@ -30,7 +32,7 @@ export type Reaction = { message_id: string; user_id: string; emoji: string };
 /** The reactions on offer. The same list is enforced in the database. */
 export const REACTIONS = ["👍", "❤️", "😂", "🎉", "🙏", "😮"] as const;
 
-export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,edited_at,post_id,reply_to,system_label,link_path,reply:messages!reply_to(id,sender_id,body,image_path,deleted_at)";
+export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,edited_at,has_attachments,post_id,reply_to,system_label,link_path,reply:messages!reply_to(id,sender_id,body,image_path,deleted_at)";
 
 export function conversationTitle(c: Pick<ConversationRow, "kind" | "title" | "other_name">): string {
   if (c.kind === "direct") return c.other_name ?? "Conversation";
@@ -98,4 +100,42 @@ export const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export function canEditMessage(message: Pick<MessageRow, "created_at" | "deleted_at" | "post_id" | "system_label">, now = Date.now()): boolean {
   return !message.deleted_at && !message.post_id && !message.system_label && now - new Date(message.created_at).getTime() < EDIT_WINDOW_MS;
+}
+
+/** A photo or file attached to a message. The first photo is also the message's image_path, which older code reads. */
+export type Attachment = {
+  id: string; message_id: string; position: number; kind: "image" | "file";
+  path: string; name: string; mime: string; size_bytes: number;
+};
+
+export const ATTACH_MAX = 10;
+export const FILE_MAX_BYTES = 10 * 1024 * 1024;
+/** What the file picker offers; the database checks the same list again. */
+export const ATTACH_ACCEPT = "image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv";
+
+const DOCUMENT_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv: "text/csv",
+};
+
+/** What a chosen file is to Messages: a photo (shrunk before sending), a document, or not allowed (null). */
+export function classifyFile(file: Pick<File, "name" | "type">): { kind: "image" | "file"; mime: string } | null {
+  if (file.type.startsWith("image/")) return { kind: "image", mime: "image/jpeg" };
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const mime = DOCUMENT_TYPES[extension];
+  if (!mime) return null;
+  if (file.type && file.type !== mime && !Object.values(DOCUMENT_TYPES).includes(file.type)) return null;
+  return { kind: "file", mime };
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

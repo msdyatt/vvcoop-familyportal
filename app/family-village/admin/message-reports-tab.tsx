@@ -16,7 +16,11 @@ type PhotoReport = {
   id: string; photo_id: string; status: "open" | "actioned" | "dismissed"; reason: string; created_at: string;
   reporter_name: string; uploader_name: string; caption: string | null; class_title: string | null; thumb_path: string; storage_path: string;
 };
-type ContextRow = { id: string; sender_name: string; body: string | null; image_path: string | null; created_at: string; is_reported: boolean; deleted: boolean };
+type ContextRow = {
+  id: string; sender_name: string; body: string | null; image_path: string | null; created_at: string; is_reported: boolean; deleted: boolean;
+  /** Every photo and file on the message (the first photo is also image_path). */
+  attachments: { kind: "image" | "file"; path: string; name: string }[] | null;
+};
 
 const STATUS_LABEL = { open: "Needs review", actioned: "Message removed", dismissed: "Dismissed" } as const;
 
@@ -62,7 +66,7 @@ export default function MessageReportsTab() {
     const { data, error } = await supabase.rpc("admin_report_context", { p_report_id: report.id });
     if (error) { setStatus(error.message); return; }
     const rows = (data ?? []) as ContextRow[];
-    const paths = rows.map((row) => row.image_path).filter((path): path is string => !!path);
+    const paths = rows.flatMap((row) => [row.image_path, ...(row.attachments ?? []).filter((a) => a.kind === "image").map((a) => a.path)]).filter((path): path is string => !!path);
     if (paths.length) {
       const urls = await getSignedFileUrls(supabase, paths);
       setImages((previous) => new Map([...previous, ...urls]));
@@ -71,13 +75,14 @@ export default function MessageReportsTab() {
   }
 
   async function resolve(report: Report, action: "remove" | "dismiss") {
-    if (action === "remove" && !confirm("Remove this message for everyone in the conversation? Its text and photo are erased.")) return;
+    if (action === "remove" && !confirm("Remove this message for everyone in the conversation? Its text, photos and files are erased.")) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setBusyId(report.id); setStatus("");
     const { data, error } = await supabase.rpc("resolve_message_report", { p_report_id: report.id, p_action: action, p_note: null });
     if (error) { setStatus(error.message); setBusyId(null); return; }
-    if (typeof data === "string" && data) await supabase.storage.from(PRIVATE_BUCKET).remove([data]);
+    // One path, or several separated by new lines when the message had more than one photo or file.
+    if (typeof data === "string" && data) await supabase.storage.from(PRIVATE_BUCKET).remove(data.split("\n"));
     setBusyId(null); setContext(null);
     setStatus(action === "remove" ? "The message was removed." : "The report was dismissed.");
     await load();
@@ -178,6 +183,11 @@ export default function MessageReportsTab() {
               // eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage
               <img className="messages-report-photo" src={images.get(row.image_path)} alt="Attachment in the conversation" />
             )}
+            {(row.attachments ?? []).filter((a) => a.kind === "image" && a.path !== row.image_path && images.get(a.path)).map((a) => (
+              // eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage
+              <img key={a.path} className="messages-report-photo" src={images.get(a.path)} alt="Attachment in the conversation" />
+            ))}
+            {(row.attachments ?? []).filter((a) => a.kind === "file").map((a) => <p key={a.path}><em>File: {a.name}</em></p>)}
           </>}
         </li>)}
       </ul>

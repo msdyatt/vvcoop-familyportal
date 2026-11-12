@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { PRIVATE_BUCKET, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { resizeImage } from "../../../lib/image-resize";
-import { MESSAGE_COLUMNS, REACTIONS, canEditMessage, conversationTitle, dayLabel, isChannel, postingBlock, shortTime, snippet, splitMentions, type ConversationRow, type MessageRow, type Person, type Reaction } from "../../../lib/messages";
+import { ATTACH_ACCEPT, ATTACH_MAX, FILE_MAX_BYTES, MESSAGE_COLUMNS, REACTIONS, canEditMessage, classifyFile, formatBytes, type Attachment, conversationTitle, dayLabel, isChannel, postingBlock, shortTime, snippet, splitMentions, type ConversationRow, type MessageRow, type Person, type Reaction } from "../../../lib/messages";
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
 import ChannelDetails from "./channel-details";
@@ -12,6 +12,8 @@ import ConversationAvatar from "./conversation-avatar";
 import { FLAVOUR_LABEL, conversationFlavour, conversationTone, roleRing, toneFor } from "../../../lib/message-colors";
 
 const PAGE = 50;
+
+type Pending = { id: string; file: File; kind: "image" | "file"; previewUrl: string | null };
 
 /**
  * Pairs each message with its day label, and where it sits in a run: a run is
@@ -55,13 +57,15 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   const [people, setPeople] = useState<Map<string, Person>>(new Map());
   const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
   const [draft, setDraft] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // Photos and files chosen for the next message, not yet sent.
+  const [pending, setPending] = useState<Pending[]>([]);
+  // Photos and files already sent, by message.
+  const [attachments, setAttachments] = useState<Map<string, Attachment[]>>(new Map());
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [reporting, setReporting] = useState<MessageRow | null>(null);
   const [reason, setReason] = useState("");
-  const [viewing, setViewing] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<{ urls: string[]; index: number } | null>(null);
   const [showMembers, setShowMembers] = useState(false);
   // For a conversation about a student: adults of that student who have not joined the portal yet.
   const [notInPortal, setNotInPortal] = useState<string[]>([]);
@@ -183,65 +187,95 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     void getSignedFileUrls(supabase, paths).then(setAvatarUrls);
   }, [people]);
 
-  // Photos: fetch a signed link for any that do not have one yet.
+  // Photos and files on messages: load the list for any message that has some and has not been loaded yet.
+  const toLoad = messages.filter((m) => m.has_attachments && !attachments.has(m.id)).map((m) => m.id).join(",");
   useEffect(() => {
-    const missing = messages.map((m) => m.image_path).filter((p): p is string => !!p && !imageUrls.has(p));
+    if (!toLoad) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const ids = toLoad.split(",");
+    void supabase.from("message_attachments").select("id,message_id,position,kind,path,name,mime,size_bytes").in("message_id", ids).order("position").then(({ data }) => {
+      const grouped = new Map<string, Attachment[]>(ids.map((id) => [id, []]));
+      for (const row of (data ?? []) as Attachment[]) grouped.get(row.message_id)?.push(row);
+      setAttachments((previous) => new Map([...previous, ...grouped]));
+    });
+  }, [toLoad]);
+
+  // Fetch a signed link for any photo or file that does not have one yet.
+  useEffect(() => {
+    const paths = [...messages.map((m) => m.image_path), ...[...attachments.values()].flat().map((a) => a.path)];
+    const missing = [...new Set(paths)].filter((p): p is string => !!p && !imageUrls.has(p));
     if (!missing.length) return;
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     void getSignedFileUrls(supabase, missing).then((urls) => setImageUrls((previous) => new Map([...previous, ...urls])));
-  }, [messages, imageUrls]);
+  }, [messages, attachments, imageUrls]);
 
   useEffect(() => {
     const el = listRef.current;
     if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
     stickToBottom.current = true;
-  }, [messages.length, imageUrls.size]);
+  }, [messages.length, imageUrls.size, attachments.size]);
 
-  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+  // Free the local previews when the conversation closes.
+  const pendingRef = useRef(pending);
+  useEffect(() => { pendingRef.current = pending; });
+  useEffect(() => () => { pendingRef.current.forEach((item) => { if (item.previewUrl) URL.revokeObjectURL(item.previewUrl); }); }, []);
 
-  function chooseFile(file: File | undefined) {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { setStatus("Choose a photo (JPEG, PNG, or similar)."); return; }
-    setStatus("");
-    setPhoto(file);
-    setPhotoPreview(URL.createObjectURL(file));
+  function chooseFiles(list: FileList | null) {
+    if (!list?.length) return;
+    const next = [...pending];
+    let problem = "";
+    for (const file of Array.from(list)) {
+      const kind = classifyFile(file);
+      if (!kind) { problem = `${file.name} is not a photo, PDF, Word, PowerPoint, Excel or CSV file.`; continue; }
+      if (kind.kind === "file" && file.size > FILE_MAX_BYTES) { problem = `${file.name} is over 10 MB.`; continue; }
+      if (next.length >= ATTACH_MAX) { problem = `Add up to ${ATTACH_MAX} photos or files to one message.`; break; }
+      next.push({ id: crypto.randomUUID(), file, kind: kind.kind, previewUrl: kind.kind === "image" ? URL.createObjectURL(file) : null });
+    }
+    setStatus(problem);
+    setPending(next);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
-  function clearPhoto() {
-    setPhoto(null);
-    setPhotoPreview(null);
-    if (fileRef.current) fileRef.current.value = "";
+  function removePending(id: string) {
+    const gone = pending.find((item) => item.id === id);
+    if (gone?.previewUrl) URL.revokeObjectURL(gone.previewUrl);
+    setPending((items) => items.filter((item) => item.id !== id));
   }
 
   async function send() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase || busy) return;
     const body = draft.trim();
-    if (!body && !photo) return;
+    if (!body && !pending.length) return;
     setBusy(true); setStatus("");
+    const uploadedPaths: string[] = [];
     try {
-      let imagePath: string | null = null;
-      if (photo) {
-        const resized = await resizeImage(photo);
-        const uploaded = await uploadPrivateFile(supabase, `messages/${conversation.id}`, resized);
+      // Photos are shrunk (and stripped of location data) first; documents go up as they are.
+      const sent = [];
+      for (const item of pending) {
+        const file = item.kind === "image" ? await resizeImage(item.file) : item.file;
+        const kind = classifyFile(item.file);
+        const upload = item.kind === "image" ? file : new File([file], file.name, { type: kind?.mime ?? file.type });
+        const uploaded = await uploadPrivateFile(supabase, `messages/${conversation.id}`, upload);
         if ("error" in uploaded) throw new Error(uploaded.error);
-        imagePath = uploaded.path;
+        uploadedPaths.push(uploaded.path);
+        sent.push({ path: uploaded.path, name: item.file.name.slice(0, 160), mime: upload.type, size: upload.size });
       }
       const mentions = [...mentionIds].filter(([name]) => body.includes(`@${name}`)).map(([, id]) => id);
       const { error } = await supabase.rpc("send_message", {
-        p_conversation_id: conversation.id, p_body: body || null, p_image_path: imagePath,
-        p_reply_to: replyingTo?.id ?? null, p_mentions: mentions,
+        p_conversation_id: conversation.id, p_body: body || null,
+        p_reply_to: replyingTo?.id ?? null, p_mentions: mentions, p_attachments: sent,
       });
-      if (error) {
-        if (imagePath) void supabase.storage.from(PRIVATE_BUCKET).remove([imagePath]);
-        throw new Error(error.message);
-      }
-      setDraft(""); clearPhoto(); setReplyingTo(null); setMentionIds(new Map()); setMentionQuery(null);
+      if (error) throw new Error(error.message);
+      pending.forEach((item) => { if (item.previewUrl) URL.revokeObjectURL(item.previewUrl); });
+      setDraft(""); setPending([]); setReplyingTo(null); setMentionIds(new Map()); setMentionQuery(null);
       stickToBottom.current = true;
       await fetchLatest();
       await onChanged();
     } catch (error) {
+      if (uploadedPaths.length) void supabase.storage.from(PRIVATE_BUCKET).remove(uploadedPaths);
       setStatus(error instanceof Error ? error.message : "That message could not be sent.");
     } finally {
       setBusy(false);
@@ -254,7 +288,8 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     if (!supabase) return;
     const { data, error } = await supabase.rpc("delete_own_message", { p_message_id: message.id });
     if (error) { setStatus(error.message); return; }
-    if (typeof data === "string" && data) void supabase.storage.from(PRIVATE_BUCKET).remove([data]);
+    // One path, or several separated by new lines when the message had more than one photo or file.
+    if (typeof data === "string" && data) void supabase.storage.from(PRIVATE_BUCKET).remove(data.split("\n"));
     await fetchLatest();
     await onChanged();
   }
@@ -398,7 +433,6 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
       {rows.map(({ message, day, showDay, startsRun, endsRun, card }) => {
         const mine = message.sender_id === userId;
         const sender = message.sender_id ? people.get(message.sender_id) : undefined;
-        const url = message.image_path ? imageUrls.get(message.image_path) : undefined;
         const group = conversation.kind !== "direct";
         const system = !!message.system_label && !message.deleted_at;
         const [headline, ...rest] = (message.body ?? "").split("\n");
@@ -443,12 +477,41 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           <b>{message.reply.sender_id === userId ? "You" : people.get(message.reply.sender_id ?? "")?.display_name ?? "Former member"}</b>
           <span>{snippet(message.reply)}</span>
         </a>;
+        // Photos and files on this message. Older messages carry one photo in image_path and no attachment rows.
+        const sentAttachments = message.has_attachments ? attachments.get(message.id) : undefined;
+        const media: Attachment[] = sentAttachments ?? (message.image_path && !message.has_attachments
+          ? [{ id: message.id, message_id: message.id, position: 0, kind: "image", path: message.image_path, name: "Photo", mime: "image/jpeg", size_bytes: 0 }] : []);
+        const mediaImages = media.filter((a) => a.kind === "image");
+        const mediaFiles = media.filter((a) => a.kind === "file");
+        const viewUrls = mediaImages.map((a) => imageUrls.get(a.path)).filter((u): u is string => !!u);
+        const hiddenImages = Math.max(0, mediaImages.length - 4);
         const photo = !message.deleted_at && <>
-          {url && <button type="button" className="messages-photo" onClick={() => setViewing(url)} aria-label="Open photo">
-            {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage; next/image can't optimize it */}
-            <img src={url} alt="Attachment" loading="lazy" />
-          </button>}
-          {message.image_path && !url && <span className="messages-photo-loading">Loading photo…</span>}
+          {mediaImages.length > 0 && <div className={`messages-media count-${Math.min(mediaImages.length, 4)}`}>
+            {mediaImages.slice(0, 4).map((a, index) => {
+              const url = imageUrls.get(a.path);
+              return url
+                ? <button key={a.id} type="button" className="messages-photo" onClick={() => setViewing({ urls: viewUrls, index: viewUrls.indexOf(url) })}
+                    aria-label={mediaImages.length > 1 ? `Open photo ${index + 1} of ${mediaImages.length}` : "Open photo"}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage; next/image can't optimize it */}
+                    <img src={url} alt="Attachment" loading="lazy" />
+                    {index === 3 && hiddenImages > 0 && <span className="messages-more">+{hiddenImages}</span>}
+                  </button>
+                : <span key={a.id} className="messages-photo-loading">Loading photo…</span>;
+            })}
+          </div>}
+          {mediaFiles.length > 0 && <div className="messages-files">
+            {mediaFiles.map((a) => {
+              const url = imageUrls.get(a.path);
+              const inner = <>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>
+                <span className="messages-file-text"><b>{a.name}</b><small>{formatBytes(a.size_bytes)}</small></span>
+              </>;
+              return url
+                ? <a key={a.id} className="messages-file" href={url} target="_blank" rel="noopener noreferrer" download={a.name}>{inner}</a>
+                : <span key={a.id} className="messages-file">{inner}</span>;
+            })}
+          </div>}
+          {message.has_attachments && !sentAttachments && <span className="messages-photo-loading">Loading…</span>}
         </>;
 
         if (card) {
@@ -480,7 +543,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
 
         const showName = !mine && group && startsRun;
         const showAvatar = group && !mine;
-        const hasPhoto = !!message.image_path && !message.deleted_at;
+        const hasMedia = media.length > 0 && !message.deleted_at;
         return <div key={message.id} id={`msg-${message.id}`} className="messages-msg">
           {showDay && <div className="messages-day"><span>{day}</span></div>}
           <div className={`messages-bubble-row pc-${personTone}${mine ? " mine" : ""}${startsRun ? " run-start" : ""}${endsRun ? " run-end" : ""}${chips.length ? " has-reactions" : ""}${showAvatar ? " with-avatar" : ""}`}>
@@ -493,7 +556,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
                 ? <Avatar url={sender?.avatar_path ? avatarUrls.get(sender.avatar_path) ?? null : null} label={senderName} size="sm" tone={personTone} ring={roleRing(sender)} />
                 : <span className="messages-avatar-gap" aria-hidden="true" />)}
               {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- tapping is a convenience; the same buttons are reachable by keyboard */}
-              <div className={`messages-bubble${mine ? " mine" : ""}${message.deleted_at ? " removed" : ""}${hasPhoto ? " has-photo" : ""}${hasPhoto && !message.body && !message.reply ? " photo-only" : ""}${open ? " open" : ""}`} onClick={toggle}>
+              <div className={`messages-bubble${mine ? " mine" : ""}${message.deleted_at ? " removed" : ""}${hasMedia ? " has-photo" : ""}${hasMedia && mediaFiles.length === 0 && !message.body && !message.reply ? " photo-only" : ""}${open ? " open" : ""}`} onClick={toggle}>
                 {message.deleted_at
                   ? <em>Message removed</em>
                   : <>
@@ -506,7 +569,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
                               onKeyDown={(event) => { if (event.key === "Escape") setEditing(null); }} />
                             <span className="messages-edit-actions">
                               <button type="button" className="ghost" onClick={() => setEditing(null)} disabled={busy}>Cancel</button>
-                              <button type="button" onClick={() => void saveEdit()} disabled={busy || (!editing.text.trim() && !message.image_path)}>Save</button>
+                              <button type="button" onClick={() => void saveEdit()} disabled={busy || (!editing.text.trim() && !message.image_path && !message.has_attachments)}>Save</button>
                             </span>
                           </div>
                         : message.body && <p>{splitMentions(message.body, mentionNames).map((part, index) => part.mention
@@ -524,11 +587,15 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
 
     {status && <p className="admin-form-status messages-status" role="status">{status}</p>}
 
-    {photoPreview && <div className="messages-attach">
-      {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the chosen file */}
-      <img src={photoPreview} alt="Attachment preview" />
-      <button type="button" className="ghost" onClick={clearPhoto}>Remove photo</button>
-    </div>}
+    {pending.length > 0 && <ul className="messages-pending" aria-label="Ready to send">
+      {pending.map((item) => <li key={item.id} className={item.kind === "image" ? "is-photo" : "is-file"}>
+        {item.previewUrl
+          // eslint-disable-next-line @next/next/no-img-element -- a local preview of the chosen file
+          ? <img src={item.previewUrl} alt="" />
+          : <span className="messages-pending-file"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg><b>{item.file.name}</b><small>{formatBytes(item.file.size)}</small></span>}
+        <button type="button" className="messages-pending-x" onClick={() => removePending(item.id)} aria-label={`Remove ${item.file.name}`}>×</button>
+      </li>)}
+    </ul>}
 
     {replyingTo && !blocked && <div className="messages-replying">
       <span>Replying to <b>{replyingTo.sender_id === userId ? "yourself" : people.get(replyingTo.sender_id ?? "")?.display_name ?? "Former member"}</b>: {snippet(replyingTo, 60)}</span>
@@ -549,8 +616,8 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     </div>}
 
     {blocked ? <p className="messages-readonly" role="note">{blocked}</p> : <form className="messages-composer" onSubmit={(event) => { event.preventDefault(); setEmojiOpen(false); void send(); }}>
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => chooseFile(event.target.files?.[0])} />
-      <button type="button" className="messages-icon-btn messages-attach-button" onClick={() => fileRef.current?.click()} disabled={busy} aria-label="Add a photo">
+      <input ref={fileRef} type="file" accept={ATTACH_ACCEPT} multiple hidden onChange={(event) => chooseFiles(event.target.files)} />
+      <button type="button" className="messages-icon-btn messages-attach-button" onClick={() => fileRef.current?.click()} disabled={busy || pending.length >= ATTACH_MAX} aria-label="Add photos or files">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
       </button>
       <div className="messages-field">
@@ -571,7 +638,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M8.5 14.2c.9 1.1 2 1.6 3.5 1.6s2.6-.5 3.5-1.6" /><path d="M9 9.6h.01M15 9.6h.01" strokeWidth="2.6" /></svg>
         </button>
       </div>
-      <button type="submit" className="messages-icon-btn send" disabled={busy || (!draft.trim() && !photo)} aria-label={busy ? "Sending" : "Send"}>
+      <button type="submit" className="messages-icon-btn send" disabled={busy || (!draft.trim() && !pending.length)} aria-label={busy ? "Sending" : "Send"}>
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6" /></svg>
       </button>
     </form>}
@@ -589,9 +656,15 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
       </div>
     </DetailModal>}
 
-    {viewing && <DetailModal title="Photo" onClose={() => setViewing(null)}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage */}
-      <img className="messages-lightbox" src={viewing} alt="Attachment, full size" />
+    {viewing && <DetailModal title={viewing.urls.length > 1 ? `Photo ${viewing.index + 1} of ${viewing.urls.length}` : "Photo"} onClose={() => setViewing(null)}>
+      <div className="messages-lightbox-wrap">
+        {viewing.urls.length > 1 && <button type="button" className="messages-icon-btn messages-lightbox-step prev" aria-label="Previous photo"
+          onClick={() => setViewing({ ...viewing, index: (viewing.index + viewing.urls.length - 1) % viewing.urls.length })}>‹</button>}
+        {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage */}
+        <img className="messages-lightbox" src={viewing.urls[viewing.index]} alt="Attachment, full size" />
+        {viewing.urls.length > 1 && <button type="button" className="messages-icon-btn messages-lightbox-step next" aria-label="Next photo"
+          onClick={() => setViewing({ ...viewing, index: (viewing.index + 1) % viewing.urls.length })}>›</button>}
+      </div>
     </DetailModal>}
 
     {showMembers && channel && <DetailModal title={`# ${title}`} onClose={() => setShowMembers(false)}>
