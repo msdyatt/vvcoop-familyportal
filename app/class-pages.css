@@ -151,6 +151,8 @@
 
 .cls-card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cls-card-actions .cls-btn:first-child { grid-column: 1 / -1; }
+/* With no chat button, Documents is the only one left on its row: let it fill the row rather than sit half-width. */
+.cls-card-actions .cls-btn:nth-child(2):last-child { grid-column: 1 / -1; }
 
 .cls-earlier summary {
   min-height: 44px;
@@ -333,7 +335,8 @@
 
 @media (min-width: 640px) {
   .cls-card-actions { display: flex; flex-wrap: wrap; }
-  .cls-card-actions .cls-btn:first-child { grid-column: auto; }
+  .cls-card-actions .cls-btn:first-child,
+  .cls-card-actions .cls-btn:nth-child(2):last-child { grid-column: auto; }
   .cls-field-row { grid-template-columns: 1fr 1fr; }
   .cls-hero, .cls-panel { padding: 24px; }
 }
