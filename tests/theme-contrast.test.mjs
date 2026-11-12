@@ -76,10 +76,7 @@ function colour(ref, vars, bg) {
   return alpha ? over(c, bg, Number(alpha)) : c;
 }
 
-// [foreground, background, minimum ratio, what it is, optional per-theme minimum]
-// The per-theme minimum records a shortfall that already existed in the light theme before the
-// themes work (the class pill is 11px cream text on brand terracotta, about 3.9:1). It stops the
-// shortfall getting worse; fixing it changes how light mode looks, so it is a separate decision.
+// [foreground, background, minimum ratio, what it is, optional per-theme minimum {light: n} or {dark: n}]
 const PAIRS = [
   ["text", "canvas", 4.5, "body text on the page"],
   ["text", "surface", 4.5, "text on a raised card"],
@@ -103,6 +100,7 @@ const PAIRS = [
   ["sage-on-navy", "ink-surface", 4.5, "muted text on a navy band"],
   ["terracotta-on-navy", "ink-surface", 4.5, "accent text on a navy band"],
   ["cream", "action", 4.5, "button label"],
+  ["accent-on-action", "action", 4.5, "mention and label text inside a bubble"],
   ["white", "action", 4.5, "button label (white)"],
   ["cream", "danger-fill", 4.5, "urgent banner text"],
   ["white", "danger-fill", 4.5, "error toast text"],
@@ -110,7 +108,7 @@ const PAIRS = [
   ["white", "terracotta-text", 4.5, "white on a status chip (needs-attention)"],
   ["white", "sage-text", 4.5, "white on a status chip (complete)"],
   ["cream", "cal-coop", 4.5, "co-op event pill"],
-  ["cream", "cal-class", 4.5, "class event pill", { light: 3.9 }],
+  ["cream", "cal-class", 4.5, "class event pill"],
   ["fg-rgb@.66", "canvas", 4.5, "inactive tab label (iOS style)"],
   ["fg-rgb@.72", "canvas", 4.5, "inactive tab label (Android style)"],
   ["line-strong", "canvas", 3, "strong outline on the page"],
@@ -149,7 +147,7 @@ test("paper keeps the light roles: every role the dark theme changes is put back
   const paper = props(paperBody);
   const dark = { ...light, ...props(darkAttr) };
   // Roles that only matter on bands, glass bars, the calendar or the Android bar never appear inside a document.
-  const notInDocuments = /^--(glass-|m3-|cal-|ink-surface|canvas-rgb|panel-rgb)/;
+  const notInDocuments = /^--(glass-|m3-|cal-|ink-surface|canvas-rgb|panel-rgb|accent-on-action|wash-on-action|chip-on-action)/;
   for (const name of Object.keys(props(darkAttr))) {
     if (name === "--cal-coop" || notInDocuments.test(name)) continue;
     const lightValue = resolve(name, light), darkValue = resolve(name, dark);

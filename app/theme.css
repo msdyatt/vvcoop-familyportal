@@ -37,6 +37,9 @@ html[data-theme="dark"] {
   --danger-fill:#c4472d;
   --cal-coop:#2b6a8f;
   --cal-class:#a85539;
+  --accent-on-action:var(--cream);
+  --wash-on-action:rgba(2,10,16,.3);
+  --chip-on-action:rgba(2,10,16,.2);
   --gold:#e0b56a;                        /* Antique Gold, lifted for night: focus rings and the lantern glow */
 
   /* Lines, washes and shadows */
@@ -87,6 +90,9 @@ html[data-theme="dark"] {
     --danger-fill:#c4472d;
     --cal-coop:#2b6a8f;
     --cal-class:#a85539;
+    --accent-on-action:var(--cream);
+    --wash-on-action:rgba(2,10,16,.3);
+    --chip-on-action:rgba(2,10,16,.2);
     --gold:#e0b56a;                        /* Antique Gold, lifted for night: focus rings and the lantern glow */
 
     /* Lines, washes and shadows */
@@ -155,6 +161,15 @@ html[data-theme="dark"] {
 .sign-pad,
 .sign-preview {
   color:var(--text);
+}
+
+/* The report sheet is drawn with no fill so it prints cleanly; on screen in the dark theme it needs its own white page. */
+html[data-theme="dark"] .report-sheet { padding:20px 16px 8px; background:var(--surface); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .report-sheet { padding:20px 16px 8px; background:var(--surface); }
+}
+@media print {
+  html[data-theme="dark"] .report-sheet { padding:0; background:none; }
 }
 
 /* ---- Page ground ------------------------------------------------------------------------------------------ */

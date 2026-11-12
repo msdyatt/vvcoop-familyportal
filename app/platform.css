@@ -121,7 +121,7 @@ html[data-app][data-kb] .app-tabbar {
   min-width: 17px;
   height: 17px;
   padding: 0 4px;
-  background: var(--terracotta);
+  background: var(--terracotta-text);
   color: #fff;
   font-size: 11px;
   font-weight: 700;

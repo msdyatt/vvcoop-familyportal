@@ -278,7 +278,7 @@ function PasskeySection() {
     <p className="card-kicker">Passkeys</p>
     <p className="portal-empty">Sign in with your device’s biometrics or security key instead of typing a password.</p>
     {passkeys.map((key) => <div className="member-row" key={key.id}>
-      <div><b>{key.friendly_name || "Passkey"}</b><span style={{ display: "block", fontSize: 11, color: "var(--sage)" }}>Added {new Date(key.created_at).toLocaleDateString()}{key.last_used_at ? ` · last used ${new Date(key.last_used_at).toLocaleDateString()}` : ""}</span></div>
+      <div><b>{key.friendly_name || "Passkey"}</b><span style={{ display: "block", fontSize: 11, color: "var(--text-muted)" }}>Added {new Date(key.created_at).toLocaleDateString()}{key.last_used_at ? ` · last used ${new Date(key.last_used_at).toLocaleDateString()}` : ""}</span></div>
       <div className="row-actions"><button className="danger" onClick={() => removePasskey(key.id)} disabled={busy}>Remove</button></div>
     </div>)}
     <button onClick={addPasskey} disabled={busy} style={{ marginTop: passkeys.length ? 14 : 0 }}>{busy ? "Working…" : "Add a passkey"}</button>
