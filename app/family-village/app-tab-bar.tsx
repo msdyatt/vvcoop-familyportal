@@ -94,14 +94,30 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   }, []);
 
   // While a field has focus the keyboard needs the room; the bar steps aside (see platform.css).
+  // The flag follows document.activeElement rather than a pair of events, so it cannot get stuck on: a
+  // focused field that is removed, or a page restored from the back/forward cache or brought back from the
+  // background, fires no focusout, and a stuck flag hides the bar until the next focus.
   useEffect(() => {
     const root = document.documentElement;
     const isField = (el: EventTarget | null) => el instanceof HTMLElement && el.matches("input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), textarea, select, [contenteditable=true]");
+    const sync = () => { if (isField(document.activeElement)) root.dataset.kb = "1"; else delete root.dataset.kb; };
+    const onVisible = () => { if (document.visibilityState === "visible") sync(); };
+    let frame = 0;
+    const later = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(sync); };
     const onIn = (event: FocusEvent) => { if (isField(event.target)) root.dataset.kb = "1"; };
-    const onOut = () => { delete root.dataset.kb; };
+    sync();
     document.addEventListener("focusin", onIn);
-    document.addEventListener("focusout", onOut);
-    return () => { document.removeEventListener("focusin", onIn); document.removeEventListener("focusout", onOut); delete root.dataset.kb; };
+    document.addEventListener("focusout", later);
+    window.addEventListener("pageshow", sync);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", later);
+      window.removeEventListener("pageshow", sync);
+      document.removeEventListener("visibilitychange", onVisible);
+      delete root.dataset.kb;
+    };
   }, []);
 
   async function savePrefs(next: NavPrefs) {
