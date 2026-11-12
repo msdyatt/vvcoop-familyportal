@@ -19,6 +19,7 @@ const KIND_LABELS: Record<string, string> = {
   post_published: "News posts",
   note_added: "Teacher notes",
   message: "Chat messages",
+  event_reminder: "Event reminders",
 };
 
 const CHANNEL_LABELS: Record<string, string> = { push: "Push", email: "Email", sms: "Text" };
