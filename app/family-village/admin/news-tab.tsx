@@ -7,33 +7,56 @@ import { uploadPrivateFile } from "../../../lib/storage";
 import { inlineImagePaths, sanitizeRichText, stripRichText } from "../../../lib/rich-text";
 import { PostThumbnail, usePostAttachments } from "../post-attachments";
 import RichTextEditor from "../rich-text-editor";
+import { addCalendarDays, coopWallTime, coopWallTimeToDate, formatCoopDateTime } from "../../../lib/coop-time";
 
-type Post = { id: string; title: string; body: string; audience: string; class_id: string | null; published_at: string | null };
+type Post = {
+  id: string; title: string; body: string; audience: string; class_id: string | null; published_at: string | null;
+  scheduled_for: string | null; schedule_held_reason: string | null;
+};
 type ClassOption = { id: string; title: string };
 type CalendarEvent = { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; audience: string; all_day: boolean };
+
+const POST_COLUMNS = "id,title,body,audience,class_id,published_at,scheduled_for,schedule_held_reason";
+
+/** Tomorrow at 8:00 AM Central: where the "Publish later" boxes start. */
+function defaultSchedule() {
+  return { date: addCalendarDays(coopWallTime(new Date()).date, 1), time: "08:00" };
+}
 
 export default function NewsTab({ actorUserId }: { actorUserId: string }) {
   const [view, setView] = useState<"news" | "calendar">("news");
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [classId, setClassId] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
+  const [waiting, setWaiting] = useState<Post[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [title, setTitle] = useState(""); const [body, setBody] = useState(""); const [audience, setAudience] = useState("families");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [when, setWhen] = useState<"now" | "later">("now");
+  const [whenDate, setWhenDate] = useState(() => defaultSchedule().date); const [whenTime, setWhenTime] = useState("08:00");
   const [busy, setBusy] = useState(false); const [status, setStatus] = useState("");
-  const attachments = usePostAttachments(posts.map((post) => post.id));
+  const attachments = usePostAttachments([...waiting, ...posts].map((post) => post.id));
+
+  // A post that has not gone out yet (scheduled, or kept as a draft) can only be saved as "publish later": a
+  // post that has gone out has no schedule left to edit.
+  const editing = [...waiting, ...posts].find((post) => post.id === editingId) ?? null;
+  const mode: "now" | "later" = editing ? (editing.published_at ? "now" : "later") : when;
+  const showSchedule = !editing || !editing.published_at;
+  const scheduledAt = mode === "later" ? coopWallTimeToDate(whenDate, whenTime) : null;
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const [{ data, error }, { data: classRows }, { data: eventRows }] = await Promise.all([
-      supabase.from("posts").select("id,title,body,audience,class_id,published_at").order("created_at", { ascending: false }).limit(40),
+    const [{ data, error }, { data: waitingRows }, { data: classRows }, { data: eventRows }] = await Promise.all([
+      supabase.from("posts").select(POST_COLUMNS).not("published_at", "is", null).order("created_at", { ascending: false }).limit(40),
+      supabase.from("posts").select(POST_COLUMNS).is("published_at", null).order("scheduled_for", { ascending: true, nullsFirst: false }).limit(100),
       supabase.from("classes").select("id,title").order("title"),
       supabase.from("events").select("id,title,description,starts_at,ends_at,location,audience,all_day").is("class_id", null).order("starts_at", { ascending: false }).limit(60),
     ]);
     if (error) return;
     setPosts((data ?? []) as Post[]);
+    setWaiting((waitingRows ?? []) as Post[]);
     setClasses((classRows ?? []) as ClassOption[]);
     setEvents((eventRows ?? []) as CalendarEvent[]);
   }
@@ -41,12 +64,33 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { load(); }, []);
 
-  async function removePost(id: string, headline: string) {
-    if (!confirm(`Delete "${headline}"? Families and teachers will no longer see it, and its photos go with it. This cannot be undone.`)) return;
+  async function removePost(id: string, headline: string, scheduled: boolean) {
+    if (!confirm(scheduled
+      ? `Delete the scheduled post "${headline}"? It will not go out. This cannot be undone.`
+      : `Delete "${headline}"? Families and teachers will no longer see it, and its photos go with it. This cannot be undone.`)) return;
     const supabase = getSupabaseBrowserClient(); if (!supabase) return;
     const { error } = await supabase.from("posts").delete().eq("id", id);
     if (error) { setStatus(error.message); return; }
+    if (editingId === id) cancelEdit();
     setStatus(`Deleted "${headline}".`); await load();
+  }
+
+  async function publishNow(post: Post) {
+    if (!confirm(`Publish "${post.title}" now? Families will be notified right away.`)) return;
+    const supabase = getSupabaseBrowserClient(); if (!supabase) return;
+    const { error } = await supabase.rpc("admin_publish_post_now", { p_id: post.id });
+    if (error) { setStatus(error.message); return; }
+    if (editingId === post.id) cancelEdit();
+    setStatus(`Published "${post.title}".`); await load();
+  }
+
+  async function cancelSchedule(post: Post) {
+    if (!confirm(`Cancel the schedule for "${post.title}"? It will not go out. It stays here as a draft, and you can schedule it again or delete it.`)) return;
+    const supabase = getSupabaseBrowserClient(); if (!supabase) return;
+    const { error } = await supabase.rpc("admin_cancel_scheduled_post", { p_id: post.id });
+    if (error) { setStatus(error.message); return; }
+    if (editingId === post.id) cancelEdit();
+    setStatus(`Cancelled the schedule for "${post.title}". It is kept as a draft.`); await load();
   }
 
   async function publish(event: FormEvent<HTMLFormElement>) {
@@ -61,8 +105,12 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
     // emptiness has to check for those too, not just leftover text, or a
     // photo/attachment-only post silently never published with no
     // explanation why.
-    if (!stripRichText(cleanBody) && !inlineImagePaths(cleanBody).length && !files.length) { setStatus("Write something, or add a photo or file, before publishing."); return; }
+    if (!stripRichText(cleanBody) && !inlineImagePaths(cleanBody).length && !files.length && !(attachments[editingId ?? ""]?.length)) { setStatus("Write something, or add a photo or file, before publishing."); return; }
     if (audience === "class" && !classId) { setStatus("Choose which class this is for."); return; }
+    if (mode === "later") {
+      if (!scheduledAt) { setStatus("Choose the date and time to publish."); return; }
+      if (scheduledAt.getTime() <= new Date().getTime()) { setStatus("Choose a time in the future."); return; }
+    }
     setBusy(true); setStatus("");
 
     const uploaded: { path: string; file: File }[] = [];
@@ -73,30 +121,74 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
     }
 
     const payload = { title: title.trim(), body: cleanBody, audience, class_id: audience === "class" ? classId || null : null };
-    const write = editingId
-      ? supabase.from("posts").update(payload).eq("id", editingId).select("id").single()
-      : supabase.from("posts").insert({ ...payload, author_user_id: actorUserId, published_at: new Date().toISOString() }).select("id").single();
-    const { data: post, error } = await write;
-    if (error) { setStatus(error.message); setBusy(false); return; }
+    let postId: string;
+    if (scheduledAt) {
+      // One step in the database: the post is saved with its time, never published, and the change is logged.
+      const { data: savedId, error } = await supabase.rpc("admin_save_scheduled_post", {
+        p_id: editingId, p_title: payload.title, p_body: payload.body, p_audience: payload.audience, p_class_id: payload.class_id, p_when: scheduledAt.toISOString(),
+      });
+      if (error || !savedId) { setStatus(error?.message ?? "Could not schedule the post."); setBusy(false); return; }
+      postId = savedId as string;
+    } else {
+      const write = editingId
+        ? supabase.from("posts").update(payload).eq("id", editingId).select("id").single()
+        : supabase.from("posts").insert({ ...payload, author_user_id: actorUserId, published_at: new Date().toISOString() }).select("id").single();
+      const { data: post, error } = await write;
+      if (error) { setStatus(error.message); setBusy(false); return; }
+      postId = post.id;
+    }
 
     if (uploaded.length) {
-      const existingCount = attachments[post.id]?.length ?? 0;
-      const { error: attachError } = await supabase.from("post_attachments").insert(uploaded.map((item, index) => ({ post_id: post.id, storage_path: item.path, file_name: item.file.name, content_type: item.file.type || null, sort_order: existingCount + index })));
+      const existingCount = attachments[postId]?.length ?? 0;
+      const { error: attachError } = await supabase.from("post_attachments").insert(uploaded.map((item, index) => ({ post_id: postId, storage_path: item.path, file_name: item.file.name, content_type: item.file.type || null, sort_order: existingCount + index })));
       if (attachError) { setStatus(`Saved, but the new files could not be attached: ${attachError.message}`); setBusy(false); await load(); return; }
     }
 
     const wasEditing = !!editingId;
-    setBusy(false); setTitle(""); setBody(""); setFiles([]); setAudience("families"); setClassId(""); setEditingId(null);
-    setStatus(wasEditing ? "News item updated." : uploaded.length ? `Published with ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}.` : "Published."); await load();
+    const message = scheduledAt
+      ? `${wasEditing ? "Schedule updated" : "Scheduled"}: it will go out ${formatCoopDateTime(scheduledAt)}.`
+      : wasEditing ? "News item updated." : uploaded.length ? `Published with ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}.` : "Published.";
+    setBusy(false); resetComposer(); setStatus(message); await load();
+  }
+
+  function resetComposer() {
+    const next = defaultSchedule();
+    setEditingId(null); setTitle(""); setBody(""); setAudience("families"); setClassId(""); setFiles([]);
+    setWhen("now"); setWhenDate(next.date); setWhenTime(next.time);
   }
 
   function editPost(post: Post) {
-    setEditingId(post.id); setTitle(post.title); setBody(post.body); setAudience(post.audience); setClassId(post.class_id ?? ""); setFiles([]); setStatus(`Editing “${post.title}”.`);
+    const slot = post.scheduled_for ? coopWallTime(post.scheduled_for) : defaultSchedule();
+    setEditingId(post.id); setTitle(post.title); setBody(post.body); setAudience(post.audience); setClassId(post.class_id ?? ""); setFiles([]);
+    setWhenDate(slot.date); setWhenTime(slot.time);
+    setStatus(`Editing “${post.title}”.`);
   }
 
   function cancelEdit() {
-    setEditingId(null); setTitle(""); setBody(""); setAudience("families"); setClassId(""); setFiles([]); setStatus("");
+    resetComposer(); setStatus("");
   }
+
+  const stateLine = (post: Post) => {
+    if (post.published_at) return new Date(post.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (post.scheduled_for) return `Scheduled for ${formatCoopDateTime(post.scheduled_for)}`;
+    return "Draft";
+  };
+
+  const renderPost = (post: Post) => <article className="news-item" key={post.id}>
+    <PostThumbnail attachments={attachments[post.id] ?? []} />
+    <div>
+      <b>{post.title}{!post.published_at && <> <span className={`status-pill ${post.scheduled_for ? "pending" : "cancelled"}`}>{post.scheduled_for ? "Scheduled" : "Draft"}</span></>}</b>
+      <span>{post.audience} · {stateLine(post)}{(attachments[post.id]?.length ?? 0) > 0 ? ` · ${attachments[post.id].length} file${attachments[post.id].length === 1 ? "" : "s"}` : ""}</span>
+      {post.schedule_held_reason && <small className="schedule-held" role="alert">Held: the person who scheduled this is no longer an active administrator, so it did not go out. Publish it, pick a new time, or cancel it.</small>}
+      <small>{stripRichText(post.body).slice(0, 150)}</small>
+    </div>
+    <div className="row-actions">
+      <button onClick={() => editPost(post)}>Edit</button>
+      {!post.published_at && <button onClick={() => publishNow(post)}>Publish now</button>}
+      {!post.published_at && post.scheduled_for && <button className="ghost" onClick={() => cancelSchedule(post)}>Cancel schedule</button>}
+      <button className="danger" onClick={() => removePost(post.id, post.title, !post.published_at)}>Delete</button>
+    </div>
+  </article>;
 
   return <section className="publishing-tab">
     <div className="publishing-switch" role="tablist" aria-label="Publishing tools">
@@ -113,10 +205,30 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
           <label className="file-drop"><span className="field-caption">Photos or files <i>optional</i></span><input type="file" multiple onChange={(event) => setFiles([...(event.target.files ?? [])])} disabled={busy} /></label>
         </div>
         <p className="composer-hint">{audience === "public" ? "Shown in the public news section on the main site." : audience === "teachers" ? "Shown in the Teacher's Lounge only." : audience === "class" ? "Shown to that class's teaching team and enrolled families." : "Shown on every family's dashboard."}</p>
+        {showSchedule && <fieldset className="schedule-pick" disabled={busy}>
+          <legend className="field-caption">When</legend>
+          {!editing && <div className="schedule-choice">
+            <label className="checkbox-field"><input type="radio" name="publish-when" checked={when === "now"} onChange={() => setWhen("now")} /> Publish now</label>
+            <label className="checkbox-field"><input type="radio" name="publish-when" checked={when === "later"} onChange={() => setWhen("later")} /> Publish later</label>
+          </div>}
+          {mode === "later" && <>
+            <div className="composer-row schedule-boxes">
+              <label><span className="field-caption">Date</span><input type="date" required value={whenDate} min={coopWallTime(new Date()).date} onChange={(event) => setWhenDate(event.target.value)} /></label>
+              <label><span className="field-caption">Time (Central)</span><input type="time" required value={whenTime} onChange={(event) => setWhenTime(event.target.value)} /></label>
+            </div>
+            <p className="composer-hint" role="status">{scheduledAt
+              ? scheduledAt.getTime() > new Date().getTime() ? `Goes out ${formatCoopDateTime(scheduledAt)}. Until then no one but administrators can see it, and nobody is notified.` : "That time has already passed. Choose a later one."
+              : "Choose a date and time."}</p>
+          </>}
+        </fieldset>}
         {files.length > 0 && <p className="composer-files">{files.length} file{files.length === 1 ? "" : "s"} ready: {files.map((file) => file.name).join(", ")}</p>}
-        <div className="row-actions"><button disabled={busy}>{busy ? "Saving…" : editingId ? "Save changes" : "Publish news"}</button>{editingId && <button type="button" className="ghost" onClick={cancelEdit} disabled={busy}>Cancel edit</button>}</div><p className="admin-form-status" role="status">{status}</p>
+        <div className="row-actions"><button disabled={busy}>{busy ? "Saving…" : editing ? (mode === "later" ? "Save schedule" : "Save changes") : mode === "later" ? "Schedule news" : "Publish news"}</button>{editingId && <button type="button" className="ghost" onClick={cancelEdit} disabled={busy}>Cancel edit</button>}</div><p className="admin-form-status" role="status">{status}</p>
       </form>
-      <div className="news-list">{posts.map((post) => <article className="news-item" key={post.id}><PostThumbnail attachments={attachments[post.id] ?? []} /><div><b>{post.title}</b><span>{post.audience} · {post.published_at ? new Date(post.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Draft"}{(attachments[post.id]?.length ?? 0) > 0 ? ` · ${attachments[post.id].length} file${attachments[post.id].length === 1 ? "" : "s"}` : ""}</span><small>{stripRichText(post.body).slice(0, 150)}</small></div><div className="row-actions"><button onClick={() => editPost(post)}>Edit</button><button className="danger" onClick={() => removePost(post.id, post.title)}>Delete</button></div></article>)}{!posts.length && <p>No news published yet.</p>}</div>
+      {waiting.length > 0 && <section className="news-waiting" aria-label="Scheduled and draft posts">
+        <p className="card-kicker">Waiting to go out</p>
+        <div className="news-list">{waiting.map(renderPost)}</div>
+      </section>}
+      <div className="news-list">{posts.map(renderPost)}{!posts.length && <p>No news published yet.</p>}</div>
     </> : <CalendarPublisher events={events} onSaved={load} onStatus={setStatus} status={status} />}
   </section>;
 }
