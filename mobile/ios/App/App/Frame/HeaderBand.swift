@@ -41,6 +41,9 @@ final class HeaderBandView: UIView {
     private let profile = UIButton(type: .system)
     private let titleLabel = UILabel()
     private let rule = UIView()
+    /// What the bell was last drawn for, so it can be drawn again when Light/Dark changes: its image is a bitmap with
+    /// the colour baked in, which a dynamic colour cannot re-colour by itself.
+    private var bellState: (unread: Int, ink: UIColor)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -126,8 +129,21 @@ final class HeaderBandView: UIView {
             button.tintColor = theme.foreground
             button.layer.borderColor = theme.rule.cgColor
         }
-        bell.setImage(BellImage.make(count: unread, ink: theme.foreground), for: .normal)
+        bellState = (unread, theme.foreground)
+        drawBell()
         bell.accessibilityLabel = unread > 0 ? "Notifications, \(unread) unread" : "Notifications"
         profile.menu = menu
+    }
+
+    private func drawBell() {
+        guard let state = bellState else { return }
+        bell.setImage(BellImage.make(count: state.unread, ink: state.ink.resolvedColor(with: traitCollection)), for: .normal)
+    }
+
+    override func traitCollectionDidChange(_ previous: UITraitCollection?) {
+        super.traitCollectionDidChange(previous)
+        if previous?.userInterfaceStyle != traitCollection.userInterfaceStyle {
+            drawBell()
+        }
     }
 }
