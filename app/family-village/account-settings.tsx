@@ -10,10 +10,12 @@ import PushSection from "./push-section";
 import NotificationPrefsSection from "./notification-prefs-section";
 import { ConfirmDeleteModal } from "./admin/admin-ui";
 import { disablePush } from "../../lib/push";
+import ThemeChoiceControl from "./theme-choice";
 
 export default function AccountSettings({ email, onProfileUpdated }: { email: string; onSignOut?: () => void; onProfileUpdated?: () => void }) {
   return <div className="account-settings">
     <ContactSection onProfileUpdated={onProfileUpdated} />
+    <AppearanceSection />
     <PasswordSection email={email} />
     <PasskeySection />
     <TwoFactorSection />
@@ -22,6 +24,14 @@ export default function AccountSettings({ email, onProfileUpdated }: { email: st
     <CalendarSection />
     <DangerZone />
     <p className="portal-legal-links"><a href="/privacy">Privacy policy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></p>
+  </div>;
+}
+
+function AppearanceSection() {
+  return <div className="settings-block">
+    <p className="card-kicker">Appearance</p>
+    <p className="portal-empty">Light, dark, or follow this device’s setting. Dark is easier on the eyes in the evening.</p>
+    <ThemeChoiceControl />
   </div>;
 }
 

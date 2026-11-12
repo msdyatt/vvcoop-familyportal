@@ -30,7 +30,7 @@ final class PaymentSheetPresenter {
         if let merchantId = options["applePayMerchantId"] as? String {
             configuration.applePay = .init(merchantId: merchantId, merchantCountryCode: options["countryCode"] as? String ?? "US")
         }
-        configuration.appearance.colors.primary = Brand.navy
+        configuration.appearance.colors.primary = Brand.action
 
         let sheet = PaymentSheet(paymentIntentClientSecret: secret, configuration: configuration)
         self.sheet = sheet

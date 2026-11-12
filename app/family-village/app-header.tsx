@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import BrandLockup from "../brand-lockup";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { useOutsideClick } from "../../lib/use-outside-click";
@@ -84,14 +85,9 @@ export default function AppHeader({ current, roles: held, title, subtitle }: { c
         {/* The guide's own navigation-bar example uses the primary horizontal
             lockup, and pairs the cream variant with dark fields -- which is
             Admin's navy band. Rendered at 150px wide, above its 120px minimum. */}
-        <Image
-          className={`app-header-lockup${current === "admin" ? " on-dark" : ""}`}
-          src={current === "admin" ? "/brand/lockup-horizontal-cream.png" : "/brand/lockup-horizontal-navy.png"}
-          alt="Veritas Village"
-          width={900}
-          height={310}
-          priority
-        />
+        {current === "admin"
+          ? <Image className="app-header-lockup on-dark" src="/brand/lockup-horizontal-cream.png" alt="Veritas Village" width={900} height={310} priority />
+          : <BrandLockup className="app-header-lockup" priority />}
         {/* In the apps the header takes the colour of the screen, so Admin needs the navy lockup there too. */}
         {current === "admin" && <Image className="app-header-lockup on-light" src="/brand/lockup-horizontal-navy.png" alt="" aria-hidden="true" width={900} height={310} />}
       </a>

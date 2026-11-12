@@ -31,8 +31,8 @@ function makeArrow(): HTMLDivElement {
   arrow.setAttribute("aria-hidden", "true");
   arrow.style.cssText = [
     "position:fixed", "z-index:2147483000", "top:50%", "left:0", "width:44px", "height:44px", "margin-top:-22px",
-    "display:grid", "place-items:center", "border-radius:50%", "background:#0b2a3d", "color:#faf7f1",
-    "font:700 22px/1 -apple-system,system-ui,sans-serif", "box-shadow:0 4px 14px rgba(11,42,61,.35)",
+    "display:grid", "place-items:center", "border-radius:50%", "background:var(--ink-surface)", "color:var(--cream)",
+    "font:700 22px/1 -apple-system,system-ui,sans-serif", "box-shadow:0 4px 14px rgba(var(--shadow-rgb),.35)",
     "pointer-events:none", "opacity:0", "transform:translateX(-60px)",
   ].join(";");
   arrow.textContent = "‹";

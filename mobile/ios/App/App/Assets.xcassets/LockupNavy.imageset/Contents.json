@@ -1,6 +1,7 @@
 {
   "images" : [
-    { "filename" : "lockup-navy.png", "idiom" : "universal" }
+    { "filename" : "lockup-navy.png", "idiom" : "universal" },
+    { "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ], "filename" : "lockup-cream-dark.png", "idiom" : "universal" }
   ],
   "info" : { "author" : "xcode", "version" : 1 }
 }

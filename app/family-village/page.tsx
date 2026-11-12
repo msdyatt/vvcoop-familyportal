@@ -1,4 +1,4 @@
-import Image from "next/image";
+import BrandLockup from "../brand-lockup";
 import SignInPanel from "./sign-in-panel";
 
 export const metadata = {
@@ -10,7 +10,7 @@ export default function FamilyVillageSignIn() {
   return <main className="portal-entry">
     <a className="portal-back" href="https://veritasvillage.org/">← Back to homepage</a>
     <section className="portal-entry-card">
-      <div className="portal-entry-brand"><Image src="/brand/lockup-horizontal-navy.png" alt="Veritas Village" width={900} height={310} priority /></div>
+      <div className="portal-entry-brand"><BrandLockup priority /></div>
       <p className="eyebrow">Invitation-only family portal</p>
       <h2 className="portal-entry-app-title">Sign in</h2>
       <h1>Everything your family<br/><em>needs for the week.</em></h1>

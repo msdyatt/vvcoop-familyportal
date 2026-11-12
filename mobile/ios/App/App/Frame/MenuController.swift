@@ -42,7 +42,7 @@ final class MenuController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        tableView.backgroundColor = Brand.cream
+        tableView.backgroundColor = Brand.canvas
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "row")
         navigationItem.rightBarButtonItem = UIBarButtonItem(systemItem: .done, primaryAction: UIAction { [weak self] _ in
             self?.dismiss(animated: true)
@@ -67,7 +67,7 @@ final class MenuController: UITableViewController {
             content.image = UIImage(systemName: "faceid")
             let toggle = UISwitch()
             toggle.isOn = AppLock.shared.isEnabled
-            toggle.onTintColor = Brand.navy
+            toggle.onTintColor = Brand.action
             toggle.addAction(UIAction { [weak toggle] _ in AppLock.shared.isEnabled = toggle?.isOn ?? true }, for: .valueChanged)
             cell.accessoryView = toggle
         case .action(let action, let text, let symbol):
@@ -77,9 +77,9 @@ final class MenuController: UITableViewController {
             cell.accessoryType = .none
         }
         if case .lockSwitch = groups[indexPath.section].rows[indexPath.row] {} else { cell.accessoryView = nil }
-        if content.imageProperties.tintColor == nil { content.imageProperties.tintColor = Brand.navy }
+        if content.imageProperties.tintColor == nil { content.imageProperties.tintColor = Brand.ink }
         cell.contentConfiguration = content
-        cell.backgroundColor = .white
+        cell.backgroundColor = Brand.surface
         return cell
     }
 

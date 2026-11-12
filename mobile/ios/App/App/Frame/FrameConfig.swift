@@ -50,6 +50,49 @@ enum Brand {
     static let navy = UIColor(red: 0x0B / 255, green: 0x2A / 255, blue: 0x3D / 255, alpha: 1)
     static let cream = UIColor(red: 0xFA / 255, green: 0xF7 / 255, blue: 0xF1 / 255, alpha: 1)
     static let terracotta = UIColor(red: 0xBB / 255, green: 0x61 / 255, blue: 0x41 / 255, alpha: 1)
+
+    // MARK: Roles that follow Light / Dark
+    // The web's role tokens (app/globals.css, app/theme.css) as dynamic colours: UIKit picks the light or the dark value from
+    // the window's interface style, so every view that uses a role re-colours by itself when the theme changes.
+
+    private static func hex(_ rgb: UInt32) -> UIColor {
+        UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255, blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
+    }
+    private static func dynamic(light: UIColor, dark: UIColor) -> UIColor {
+        UIColor { $0.userInterfaceStyle == .dark ? dark : light }
+    }
+    /// The page itself (web `--canvas`).
+    static let canvas = dynamic(light: cream, dark: hex(0x08202F))
+    /// Text and icons on the canvas (web `--text`).
+    static let ink = dynamic(light: navy, dark: cream)
+    /// A solid dark band: the strip behind the clock, the Admin header (web `--ink-surface`).
+    static let band = dynamic(light: navy, dark: hex(0x0D3A57))
+    /// A raised row or card (web `--surface`).
+    static let surface = dynamic(light: .white, dark: hex(0x0E3045))
+    /// The selected tab, switches and primary buttons (web `--action`, with terracotta-on-navy for a selection on the dark canvas).
+    static let action = dynamic(light: navy, dark: hex(0xA85539))
+    static let selection = dynamic(light: navy, dark: hex(0xD7A590))
+
+    // MARK: The person's choice (Light / Dark / System)
+    // The page tells the frame which one is in force (`theme` message, lib/theme.ts). The frame keeps it so the next launch
+    // is dressed correctly from the first frame, and applies it to the windows: System leaves them to follow the phone.
+    private static let themeKey = "vv.theme"
+    static func setTheme(_ choice: String) {
+        guard ["system", "light", "dark"].contains(choice) else { return }
+        UserDefaults.standard.set(choice, forKey: themeKey)
+        applyStoredTheme()
+    }
+    static func applyStoredTheme() {
+        let style: UIUserInterfaceStyle
+        switch UserDefaults.standard.string(forKey: themeKey) {
+        case "dark": style = .dark
+        case "light": style = .light
+        default: style = .unspecified
+        }
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            for window in scene.windows { window.overrideUserInterfaceStyle = style }
+        }
+    }
 }
 
 /// Frame events in the unified log (subsystem org.veritasvillage.family, category "frame"), so

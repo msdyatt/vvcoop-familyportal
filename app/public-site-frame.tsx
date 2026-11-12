@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
+import BrandLockup from "./brand-lockup";
 import SiteHeader from "./site-header";
 import Link from "next/link";
-import Image from "next/image";
 
 export default function PublicSiteFrame({ children }: { children: ReactNode }) {
   return (
     <>
       <SiteHeader alwaysVisible />
       <Link className="public-header-logo" href="/" aria-label="Veritas Village home">
-        <Image src="/brand/lockup-horizontal-navy.png" alt="Veritas Village" width={900} height={310} priority sizes="(max-width: 850px) 116px, 132px" />
+        <BrandLockup priority sizes="(max-width: 850px) 116px, 132px" />
       </Link>
       <main id="main-content" className="public-page">{children}</main>
       <footer className="public-footer">
