@@ -35,6 +35,9 @@ async function handle(req: Request): Promise<Response> {
     const out: Record<string, unknown> = {
       provider: config.provider,
       keyConfigured: config.ok,
+      // Without the publishable key the website and the apps cannot show Stripe's payment form in the page or in
+      // the native sheet; families are sent to Stripe's own page in a browser instead.
+      publishableKeyConfigured: config.ok ? Boolean(config.publishableKey) : null,
       problem: config.ok ? null : config.message,
       webhookSecretConfigured: config.provider === "stripe_live" ? Boolean(secrets.live) : config.provider === "stripe_test" ? Boolean(secrets.test) : Boolean(secrets.test || secrets.live),
     };
