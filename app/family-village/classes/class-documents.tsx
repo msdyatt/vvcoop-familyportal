@@ -156,9 +156,9 @@ function AddFile({ klassId, userId, onClose, onAdded }: { klassId: string; userI
     <fieldset className="cls-radios" disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
       <legend className="cls-section-title" style={{ marginBottom: 8 }}>Who can open it</legend>
       <label className="cls-radio"><input type="radio" name="kind" checked={kind === "handout"} onChange={() => setKind("handout")} />
-        <span><b>Families and teachers</b><small>A handout: parents of enrolled children see it too.</small></span></label>
+        <b>Families and teachers</b><small>A handout: parents of enrolled children see it too.</small></label>
       <label className="cls-radio"><input type="radio" name="kind" checked={kind === "curriculum"} onChange={() => setKind("curriculum")} />
-        <span><b>Teachers only</b><small>Curriculum or lesson plans for the teaching team.</small></span></label>
+        <b>Teachers only</b><small>Curriculum or lesson plans for the teaching team.</small></label>
     </fieldset>
     <div className="cls-actions">
       <button className="cls-btn" disabled={busy || !file || !title.trim()}>{busy ? "Uploading…" : "Add file"}</button>

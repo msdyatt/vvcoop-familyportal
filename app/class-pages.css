@@ -310,18 +310,19 @@
 .cls-radios { display: grid; gap: 8px; }
 
 .cls-radio {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  align-items: start;
   padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--cls-line);
   cursor: pointer;
 }
 
-.cls-radio input { margin-top: 3px; }
-.cls-radio b { display: block; font-size: 14px; }
-.cls-radio small { display: block; color: var(--sage-text); font-size: 13px; line-height: 1.4; }
+.cls-radio input { grid-row: span 2; margin-top: 3px; }
+.cls-radio b { font-size: 14px; }
+.cls-radio small { color: var(--sage-text); font-size: 13px; line-height: 1.4; }
 
 /* --- people ------------------------------------------------------------------------- */
 .cls-person { align-items: center; }
