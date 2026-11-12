@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { SchoolYear } from "../../../lib/compliance";
+import { PlacementReport, PlacementReportData } from "./grade-placement";
 
 /**
  * Start next school year.
@@ -17,7 +18,7 @@ import { SchoolYear } from "../../../lib/compliance";
 
 type OptionKey =
   | "blocks_rooms" | "terms" | "classes" | "teachers" | "document_requirements"
-  | "dues_requirements" | "enrollment_windows" | "open_requirements";
+  | "dues_requirements" | "enrollment_windows" | "open_requirements" | "place_children";
 
 const OPTIONS: { key: OptionKey; label: string; hint: string }[] = [
   { key: "blocks_rooms", label: "Meeting blocks and rooms", hint: "The weekly time slots, and the room each class uses. Rooms are shared by every year." },
@@ -27,6 +28,7 @@ const OPTIONS: { key: OptionKey; label: string; hint: string }[] = [
   { key: "document_requirements", label: "Required documents", hint: "Same documents, due dates a year later. Nothing anyone signed carries over." },
   { key: "dues_requirements", label: "Dues", hint: "Same amounts, payment link and monthly plan choice, due dates a year later." },
   { key: "enrollment_windows", label: "Enrollment windows", hint: "Dates move forward a year, and each window starts closed." },
+  { key: "place_children", label: "Place children in grade-based classes", hint: "Children of the returning households go into the History, Science and other grade-assigned classes for their grade in the new year (one grade up for most). Nothing placed by hand is touched, a full class waitlists, and electives stay with families. You see exactly who is placed, and who could not be and why, before you confirm. You can run it again any time under Grade-based placement." },
   { key: "open_requirements", label: "Ask returning households for the new year's documents and dues now", hint: "They appear in each returning household's Paperwork and Dues straight away, even before the new year is current. Untick to open them later." },
 ];
 
@@ -39,6 +41,7 @@ type Result = {
   households: { moving_forward: number; not_returning: number; changed: number };
   opened: { document_rows: number; dues_charges: number };
   made_current?: boolean;
+  placement?: PlacementReportData | null;
 };
 
 const STEPS = ["Years", "What to copy", "Households", "Review"];
@@ -81,7 +84,7 @@ export default function YearRollover({ years, onSaved, onStatus }: {
   const [chosenTarget, setChosenTarget] = useState("");
   const [options, setOptions] = useState<Record<OptionKey, boolean>>({
     blocks_rooms: true, terms: true, classes: true, teachers: true, document_requirements: true,
-    dues_requirements: true, enrollment_windows: true, open_requirements: true,
+    dues_requirements: true, enrollment_windows: true, open_requirements: true, place_children: true,
   });
   const [termRows, setTermRows] = useState<TermRow[]>([]);
   const [termEdits, setTermEdits] = useState<Record<string, { starts_on?: string; ends_on?: string }>>({});
@@ -199,7 +202,11 @@ export default function YearRollover({ years, onSaved, onStatus }: {
       (copied.document_requirements + copied.dues_requirements) ? plural(copied.document_requirements + copied.dues_requirements, "requirement") : "",
       copied.enrollment_windows ? plural(copied.enrollment_windows, "enrollment window") : "",
     ].filter(Boolean);
-    onStatus(`${result.target} is set up${parts.length ? `: ${parts.join(", ")} copied` : ""}. ${plural(result.households.moving_forward, "household")} moving forward${result.households.not_returning ? `, ${result.households.not_returning} not returning` : ""}. ${result.made_current ? `${result.target} is now the current school year.` : source.is_current ? `${result.source} is still the current school year.` : "The current school year did not change."}`);
+    const placement = result.placement;
+    const placementNote = placement
+      ? ` ${(placement.counts.placed ?? 0) + (placement.counts.promoted ?? 0)} grade-based placements made${placement.items.some((item) => ["no_grade", "no_class", "clash", "waitlisted"].includes(item.outcome)) ? "; some children need attention (see Grade-based placement)" : ""}.`
+      : "";
+    onStatus(`${result.target} is set up${parts.length ? `: ${parts.join(", ")} copied` : ""}. ${plural(result.households.moving_forward, "household")} moving forward${result.households.not_returning ? `, ${result.households.not_returning} not returning` : ""}. ${result.made_current ? `${result.target} is now the current school year.` : source.is_current ? `${result.source} is still the current school year.` : "The current school year did not change."}${placementNote}`);
     reset();
     setOpen(false);
     onSaved();
@@ -356,7 +363,8 @@ function ReviewSummary({ result, options }: { result: Result; options: Record<Op
       {(opened.document_rows > 0 || opened.dues_charges > 0) && <li>Opening to returning households: <b>{opened.document_rows}</b> document {opened.document_rows === 1 ? "request" : "requests"} and <b>{opened.dues_charges}</b> dues {opened.dues_charges === 1 ? "charge" : "charges"}</li>}
       <li>No students are copied, and nobody is invited or notified.</li>
     </ul>
-    {nothingNew && <p className="sign-hint">Everything chosen is already in {result.target}, so confirming changes nothing.</p>}
+    {nothingNew && !result.placement && <p className="sign-hint">Everything chosen is already in {result.target}, so confirming changes nothing.</p>}
+    {result.placement && <PlacementReport report={result.placement} preview />}
   </div>;
 }
 

@@ -10,6 +10,7 @@ import { printElement } from "../../../lib/dom";
 import { CollapsibleRecord, ConfirmDeleteModal, EditableSection, Field, GRADES, GradePicker, formatGrades } from "./admin-ui";
 import EnrollmentPeriods from "./enrollment-periods";
 import YearRollover from "./year-rollover";
+import GradePlacement from "./grade-placement";
 import DetailModal from "../detail-modal";
 
 type TeacherAssignment = { user_id: string; assignment_role: string; profiles: { display_name: string | null; email: string } | null };
@@ -19,7 +20,7 @@ type ClassTerm = { class_id: string; term_id: string };
 type ClassRow = {
   id: string; title: string; description: string | null; term: string | null;
   grades: string[]; block_id: string | null; room_id: string | null; capacity: number | null;
-  active: boolean; is_elective: boolean; school_year_id: string | null; calendar_token: string;
+  active: boolean; is_elective: boolean; subject: string | null; school_year_id: string | null; calendar_token: string;
   teacher_assignments: TeacherAssignment[]; enrollments: Enrollment[]; term_ids: string[]; prerequisite_ids: string[];
 };
 type TeacherOption = { user_id: string; name: string; email: string };
@@ -55,7 +56,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     const [{ data }, { data: teachers }, { data: children }, { data: yearRows }, { data: blockRows }, { data: roomRows }, { data: termRows }, { data: classTermRows }, { data: prereqRows }] = await Promise.all([
-      supabase.from("classes").select("id,title,description,term,grades,block_id,room_id,capacity,active,is_elective,school_year_id,calendar_token,teacher_assignments(user_id,assignment_role,profiles(display_name,email)),enrollments(child_id,status,children(first_name,last_name,age_band,families(last_name,display_name)))").order("title"),
+      supabase.from("classes").select("id,title,description,term,grades,block_id,room_id,capacity,active,is_elective,subject,school_year_id,calendar_token,teacher_assignments(user_id,assignment_role,profiles(display_name,email)),enrollments(child_id,status,children(first_name,last_name,age_band,families(last_name,display_name)))").order("title"),
       // The surname lives on the household, not the profile, so it is joined in
       // rather than showing a bare first name on every roster.
       supabase.from("user_roles").select("user_id,profiles(display_name,email)").eq("role", "teacher"),
@@ -172,9 +173,12 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
     await load();
   }
 
+  const subjectOptions = useMemo(() => [...new Set(classes.map((row) => row.subject?.trim()).filter((name): name is string => !!name))].sort(), [classes]);
+
   async function saveClass(row: ClassRow) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+    if (!row.is_elective && row.subject !== null && !row.subject.trim()) { setStatus("Say which subject this class is (History, Science...), or choose another way of placing it."); return; }
     const wanted = row.term_ids;
     const wantedPrereqs = row.prerequisite_ids;
     // The join-table reads don't depend on the classes update completing --
@@ -184,7 +188,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
       supabase.from("classes").update({
         title: row.title, description: row.description, term: row.term,
         grades: row.grades, block_id: row.block_id, room_id: row.room_id, active: row.active,
-        capacity: row.capacity, is_elective: row.is_elective, school_year_id: row.school_year_id,
+        capacity: row.capacity, is_elective: row.is_elective, subject: row.is_elective ? null : row.subject?.trim() || null, school_year_id: row.school_year_id,
       }).eq("id", row.id),
       supabase.from("class_terms").select("term_id").eq("class_id", row.id),
       supabase.from("class_prerequisites").select("prerequisite_class_id").eq("class_id", row.id),
@@ -310,6 +314,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
         terms={terms}
         clash={clashes.get(row.id) ?? null}
         classOptions={yearClasses.map((klass) => ({ id: klass.id, title: klass.title }))}
+        subjectOptions={subjectOptions}
         teacherOptions={teacherOptions} childOptions={childOptions}
         actorUserId={actorUserId}
         onSave={saveClass} onAssignTeacher={assignTeacher} onRemoveTeacher={removeTeacher}
@@ -322,6 +327,7 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
       <div className="schedule-settings-body">
         <SchoolYears years={years} onSaved={load} onStatus={setStatus} />
         <YearRollover years={years} onSaved={load} onStatus={setStatus} />
+        <GradePlacement years={years} onSaved={load} onStatus={setStatus} />
         <AcademicTerms terms={terms} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
         <TimeBlocks blocks={blocks} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
         <Rooms rooms={rooms} onSaved={load} onStatus={setStatus} />
@@ -729,9 +735,9 @@ function RoomRow({ room, onSave, onToggle }: { room: Room; onSave: (room: Room) 
   </div>;
 }
 
-function ClassCard({ row, years, blocks, rooms, terms, clash, classOptions, teacherOptions, childOptions, actorUserId, onSave, onAssignTeacher, onRemoveTeacher, onEnrollChild, onSetEnrollmentStatus }: {
+function ClassCard({ row, years, blocks, rooms, terms, clash, classOptions, subjectOptions, teacherOptions, childOptions, actorUserId, onSave, onAssignTeacher, onRemoveTeacher, onEnrollChild, onSetEnrollmentStatus }: {
   row: ClassRow; years: SchoolYear[]; blocks: ClassBlock[]; rooms: Room[]; terms: AcademicTerm[]; clash: string | null;
-  classOptions: ClassOption[];
+  classOptions: ClassOption[]; subjectOptions: string[];
   teacherOptions: TeacherOption[]; childOptions: ChildOption[]; actorUserId: string;
   onSave: (row: ClassRow) => void;
   onAssignTeacher: (classId: string, userId: string, role: string) => void;
@@ -749,6 +755,7 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, classOptions, teac
   useEffect(() => { setLocal(row); }, [row]);
 
   const active = row.enrollments.filter((entry) => entry.status === "active");
+  const waiting = row.enrollments.filter((entry) => entry.status === "waitlisted");
   const overCapacity = row.capacity != null && active.length > row.capacity;
   const prereqClasses = classOptions.filter((option) => row.prerequisite_ids.includes(option.id));
   const otherClasses = classOptions.filter((option) => option.id !== row.id);
@@ -772,7 +779,8 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, classOptions, teac
       formatGrades(row.grades),
       `${active.length}${row.capacity != null ? `/${row.capacity}` : ""} enrolled`,
       prereqClasses.length ? `needs ${prereqClasses.map((option) => option.title).join(", ")}` : null,
-      row.is_elective ? "elective" : null,
+      row.is_elective ? "elective" : row.subject ? `placed by grade: ${row.subject}` : null,
+      waiting.length ? `${waiting.length} waiting` : null,
       row.active ? null : "inactive",
     ].filter(Boolean).join(" · ")}
     chips={<>
@@ -803,6 +811,24 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, classOptions, teac
         </Field>
         <Field label="Grades" value={formatGrades(row.grades)} editing={editing}>
           <GradePicker selected={local.grades ?? []} onChange={(grades) => setLocal({ ...local, grades })} />
+        </Field>
+        <Field label="Who is placed in it" value={row.is_elective ? "Families choose (elective)" : row.subject ? `Placed by grade: ${row.subject}` : "An administrator places each child"} editing={editing}>
+          <select value={local.is_elective ? "elective" : local.subject !== null ? "grade" : "hand"}
+            onChange={(event) => setLocal({
+              ...local,
+              is_elective: event.target.value === "elective",
+              subject: event.target.value === "grade" ? (local.subject ?? row.subject ?? "") : null,
+            })}>
+            <option value="hand">An administrator places each child</option>
+            <option value="grade">By grade, automatically (History, Science...)</option>
+            <option value="elective">Families choose it (elective)</option>
+          </select>
+          {!local.is_elective && local.subject !== null && <>
+            <input list="class-subjects" value={local.subject} placeholder="Subject, e.g. Science" aria-label="Subject"
+              onChange={(event) => setLocal({ ...local, subject: event.target.value })} />
+            <datalist id="class-subjects">{["History", "Science", ...subjectOptions.filter((name) => !["history", "science"].includes(name.toLowerCase()))].map((name) => <option key={name} value={name} />)}</datalist>
+            <p className="field-note">Each child goes to the class of this subject whose grades include theirs, and moves up a class on their own as grades change. Set this class&rsquo;s grades and capacity too. Run it from Grade-based placement under Schedule &amp; enrollment settings.</p>
+          </>}
         </Field>
         <Field label="Capacity" value={row.capacity != null ? `${row.capacity} student${row.capacity === 1 ? "" : "s"}` : "No limit"} editing={editing}>
           <input type="number" min={0} step={1} value={local.capacity ?? ""} placeholder="No limit"
@@ -859,10 +885,6 @@ function ClassCard({ row, years, blocks, rooms, terms, clash, classOptions, teac
           <input value={local.description ?? ""} onChange={(event) => setLocal({ ...local, description: event.target.value })} />
         </Field>
         {editing && <>
-          <label className="checkbox-field">
-            <input type="checkbox" checked={local.is_elective} onChange={(event) => setLocal({ ...local, is_elective: event.target.checked })} />
-            Elective — families choose this during an enrollment window
-          </label>
           <label className="checkbox-field">
             <input type="checkbox" checked={local.active} onChange={(event) => setLocal({ ...local, active: event.target.checked })} />
             Active
