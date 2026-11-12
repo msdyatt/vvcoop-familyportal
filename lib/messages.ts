@@ -16,6 +16,8 @@ export type Person = { user_id: string; display_name: string; avatar_path: strin
 export type MessageRow = {
   id: string; conversation_id: string; sender_id: string | null;
   body: string | null; image_path: string | null; created_at: string; deleted_at: string | null;
+  /** Set when the sender changed the words after sending. */
+  edited_at: string | null;
   post_id: string | null; reply_to: string | null;
   /** Set on messages the system posted (a report card, say): who it is "from", and where its link goes. */
   system_label: string | null; link_path: string | null;
@@ -28,7 +30,7 @@ export type Reaction = { message_id: string; user_id: string; emoji: string };
 /** The reactions on offer. The same list is enforced in the database. */
 export const REACTIONS = ["👍", "❤️", "😂", "🎉", "🙏", "😮"] as const;
 
-export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,post_id,reply_to,system_label,link_path,reply:messages!reply_to(id,sender_id,body,image_path,deleted_at)";
+export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,edited_at,post_id,reply_to,system_label,link_path,reply:messages!reply_to(id,sender_id,body,image_path,deleted_at)";
 
 export function conversationTitle(c: Pick<ConversationRow, "kind" | "title" | "other_name">): string {
   if (c.kind === "direct") return c.other_name ?? "Conversation";
@@ -89,4 +91,11 @@ export function snippet(message: { body: string | null; image_path: string | nul
   if (message.deleted_at) return "Message removed";
   if (message.body) return message.body.length > max ? `${message.body.slice(0, max)}…` : message.body;
   return message.image_path ? "Photo" : "";
+}
+
+/** How long after sending a person can still edit a message. The database enforces the same limit. */
+export const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export function canEditMessage(message: Pick<MessageRow, "created_at" | "deleted_at" | "post_id" | "system_label">, now = Date.now()): boolean {
+  return !message.deleted_at && !message.post_id && !message.system_label && now - new Date(message.created_at).getTime() < EDIT_WINDOW_MS;
 }
