@@ -1,9 +1,5 @@
 # Writing theme-aware CSS
 
-> The roles below exist as of the tokens PR. The dark values, the Paper rule, the
-> contrast test and `lib/theme.ts` arrive in the dark-theme PR that follows. Write
-> new CSS with roles now so it is already correct when they land.
-
 The portal has a light and a dark theme. Components do not know which one is
 showing. They use **role tokens** (custom properties on `:root` in
 `app/globals.css`), and each theme gives every role a value. If you use the
@@ -29,6 +25,7 @@ Do not use the brand colours for a text, surface or line role:
 | `rgba(var(--navy-rgb), .5)` behind a dialog | `rgba(var(--scrim-rgb), .5)` |
 | `border: 1px solid var(--navy)` (strong outline) | `border: 1px solid var(--line-strong)` |
 | `outline: 2px solid var(--antique-gold)` | `outline: 2px solid var(--gold)` |
+| accent text, a highlight or a chip inside a bubble or button filled with `--action` | `--accent-on-action`, `--wash-on-action`, `--chip-on-action` |
 
 Surfaces that were already roles stay roles: `--surface` (raised card),
 `--surface-sunken` (inputs), `--panel` (sage panel), `--warm-tint` (soft
@@ -72,3 +69,13 @@ The dark values appear twice, under `html[data-theme="dark"]` (the choice made
 in Settings, applied before first paint by the script in `lib/theme.ts`) and
 under `@media (prefers-color-scheme: dark)` (System, and browsers with
 JavaScript off). The test asserts the two blocks are identical; edit both.
+
+## Checking a screen
+
+Switch with Account & security > Appearance (or set `localStorage["vv-theme"]` to
+`light`, `dark` or `system` and reload). Look at the screen in both themes at phone
+and desktop width. The things that go wrong are: themed text on a fill that does
+not change (use a constant like `var(--navy)` there, or a role that is defined for
+that fill), a hex colour or `rgba(11,42,61,…)` that slipped in, and text on a
+translucent surface. `tests/theme-contrast.test.mjs` catches wrong token values,
+not wrong placement, so a quick look is still needed.

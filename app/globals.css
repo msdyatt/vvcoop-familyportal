@@ -120,7 +120,10 @@
   --action:var(--navy);                   /* fill of primary buttons and selected tabs and chips (text on it is cream or white) */
   --danger-fill:var(--terracotta-deep);   /* solid alert fill (urgent banner, error toast, urgent chip) */
   --cal-coop:var(--navy);                 /* calendar: co-op event pill and dot (cream text on it) */
-  --cal-class:var(--terracotta);          /* calendar: class event pill and dot (white text on it) */
+  --cal-class:var(--terracotta-text);     /* calendar: class event pill and dot (cream text on it) */
+  --accent-on-action:var(--terracotta-on-navy);  /* accent text inside a bubble or button that has the --action fill */
+  --wash-on-action:rgba(255,255,255,.14);         /* a highlight behind a mention inside such a bubble */
+  --chip-on-action:rgba(var(--navy-rgb),.14);     /* a reaction chip inside such a bubble */
   --gold:var(--antique-gold);             /* warm accent: focus rings, avatar rings, selection handles */
   --accent-fill:var(--terracotta-deep);   /* a deep terracotta fill that is not an alert, e.g. today's date */
 
@@ -4590,7 +4593,7 @@ footer nav a:hover {
 }
 
 .avatar-fallback {
-  background:var(--terracotta);
+  background:var(--terracotta-text);
   color:var(--cream);
   font:700 1em var(--serif);
 }
@@ -4601,7 +4604,7 @@ footer nav a:hover {
 
 .settings-block {
   padding-top:16px;
-  border-top:1px solid rgba(var(--cream-rgb),.15);
+  border-top:1px solid rgba(var(--fg-rgb),.15);
 }
 
 .settings-block:first-child {
@@ -4610,7 +4613,7 @@ footer nav a:hover {
 }
 
 .settings-block .card-kicker {
-  color:var(--terracotta-on-navy);
+  color:var(--text-accent);
 }
 
 .avatar-uploader {
@@ -4623,7 +4626,7 @@ footer nav a:hover {
 .avatar-uploader .file-drop { margin:0 0 8px; }
 
 .danger-zone .card-kicker {
-  color:var(--terracotta-on-navy);
+  color:var(--text-accent);
 }
 
 .mfa-enroll {
@@ -4773,7 +4776,7 @@ footer nav a:hover {
   padding:0 3px;
   display:grid;
   place-items:center;
-  background:var(--terracotta);
+  background:var(--terracotta-text);
   color:var(--cream);
   font-size:10px;
   font-weight:700;
@@ -5077,7 +5080,7 @@ footer nav a:hover {
   --portal-accent-text:var(--text-accent);
   --portal-band-bg:transparent;
   --portal-band-fg:var(--text);
-  --portal-band-muted:var(--text-soft);
+  --portal-band-muted:var(--text-muted);
   --portal-band-rule:var(--terracotta);
 }
 
@@ -6470,7 +6473,7 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
   min-width:19px;
   height:19px;
   padding:0 5px;
-  background:var(--terracotta);
+  background:var(--terracotta-text);
   color:#fff;
   font-size:11px;
   font-weight:700;
@@ -6686,7 +6689,7 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 }
 
 .messages-bubble.mine .messages-sender i {
-  color:var(--terracotta-on-navy);
+  color:var(--accent-on-action);
 }
 
 .messages-meta {
@@ -7349,8 +7352,13 @@ body:not(:has(.app-header)):not(:has(.portal-entry)) {
 }
 
 .messages-bubble.mine .messages-mention {
-  color:var(--terracotta-on-navy);
-  background:rgba(255,255,255,.14);
+  color:var(--accent-on-action);
+  background:var(--wash-on-action);
+}
+
+.messages-bubble.mine .messages-chip,
+.messages-bubble.mine .messages-chip.mine {
+  background:var(--chip-on-action);
 }
 
 .messages-replying {
