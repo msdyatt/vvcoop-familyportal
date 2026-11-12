@@ -32,6 +32,12 @@ function withDaySeparators(messages: MessageRow[]) {
 
 const RUN_MS = 10 * 60_000;
 
+/** "Maria", "Maria and James", "Maria, James and Ana". */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 export default function Thread({ conversation, userId, roles, tick, onBack, onChanged }: {
   conversation: ConversationRow; userId: string; roles: string[]; tick: number; onBack: () => void; onChanged: () => void | Promise<void>;
 }) {
@@ -48,6 +54,8 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   const [reason, setReason] = useState("");
   const [viewing, setViewing] = useState<string | null>(null);
   const [showMembers, setShowMembers] = useState(false);
+  // For a conversation about a student: adults of that student who have not joined the portal yet.
+  const [notInPortal, setNotInPortal] = useState<string[]>([]);
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
@@ -109,6 +117,10 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     (async () => {
       const { data } = await supabase.rpc("conversation_people", { p_conversation_id: conversation.id });
       setPeople(new Map(((data ?? []) as Person[]).map((person) => [person.user_id, person])));
+      if (conversation.child_thread) {
+        const { data: missing } = await supabase.rpc("child_thread_not_in_portal", { p_conversation_id: conversation.id });
+        setNotInPortal(Array.isArray(missing) ? (missing as string[]) : []);
+      }
       await fetchLatest();
       await markRead();
     })();
@@ -301,6 +313,16 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
       </button>
     </header>
 
+    {conversation.child_thread && <p className="admin-form-status messages-status" role="note">
+      {(() => {
+        const others = [...people.values()].filter((person) => person.user_id !== userId).map((person) => person.display_name);
+        return <>
+          {others.length ? `Messages here go to ${joinNames(others)}.` : "No one else is in this conversation right now."}
+          {notInPortal.length > 0 && ` ${joinNames(notInPortal)} ${notInPortal.length === 1 ? "is" : "are"} not in the portal yet.`}
+        </>;
+      })()}
+    </p>}
+
     <div className="messages-scroll" ref={listRef} onScroll={(event) => {
       const el = event.currentTarget;
       stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -313,6 +335,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
         const url = message.image_path ? imageUrls.get(message.image_path) : undefined;
         const group = conversation.kind !== "direct";
         const announcement = !!message.post_id && !message.deleted_at;
+        const system = !!message.system_label && !message.deleted_at;
         const [headline, ...rest] = (message.body ?? "").split("\n");
         const own = reactions.filter((r) => r.message_id === message.id);
         const chips = REACTIONS.map((emoji) => ({ emoji, count: own.filter((r) => r.emoji === emoji).length, mine: own.some((r) => r.emoji === emoji && r.user_id === userId) })).filter((chip) => chip.count > 0);
@@ -320,11 +343,11 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           {showDay && <div className="messages-day"><span>{day}</span></div>}
           <div className={`messages-bubble-row${mine ? " mine" : ""}${startsRun ? " run-start" : ""}`}>
             {group && !mine && (startsRun
-              ? <Avatar url={sender?.avatar_path ? avatarUrls.get(sender.avatar_path) ?? null : null} label={(sender?.display_name ?? "?").slice(0, 1)} size="md" />
+              ? <Avatar url={sender?.avatar_path ? avatarUrls.get(sender.avatar_path) ?? null : null} label={(sender?.display_name ?? message.system_label ?? "?").slice(0, 1)} size="md" />
               : <span className="messages-avatar-gap" aria-hidden="true" />)}
-            <div className={`messages-bubble${mine ? " mine" : ""}${message.deleted_at ? " removed" : ""}${announcement ? " announcement" : ""}`}>
+            <div className={`messages-bubble${mine ? " mine" : ""}${message.deleted_at ? " removed" : ""}${announcement || system ? " announcement" : ""}`}>
               {!mine && group && startsRun && <span className="messages-sender">
-                {sender?.display_name ?? "Former member"}
+                {sender?.display_name ?? message.system_label ?? "Former member"}
                 {sender?.is_teacher && <i>Teacher</i>}{sender?.is_admin && <i>Admin</i>}
               </span>}
               {message.deleted_at
@@ -339,7 +362,14 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
                       <b>{message.reply.sender_id === userId ? "You" : people.get(message.reply.sender_id ?? "")?.display_name ?? "Former member"}</b>
                       <span>{snippet(message.reply)}</span>
                     </a>}
-                    {announcement
+                    {system
+                      ? <>
+                          <span className="messages-announce-tag">{message.system_label}</span>
+                          <p><b>{headline}</b></p>
+                          {rest.map((line, index) => <p key={index}>{line}</p>)}
+                          {message.link_path && <a className="messages-announce-link" href={message.link_path}>Open in review</a>}
+                        </>
+                      : announcement
                       ? <>
                           <span className="messages-announce-tag">News</span>
                           <p><b>{headline}</b></p>
@@ -362,7 +392,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
                 {!message.deleted_at && !archivedBlock && <button type="button" onClick={() => setPickerFor(pickerFor === message.id ? null : message.id)}>React</button>}
                 {!message.deleted_at && !blocked && <button type="button" onClick={() => { setReplyingTo(message); composerRef.current?.focus(); }}>Reply</button>}
                 {!message.deleted_at && mine && <button type="button" onClick={() => removeOwn(message)}>Remove</button>}
-                {!message.deleted_at && !mine && <button type="button" onClick={() => { setReporting(message); setReason(""); }}>Report</button>}
+                {!message.deleted_at && !mine && !message.system_label && <button type="button" onClick={() => { setReporting(message); setReason(""); }}>Report</button>}
               </span>
             </div>
           </div>

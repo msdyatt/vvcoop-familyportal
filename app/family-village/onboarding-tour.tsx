@@ -12,7 +12,7 @@ function stepCopy(id: TourStepId, returning: boolean, native: boolean, openAccou
     case "welcome":
       return {
         eyebrow: "Welcome", title: "Welcome to Family Village.",
-        body: <p>This is the co-op&rsquo;s private home, on the web and in the app. Your children&rsquo;s classes, teacher notes, news and calendar, paperwork, messages, and photos are all here. It takes about a minute to look around.</p>,
+        body: <p>This is the co-op&rsquo;s private home, on the web and in the app. Your children&rsquo;s classes, messages with their teachers, news and calendar, paperwork, messages, and photos are all here. It takes about a minute to look around.</p>,
       };
     case "household":
       return {

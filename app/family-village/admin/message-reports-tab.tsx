@@ -96,10 +96,17 @@ export default function MessageReportsTab() {
     await load();
   }
 
+  // A link from the #Reports channel arrives as #report-<id> or #photo-report-<id>.
+  useEffect(() => {
+    if (!loaded) return;
+    const target = window.location.hash.slice(1);
+    if (target) document.getElementById(target)?.scrollIntoView({ block: "center" });
+  }, [loaded]);
+
   const open = reports.filter((report) => report.status === "open");
   const closed = reports.filter((report) => report.status !== "open");
 
-  const card = (report: Report) => <article key={report.id} className="record-card">
+  const card = (report: Report) => <article key={report.id} id={`report-${report.id}`} className="record-card">
     <div className="record-head">
       <b>{report.sender_name}</b>
       <span className={`status-pill ${report.status === "open" ? "outstanding" : ""}`}>{STATUS_LABEL[report.status]}</span>
@@ -125,7 +132,7 @@ export default function MessageReportsTab() {
   </article>;
 
   const openPhotos = photoReports.filter((report) => report.status === "open");
-  const photoCard = (report: PhotoReport) => <article key={report.id} className="record-card">
+  const photoCard = (report: PhotoReport) => <article key={report.id} id={`photo-report-${report.id}`} className="record-card">
     <div className="record-head">
       <b>{report.caption ?? "Untitled photo"}</b>
       <span className="status-pill outstanding">Needs review</span>

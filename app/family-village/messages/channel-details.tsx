@@ -63,7 +63,7 @@ export default function ChannelDetails({ conversation, userId, roles, people, on
 
   return <div className="channel-details portal-form">
     {conversation.topic && !manager && <p>{conversation.topic}</p>}
-    {builtIn && <p className="field-note">This is a built-in channel. {conversation.audience === "everyone" ? "Every member is in it automatically." : ""}</p>}
+    {builtIn && <p className="field-note">This is a built-in channel. {conversation.audience === "everyone" ? "Every member is in it automatically." : ""}{conversation.audience === "admins" ? "Only administrators are in it, and they are added and removed automatically. Reports land here; the actual decisions are made on the Messaging tab of the Admin page." : ""}</p>}
     {conversation.kind === "class" && <p className="field-note">This channel follows its class. Its members are the class&rsquo;s teachers and the adults of every enrolled child.</p>}
     {conversation.kind === "channel" && conversation.audience === "class" && <p className="field-note">This channel follows a class, so its members update as enrollment changes.</p>}
 

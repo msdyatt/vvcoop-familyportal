@@ -5,8 +5,10 @@ export type ConversationRow = {
   last_message_at: string; last_preview: string | null; last_sender_name: string | null;
   unread_count: number; muted: boolean; member_count: number;
   other_user_id: string | null; other_name: string | null; other_avatar_path: string | null;
-  topic: string | null; posting: "everyone" | "staff"; audience: "invite" | "everyone" | "class";
+  topic: string | null; posting: "everyone" | "staff"; audience: "invite" | "everyone" | "class" | "admins";
   archived_at: string | null; created_by: string | null; system_key: string | null;
+  /** A thread between a teacher and the parents of one student. */
+  child_thread: boolean;
 };
 
 export type Person = { user_id: string; display_name: string; avatar_path: string | null; is_teacher: boolean; is_admin: boolean };
@@ -15,6 +17,8 @@ export type MessageRow = {
   id: string; conversation_id: string; sender_id: string | null;
   body: string | null; image_path: string | null; created_at: string; deleted_at: string | null;
   post_id: string | null; reply_to: string | null;
+  /** Set on messages the system posted (a report card, say): who it is "from", and where its link goes. */
+  system_label: string | null; link_path: string | null;
   /** The message this one answers, embedded by the select below. */
   reply: { id: string; sender_id: string | null; body: string | null; image_path: string | null; deleted_at: string | null } | null;
 };
@@ -24,7 +28,7 @@ export type Reaction = { message_id: string; user_id: string; emoji: string };
 /** The reactions on offer. The same list is enforced in the database. */
 export const REACTIONS = ["👍", "❤️", "😂", "🎉", "🙏", "😮"] as const;
 
-export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,post_id,reply_to,reply:messages!reply_to(id,sender_id,body,image_path,deleted_at)";
+export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,post_id,reply_to,system_label,link_path,reply:messages!reply_to(id,sender_id,body,image_path,deleted_at)";
 
 export function conversationTitle(c: Pick<ConversationRow, "kind" | "title" | "other_name">): string {
   if (c.kind === "direct") return c.other_name ?? "Conversation";

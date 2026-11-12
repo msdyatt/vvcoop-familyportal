@@ -8,9 +8,9 @@ import DetailModal from "./detail-modal";
 import { EditableSection, Field, GRADES } from "./admin/admin-ui";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
 
-type ClassInfo = { id: string; title: string; schedule: string; teachers: string[] };
+type Teacher = { id: string; name: string };
+type ClassInfo = { id: string; title: string; schedule: string; teachers: Teacher[] };
 type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string; completed: boolean };
-type NoteInfo = { id: string; body: string; visibility: string; created_at: string; author_user_id: string | null; class_id: string; author_name: string; class_title: string; read_count: number; read_by_me: boolean };
 
 type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null; age_band_override: boolean; birthdate: string | null; avatar_path: string | null };
 
@@ -29,7 +29,8 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
   const [classPick, setClassPick] = useState("");
   const [enrollStatus, setEnrollStatus] = useState("");
   const [childStatus, setChildStatus] = useState("");
-  const [notes, setNotes] = useState<NoteInfo[]>([]);
+  const [messageStatus, setMessageStatus] = useState("");
+  const [messagingTeacherId, setMessagingTeacherId] = useState<string | null>(null);
   const [userId, setUserId] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,46 +46,22 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     const uid = authData.user?.id ?? "";
     setUserId(uid);
 
-    const [{ data: childRow }, { data: enrollments }, { data: noteRows }] = await Promise.all([
+    const [{ data: childRow }, { data: enrollments }] = await Promise.all([
       supabase.from("children").select("id,first_name,last_name,age_band,age_band_override,birthdate,avatar_path").eq("id", childId).single(),
-      supabase.from("enrollments").select(`class_id,status,classes(id,title,${SCHEDULE_SELECT},teacher_assignments(profiles(display_name,email)))`).eq("child_id", childId).eq("status", "active"),
-      supabase.from("teacher_notes").select("id,body,visibility,created_at,author_user_id,class_id").eq("child_id", childId).order("created_at", { ascending: false }),
+      supabase.from("enrollments").select(`class_id,status,classes(id,title,${SCHEDULE_SELECT},teacher_assignments(user_id,profiles(display_name,email)))`).eq("child_id", childId).eq("status", "active"),
     ]);
     setChild(childRow as ChildRecord | null);
     setAvatarUrl(childRow?.avatar_path ? await getSignedFileUrl(supabase, childRow.avatar_path) : null);
-    const rows = (enrollments ?? []) as unknown as { classes: { id: string; title: string; teacher_assignments: { profiles: { display_name: string | null; email: string } | null }[] } & ClassSchedule }[];
+    const rows = (enrollments ?? []) as unknown as { classes: { id: string; title: string; teacher_assignments: { user_id: string; profiles: { display_name: string | null; email: string } | null }[] } & ClassSchedule }[];
     const classInfos = rows.map((row) => ({
       id: row.classes.id,
       title: row.classes.title,
       schedule: describeSchedule(row.classes),
-      teachers: row.classes.teacher_assignments.map((assignment) => assignment.profiles?.display_name || assignment.profiles?.email || "").filter(Boolean),
+      teachers: row.classes.teacher_assignments
+        .map((assignment) => ({ id: assignment.user_id, name: assignment.profiles?.display_name || assignment.profiles?.email || "" }))
+        .filter((teacher) => teacher.name),
     }));
     setClasses(classInfos);
-
-    const noteBaseRows = (noteRows ?? []) as Omit<NoteInfo, "author_name" | "class_title" | "read_count" | "read_by_me">[];
-    const authorIds = [...new Set(noteBaseRows.map((row) => row.author_user_id).filter((id): id is string => !!id))];
-    const noteClassIds = [...new Set(noteBaseRows.map((row) => row.class_id))];
-    const noteIds = noteBaseRows.map((row) => row.id);
-    const [{ data: authorRows }, { data: classRows }, { data: readRows }] = await Promise.all([
-      authorIds.length ? supabase.from("profiles").select("id,display_name,email").in("id", authorIds) : Promise.resolve({ data: [] }),
-      noteClassIds.length ? supabase.from("classes").select("id,title").in("id", noteClassIds) : Promise.resolve({ data: [] }),
-      noteIds.length ? supabase.from("teacher_note_reads").select("note_id,user_id").in("note_id", noteIds) : Promise.resolve({ data: [] }),
-    ]);
-    const authorMap = new Map((authorRows ?? []).map((row) => [row.id, row.display_name || row.email]));
-    const classMap = new Map((classRows ?? []).map((row) => [row.id, row.title]));
-    const readCounts = new Map<string, number>();
-    const readByMe = new Set<string>();
-    (readRows ?? []).forEach((row) => {
-      readCounts.set(row.note_id, (readCounts.get(row.note_id) ?? 0) + 1);
-      if (row.user_id === uid) readByMe.add(row.note_id);
-    });
-    setNotes(noteBaseRows.map((row) => ({
-      ...row,
-      author_name: (row.author_user_id && authorMap.get(row.author_user_id)) || "Former teacher",
-      class_title: classMap.get(row.class_id) ?? "",
-      read_count: readCounts.get(row.id) ?? 0,
-      read_by_me: readByMe.has(row.id),
-    })));
 
     const classIds = classInfos.map((info) => info.id);
     if (classIds.length) {
@@ -195,19 +172,22 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  async function markRead(noteId: string) {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !userId) return;
-    const { error } = await supabase.from("teacher_note_reads").insert({ note_id: noteId, user_id: userId });
-    if (!error) await load();
-  }
-
-  async function deleteNote(noteId: string) {
-    if (!confirm("Delete this note? This cannot be undone.")) return;
+  /**
+   * Opens the one thread between this child's teacher and every parent of this
+   * child who is in the portal, so the other parent is always included, whichever
+   * of them started it. Asking again returns the same thread.
+   */
+  async function messageTeacher(teacher: Teacher) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const { error } = await supabase.from("teacher_notes").delete().eq("id", noteId);
-    if (!error) await load();
+    setMessagingTeacherId(teacher.id); setMessageStatus("");
+    const { data, error } = await supabase.rpc("start_child_conversation", { p_child_id: childId, p_teacher_id: teacher.id });
+    if (error || typeof data !== "string") {
+      setMessageStatus(error?.message ?? "Could not open the conversation. Try again.");
+      setMessagingTeacherId(null);
+      return;
+    }
+    window.location.assign(`/family-village/messages?c=${data}`);
   }
 
   /**
@@ -332,7 +312,16 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
 
         <section>
           <p className="card-kicker">Classes</p>
-          {classes.length ? <ul className="child-detail-list">{classes.map((row) => <li key={row.id}><b>{row.title}</b><span>{row.schedule}{row.teachers.length ? ` · ${row.teachers.join(", ")}` : ""}</span></li>)}</ul> : <p className="portal-empty">Not enrolled in any classes yet.</p>}
+          {classes.length ? <ul className="child-detail-list">{classes.map((row) => <li key={row.id}>
+            <b>{row.title}</b>
+            <span>{row.schedule}{row.teachers.length ? ` · ${row.teachers.map((teacher) => teacher.name).join(", ")}` : ""}</span>
+            {row.teachers.length > 0 && <div className="row-actions">
+              {row.teachers.map((teacher) => <button key={teacher.id} type="button" className="ghost" disabled={messagingTeacherId !== null} onClick={() => messageTeacher(teacher)}>
+                {messagingTeacherId === teacher.id ? "Opening…" : `Message ${teacher.name}`}
+              </button>)}
+            </div>}
+          </li>)}</ul> : <p className="portal-empty">Not enrolled in any classes yet.</p>}
+          {messageStatus && <p className="admin-form-status" role="status">{messageStatus}</p>}
         </section>
 
         <section>
@@ -377,21 +366,6 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
             : <p className="portal-empty">No open classes match {child?.first_name}&rsquo;s grade right now.</p>}
           {enrollStatus && <p className="admin-form-status" role="status">{enrollStatus}</p>}
         </section>}
-
-        <section>
-          <p className="card-kicker">Teacher notes</p>
-          {notes.length ? <ul className="child-detail-list note-list">{notes.map((row) => <li key={row.id}>
-            <span>{row.author_name} · {row.class_title} · {new Date(row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {row.visibility}</span>
-            <p>{row.body}</p>
-            <div className="note-actions">
-              {row.read_by_me
-                ? <span className="note-read-pill">Marked as read</span>
-                : <button onClick={() => markRead(row.id)}>Mark as read</button>}
-              {row.read_count > 0 && <span className="note-read-count">Read by {row.read_count}</span>}
-              {row.author_user_id === userId && <button className="danger" onClick={() => deleteNote(row.id)}>Delete</button>}
-            </div>
-          </li>)}</ul> : <p className="portal-empty">No notes yet.</p>}
-        </section>
       </>}
   </DetailModal>;
 }
