@@ -30,7 +30,7 @@ final class PaymentSheetPresenter {
         if let merchantId = options["applePayMerchantId"] as? String {
             configuration.applePay = .init(merchantId: merchantId, merchantCountryCode: options["countryCode"] as? String ?? "US")
         }
-        configuration.appearance.colors.primary = Brand.action
+        configuration.appearance = Self.appearance()
 
         let sheet = PaymentSheet(paymentIntentClientSecret: secret, configuration: configuration)
         self.sheet = sheet
@@ -44,6 +44,35 @@ final class PaymentSheetPresenter {
                 done("failed")
             }
         }
+    }
+
+    /// The sheet in the app's own colours and corners. The colours are the frame's dynamic roles (`Brand`), so the sheet
+    /// follows the person's Light / Dark choice like everything else; the web's tokens in app/globals.css are the source.
+    private static func appearance() -> PaymentSheet.Appearance {
+        var a = PaymentSheet.Appearance()
+        let ink = Brand.ink
+        a.colors.background = Brand.canvas
+        a.colors.componentBackground = Brand.surface
+        a.colors.componentBorder = ink.withAlphaComponent(0.18)
+        a.colors.componentDivider = ink.withAlphaComponent(0.12)
+        a.colors.text = ink
+        a.colors.textSecondary = ink.withAlphaComponent(0.65)
+        a.colors.componentText = ink
+        a.colors.componentPlaceholderText = ink.withAlphaComponent(0.45)
+        a.colors.icon = ink.withAlphaComponent(0.7)
+        a.colors.primary = Brand.action
+        a.colors.danger = Brand.terracotta
+        a.cornerRadius = 10
+        a.borderWidth = 1
+        a.shadow = .disabled
+        a.primaryButton.backgroundColor = Brand.action
+        a.primaryButton.textColor = Brand.cream
+        a.primaryButton.cornerRadius = 10
+        // The site sets its headings in a serif; the system serif is the nearest thing without shipping a font.
+        if let serif = UIFont.systemFont(ofSize: 17, weight: .semibold).fontDescriptor.withDesign(.serif) {
+            a.primaryButton.font = UIFont(descriptor: serif, size: 17)
+        }
+        return a
     }
 
     /// A bank's own page sends the person back through `org.veritasvillage.family://stripe-redirect`.
