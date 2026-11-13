@@ -25,6 +25,9 @@ final class FrameController: UIViewController, UITabBarDelegate {
     private var barKeys: [String] = []
     private static let menuTag = -1
     private(set) var notificationUnread = 0
+    /// Unread messages as the native Messages screens count them. Once known, it wins over the number the pages report
+    /// (both come from the same `unread_message_count`), so the badge stays right when no web page is loaded.
+    private var nativeMessagesUnread: Int?
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
     override var childForStatusBarStyle: UIViewController? { content }
@@ -62,6 +65,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
             // Open straight into the bar they had last time. If the session is gone, the page redirects to
             // sign-in and the frame goes back to signed-out.
             state = cached
+            NativeMessages.shared.signedIn(frame: self)
             rebuildBar()
             select(key: FrameStore.lastKey().flatMap { barKeys.contains($0) ? $0 : nil } ?? barKeys[0])
             // A tap that launched the app is waiting; the cached bar is enough to open it.
@@ -106,6 +110,8 @@ final class FrameController: UIViewController, UITabBarDelegate {
     private func showSignedOut(_ url: URL) {
         notificationUnread = 0
         FrameLog.event("signed out: sign-in page \(url.path)")
+        NativeMessages.shared.signedOut()
+        nativeMessagesUnread = nil
         stacks.removeAll()
         barKeys.removeAll()
         tabBar.setItems(nil, animated: false)
@@ -126,6 +132,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
         FrameLog.event("state from \(page.url.path): unread \(newState.unread), first \(first)")
         self.state = newState
         FrameStore.save(newState)
+        NativeMessages.shared.signedIn(frame: self)
 
         if first, let stack = page.navigationController as? FrameNavigationController, stack === signedOut {
             enterSignedIn(newState, adopting: page, from: stack)
@@ -179,9 +186,16 @@ final class FrameController: UIViewController, UITabBarDelegate {
 
     private func updateBadge(_ unread: Int) {
         guard let bar = state?.bar, let items = tabBar.items else { return }
+        let count = nativeMessagesUnread ?? unread
         for (index, destination) in bar.enumerated() where index < items.count {
-            items[index].badgeValue = destination.id == "messages" && unread > 0 ? (unread > 99 ? "99+" : "\(unread)") : nil
+            items[index].badgeValue = destination.id == "messages" && count > 0 ? (count > 99 ? "99+" : "\(count)") : nil
         }
+    }
+
+    /// The native Messages screens counted unread messages (nil: signed out).
+    func setMessagesUnread(_ count: Int?) {
+        nativeMessagesUnread = count
+        updateBadge(state?.unread ?? 0)
     }
 
     /// Highlights the tab for the stack the page is in, or none if the page is in a stack that is not on this bar.
@@ -198,7 +212,11 @@ final class FrameController: UIViewController, UITabBarDelegate {
         if let existing = stacks[key] { return existing }
         let destination = state?.bar.first { $0.id == key }
         let url = destination.flatMap { URL(string: $0.href, relativeTo: FrameConfig.baseURL)?.absoluteURL } ?? FrameConfig.baseURL
-        let created = FrameNavigationController(rootViewController: WebPageController(url: url, navigator: navigator), tabKey: key)
+        // Messages is a native screen; every other tab is the website's page.
+        let root: UIViewController = key == "messages" && NativeMessages.shared.isEnabled
+            ? NativeMessages.shared.makeList(navigator: navigator)
+            : WebPageController(url: url, navigator: navigator)
+        let created = FrameNavigationController(rootViewController: root, tabKey: key)
         stacks[key] = created
         return created
     }
@@ -297,6 +315,23 @@ final class FrameController: UIViewController, UITabBarDelegate {
     /// Whether anyone is signed in (a bar is showing, or one was remembered from last time).
     var isSignedIn: Bool { signedOut == nil && state != nil }
 
+    /// A link to the Messages page (or `?c=<conversation>`), opened natively: on the Messages tab when it is on the bar,
+    /// otherwise over the tab on screen. Returns false for anything else, and for `web=1` (the website's own page).
+    func openMessagesIfNative(_ url: URL) -> Bool {
+        guard url.path == "/family-village/messages" || url.path == "/family-village/messages/" else { return false }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        if items.contains(where: { $0.name == "web" }) { return false }
+        let conversation = items.first { $0.name == "c" }?.value
+        if state?.bar.contains(where: { $0.id == "messages" }) == true {
+            select(key: "messages")
+            if content.viewControllers.count > 1 { content.popToRootViewController(animated: false) }
+        } else {
+            content.pushViewController(NativeMessages.shared.makeList(navigator: navigator), animated: true)
+        }
+        if let conversation { NativeMessages.shared.open(conversationId: conversation, in: content, navigator: navigator) }
+        return true
+    }
+
     /// The page on top of the stack on screen.
     var currentPage: WebPageController? { content.topViewController as? WebPageController }
 
@@ -320,7 +355,7 @@ final class FrameController: UIViewController, UITabBarDelegate {
         guard count != notificationUnread else { return }
         notificationUnread = count
         for stack in stacks.values {
-            for case let page as WebPageController in stack.viewControllers { page.refreshChrome() }
+            for case let page as ChromeRefreshing in stack.viewControllers { page.refreshChrome() }
         }
     }
 
