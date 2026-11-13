@@ -3,9 +3,9 @@
 Everyone who can see a calendar event gets a reminder **3 days** and again **1 day** before it, at **9:00 AM Central time**.
 All of that can be changed by an administrator (Admin, Integrations, Event reminders).
 
-Code: `supabase/migrations/20261114100000_event_reminders.sql`, `app/family-village/admin/event-reminder-settings-card.tsx`,
+Code: `supabase/migrations/20261116110000_event_reminders.sql`, `app/family-village/admin/event-reminder-settings-card.tsx`,
 the calendar form in `app/family-village/admin/news-tab.tsx`, the toggle in `app/family-village/notification-prefs-section.tsx`.
-Tests: `supabase/tests/database/024_event_reminders.test.sql`.
+Tests: `supabase/tests/database/030_event_reminders.test.sql`.
 
 ## No second sender
 
