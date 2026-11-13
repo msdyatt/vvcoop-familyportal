@@ -46,12 +46,21 @@ final class NativeMessages {
         return controller
     }
 
+    /// The view controller that should present something new (the share sheet, a file preview).
+    var topPresenter: UIViewController? { frame?.topPresenter }
+
     /// A conversation, pushed from the list or opened from a notification.
     func open(conversationId: String, in navigation: UINavigationController, navigator: Navigator) {
-        // The thread screen arrives in the next step; until then the conversation is the website's, in the same frame.
-        var components = URLComponents(url: FrameConfig.url(forPath: "/family-village/messages"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "c", value: conversationId), URLQueryItem(name: "web", value: "1")]
-        if let url = components.url { navigator.open(url, from: nil) }
+        if let top = navigation.topViewController as? NativeScreenController, top.subject == conversationId { return }
+        let store = MessagesStore.shared
+        let controller = NativeScreenController(chrome: .strip, navigator: navigator) {
+            ThreadView(conversationId: conversationId, messagesStore: store,
+                       onBack: { [weak navigation] in navigation?.popViewController(animated: true) },
+                       onOpenURL: { [weak navigator] url in navigator?.open(url, from: nil) })
+        }
+        controller.hidesTabBar = true
+        controller.subject = conversationId
+        navigation.pushViewController(controller, animated: true)
     }
 }
 

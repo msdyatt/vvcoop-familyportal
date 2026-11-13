@@ -85,6 +85,19 @@ final class FrameNavigationController: UINavigationController, UINavigationContr
 
     override var preferredStatusBarStyle: UIStatusBarStyle { style == .navy ? .lightContent : .default }
 
+    // MARK: Tab bar
+
+    /// A conversation covers the tab bar; going back to the list brings it back.
+    func navigationController(_ navigationController: UINavigationController, willShow viewController: UIViewController, animated: Bool) {
+        guard tabKey != nil, let frame = parent as? FrameController else { return }
+        let covered = (viewController as? NativeScreenController)?.hidesTabBar ?? false
+        if let coordinator = navigationController.transitionCoordinator, animated {
+            coordinator.animate(alongsideTransition: { _ in frame.setTabBarCovered(covered) }, completion: { context in
+                if context.isCancelled { frame.setTabBarCovered((navigationController.topViewController as? NativeScreenController)?.hidesTabBar ?? false) }
+            })
+        } else { frame.setTabBarCovered(covered) }
+    }
+
     // MARK: Transition
 
     func navigationController(_ navigationController: UINavigationController, animationControllerFor operation: UINavigationController.Operation,

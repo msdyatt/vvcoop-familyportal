@@ -35,7 +35,11 @@ struct SupabaseAPI {
         while true {
             let info = try await NativeSession.shared.validSession(force: forced)
             var components = URLComponents(url: info.url.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
-            if !query.isEmpty { components.queryItems = query }
+            if !query.isEmpty {
+                components.queryItems = query
+                // A "+" in a timestamp ("...+00:00") would be read as a space by the server.
+                components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+            }
             var request = URLRequest(url: components.url!)
             request.httpMethod = method
             request.httpBody = body
