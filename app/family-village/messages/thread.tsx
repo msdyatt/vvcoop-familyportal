@@ -8,6 +8,7 @@ import { ATTACH_ACCEPT, ATTACH_MAX, FILE_MAX_BYTES, MESSAGE_COLUMNS, REACTIONS, 
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
 import ChannelDetails from "./channel-details";
+import { EMOJI_GROUPS } from "../../../lib/emoji";
 import ConversationAvatar from "./conversation-avatar";
 import { FLAVOUR_LABEL, conversationFlavour, conversationTone, roleRing, toneFor } from "../../../lib/message-colors";
 
@@ -71,7 +72,9 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   const [notInPortal, setNotInPortal] = useState<string[]>([]);
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const [reactions, setReactions] = useState<Reaction[]>([]);
-  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  // The message whose reactions are being listed ("who reacted").
+  const [reactionsFor, setReactionsFor] = useState<string | null>(null);
+  const [emojiGroup, setEmojiGroup] = useState(EMOJI_GROUPS[0].id);
   // The message whose actions (react, reply, remove, report) are showing; tap a message to open them.
   const [activeId, setActiveId] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -201,7 +204,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   async function react(messageId: string, emoji: string) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    setPickerFor(null);
+    setActiveId(null);
     const { error } = await supabase.rpc("toggle_reaction", { p_message_id: messageId, p_emoji: emoji });
     if (error) { setStatus(error.message); return; }
     await fetchReactions();
@@ -334,7 +337,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
 
   function startEdit(message: MessageRow) {
     setEditing({ id: message.id, text: message.body ?? "" });
-    setActiveId(null); setPickerFor(null);
+    setActiveId(null);
   }
 
   async function saveEdit() {
@@ -450,7 +453,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     </p>}
 
     {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- a tap on the empty space closes open message actions; nothing here needs a keyboard */}
-    <div className="messages-scroll" ref={listRef} onClick={(event) => { if (event.target === event.currentTarget) { setActiveId(null); setPickerFor(null); } }} onScroll={(event) => {
+    <div className="messages-scroll" ref={listRef} onClick={(event) => { if (event.target === event.currentTarget) { setActiveId(null); } }} onScroll={(event) => {
       const el = event.currentTarget;
       stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     }}>
@@ -467,7 +470,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
         const [headline, ...rest] = (message.body ?? "").split("\n");
         const own = reactions.filter((r) => r.message_id === message.id);
         const chips = REACTIONS.map((emoji) => ({ emoji, count: own.filter((r) => r.emoji === emoji).length, mine: own.some((r) => r.emoji === emoji && r.user_id === userId) })).filter((chip) => chip.count > 0);
-        const open = activeId === message.id || pickerFor === message.id;
+        const open = activeId === message.id;
         const seenInfo = mayWatchReads && !message.deleted_at ? seenCounts.get(message.id) : undefined;
         const senderName = sender?.display_name ?? message.system_label ?? "Former member";
         const personTone = card ? tone : toneFor(message.sender_id);
@@ -478,30 +481,32 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
         </span>;
 
         // The small line under a message: its time, and when the message is tapped (or focused), what can be done with it.
-        const meta = (showTime: boolean) => <>
-          {pickerFor === message.id && !message.deleted_at && <span className="messages-picker" role="group" aria-label="Choose a reaction">
-            {REACTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => void react(message.id, emoji)} aria-label={`React ${emoji}`}>{emoji}</button>)}
+        const meta = (showTime: boolean) => <div className={`messages-tools${open ? " open" : ""}`}>
+          {!message.deleted_at && !archivedBlock && <span className="messages-picker" role="group" aria-label="React to this message">
+            {REACTIONS.map((emoji) => {
+              const mineNow = own.some((r) => r.emoji === emoji && r.user_id === userId);
+              return <button key={emoji} type="button" className={mineNow ? "mine" : ""} aria-pressed={mineNow} onClick={() => void react(message.id, emoji)} aria-label={`React ${emoji}`}>{emoji}</button>;
+            })}
           </span>}
           <span className={`messages-meta${open ? " open" : ""}${showTime ? " timed" : ""}`}>
             {(showTime || open) && <time dateTime={message.created_at}>{shortTime(message.created_at)}</time>}
             {message.edited_at && !message.deleted_at && <span className="messages-edited">Edited</span>}
             {seenInfo && open && !card && <button type="button" className="messages-seen" onClick={() => void openSeen(message.id)}>Seen by {seenInfo.seen} of {seenInfo.total}</button>}
             {!message.deleted_at && <span className="messages-actions">
-              {!archivedBlock && <button type="button" onClick={() => setPickerFor(pickerFor === message.id ? null : message.id)}>React</button>}
               {!blocked && <button type="button" onClick={() => { setReplyingTo(message); setActiveId(null); composerRef.current?.focus(); }}>Reply</button>}
+              {chips.length > 0 && <button type="button" onClick={() => setReactionsFor(message.id)}>Who reacted</button>}
               {mine && !archivedBlock && canEditMessage(message) && <button type="button" onClick={() => startEdit(message)}>Edit</button>}
               {mine && <button type="button" onClick={() => removeOwn(message)}>Remove</button>}
               {!mine && !message.system_label && <button type="button" onClick={() => { setReporting(message); setReason(""); }}>Report</button>}
             </span>}
           </span>
-        </>;
+        </div>;
 
         // Tapping the message itself (not a link or button inside it) shows or hides its actions.
         const toggle = (event: React.MouseEvent) => {
           if ((event.target as HTMLElement).closest("a,button")) return;
           if (window.getSelection()?.toString()) return;
           setActiveId(activeId === message.id ? null : message.id);
-          if (pickerFor && pickerFor !== message.id) setPickerFor(null);
         };
 
         const quote = !message.deleted_at && message.reply_to && message.reply && <a className="messages-quote" href={`#msg-${message.reply.id}`}>
@@ -643,8 +648,13 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
       </li>)}
     </ul>}
 
-    {emojiOpen && !blocked && <div className="messages-emoji-tray" role="group" aria-label="Insert an emoji">
-      {REACTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => insertEmoji(emoji)} aria-label={`Insert ${emoji}`}>{emoji}</button>)}
+    {emojiOpen && !blocked && <div className="messages-emoji-panel" role="group" aria-label="Insert an emoji">
+      <div className="messages-emoji-tabs" role="tablist">
+        {EMOJI_GROUPS.map((group) => <button key={group.id} type="button" role="tab" aria-selected={emojiGroup === group.id} aria-label={group.label} className={emojiGroup === group.id ? "active" : ""} onClick={() => setEmojiGroup(group.id)}>{group.icon}</button>)}
+      </div>
+      <div className="messages-emoji-grid">
+        {(EMOJI_GROUPS.find((group) => group.id === emojiGroup) ?? EMOJI_GROUPS[0]).emoji.map((emoji) => <button key={emoji} type="button" onClick={() => insertEmoji(emoji)} aria-label={`Insert ${emoji}`}>{emoji}</button>)}
+      </div>
     </div>}
 
     {blocked ? <p className="messages-readonly" role="note">{blocked}</p> : <form className="messages-composer" onSubmit={(event) => { event.preventDefault(); setEmojiOpen(false); void send(); }}>
@@ -698,6 +708,29 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           onClick={() => setViewing({ ...viewing, index: (viewing.index + 1) % viewing.urls.length })}>›</button>}
       </div>
     </DetailModal>}
+
+    {reactionsFor && (() => {
+      const list = reactions.filter((r) => r.message_id === reactionsFor);
+      return <DetailModal title="Reactions" onClose={() => setReactionsFor(null)}>
+        {list.length === 0 && <p className="portal-empty">No reactions.</p>}
+        <div className="messages-seen-lists">
+          {REACTIONS.filter((emoji) => list.some((r) => r.emoji === emoji)).map((emoji) => {
+            const who = list.filter((r) => r.emoji === emoji);
+            return <section key={emoji}>
+              <h3><span className="messages-reaction-glyph" aria-hidden="true">{emoji}</span> {who.length}</h3>
+              <ul className="messages-members">
+                {who.map((r) => {
+                  const person = people.get(r.user_id);
+                  return <li key={r.user_id}>
+                    <span className="messages-member"><Avatar url={person?.avatar_path ? avatarUrls.get(person.avatar_path) ?? null : null} label={person?.display_name ?? "?"} size="sm" tone={toneFor(r.user_id)} ring={roleRing(person)} /><span>{r.user_id === userId ? "You" : person?.display_name ?? "Former member"}</span></span>
+                  </li>;
+                })}
+              </ul>
+            </section>;
+          })}
+        </div>
+      </DetailModal>;
+    })()}
 
     {seenList && <DetailModal title="Seen by" onClose={() => setSeenList(null)}>
       {!seenList.rows && <p className="portal-empty">Loading…</p>}
