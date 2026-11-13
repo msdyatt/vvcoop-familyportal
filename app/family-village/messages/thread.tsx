@@ -74,6 +74,8 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   const [reactions, setReactions] = useState<Reaction[]>([]);
   // The message whose reactions are being listed ("who reacted").
   const [reactionsFor, setReactionsFor] = useState<string | null>(null);
+  // Administrators can read what an edited message said before (message_edits; the database shows it to no one else).
+  const [history, setHistory] = useState<{ message: MessageRow; versions: { id: string; body: string | null; edited_at: string }[] | null } | null>(null);
   const [emojiGroup, setEmojiGroup] = useState(EMOJI_GROUPS[0].id);
   // The message whose actions (react, reply, remove, report) are showing; tap a message to open them.
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -191,6 +193,15 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     });
     return () => { cancelled = true; };
   }, [mayWatchReads, loadedIds, tick, conversation.id]);
+
+  async function openHistory(message: MessageRow) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setHistory({ message, versions: null });
+    const { data, error } = await supabase.from("message_edits").select("id,body,edited_at").eq("message_id", message.id).order("edited_at", { ascending: false });
+    if (error) { setHistory(null); setStatus(error.message); return; }
+    setHistory({ message, versions: (data ?? []) as { id: string; body: string | null; edited_at: string }[] });
+  }
 
   async function openSeen(messageId: string) {
     const supabase = getSupabaseBrowserClient();
@@ -496,6 +507,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
               {!blocked && <button type="button" onClick={() => { setReplyingTo(message); setActiveId(null); composerRef.current?.focus(); }}>Reply</button>}
               {chips.length > 0 && <button type="button" onClick={() => setReactionsFor(message.id)}>Who reacted</button>}
               {mine && !archivedBlock && canEditMessage(message) && <button type="button" onClick={() => startEdit(message)}>Edit</button>}
+              {message.edited_at && roles.includes("admin") && <button type="button" onClick={() => void openHistory(message)}>Edit history</button>}
               {mine && <button type="button" onClick={() => removeOwn(message)}>Remove</button>}
               {!mine && !message.system_label && <button type="button" onClick={() => { setReporting(message); setReason(""); }}>Report</button>}
             </span>}
@@ -731,6 +743,18 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
         </div>
       </DetailModal>;
     })()}
+
+    {history && <DetailModal title="Edit history" onClose={() => setHistory(null)}>
+      {!history.versions && <p className="portal-empty">Loading…</p>}
+      {history.versions && <ol className="messages-versions">
+        <li><span className="messages-version-when">Now</span><p>{history.message.body ?? "No words (photos or files only)"}</p></li>
+        {history.versions.map((version) => <li key={version.id}>
+          <span className="messages-version-when">Before the edit at {shortTime(version.edited_at)}</span>
+          <p>{version.body ?? "No words (photos or files only)"}</p>
+        </li>)}
+      </ol>}
+      <p className="field-note">Only administrators can see this. The sender and everyone else see only the current words and the word Edited.</p>
+    </DetailModal>}
 
     {seenList && <DetailModal title="Seen by" onClose={() => setSeenList(null)}>
       {!seenList.rows && <p className="portal-empty">Loading…</p>}
