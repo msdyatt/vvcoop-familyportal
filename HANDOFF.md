@@ -1,172 +1,140 @@
-# Veritas Village Family Portal — Project Handoff
+# Veritas Village Family Portal: handoff
 
-## 25 Aug 2026 feature pass — built and verified locally, not yet released
+Last updated 13 Nov 2026. Read this first, then the docs it points to. The older, longer notes (August to early November) are kept in [docs/handoff-archive-2026-08.md](docs/handoff-archive-2026-08.md); parts of that file are out of date, but it still holds useful detail on traps and decisions.
 
-The current working tree contains a coordinated public-site and portal update responding to Sam's 25 Aug feedback. It is intentionally **not described as live yet**: the two database migrations below have been applied to Supabase, but the Cloudflare site bundle and the updated `invite-family-admin` Edge Function still require an explicit production release.
+## 1. What this is
 
-- Public/login: horizontal hero lockup, public news section, reduced Friday-specific copy, email/password-only sign-in, repaired home link, and removal of the login sidebar.
-- Shared UI: signed-in account photo with a gold detail, browser-based crop/zoom before upload, lighter motion cues, and permission-aware portal navigation without the old “Workspace” label.
-- Admin: persistent left navigation, combined **News & calendar** editor, safe formatted news, system-wide events, printable Reports, class/family readiness filters, grouped CSV payment matching, and editable schedule settings nested under Classes.
-- Scheduling: weekdays on time blocks, editable rooms, date-bounded academic terms, and many-to-many class-to-term assignment. Schema is recorded in `20260825050325_portal_schedule_terms.sql` and is already live.
-- Family/teacher: descriptive elective enrollment cards, per-child and bulk assignment completion, teacher month calendar, family handouts versus teacher-only curriculum files, and a file-backed print queue. The curriculum privacy tightening in `20260825051802_protect_teacher_curriculum_files.sql` is already live.
-- Verification: lint has zero errors (two existing `<img>` optimization warnings), the production build succeeds, focused rendered-page tests pass, the public home/login/preview fit a 390px viewport without overflow, and the formatted-news allow-list rejects scripts, event attributes, and unsafe links.
+A private, invitation-only portal for Veritas Village, a homeschool co-op (a 501(c)(3)). Parents, teachers and a few administrators use it for messages, classes, calendar, photos, signed documents and dues. Nothing is public except the marketing pages and sign-in.
 
-Release boundary: `supabase/functions/invite-family-admin/index.ts` now points invitations to `family.veritasvillage.org`, but that function version has **not** been deployed. Deploying it can create real household invitations and send real mail, so do so only after Sam explicitly confirms the production release. The same confirmation should cover the Cloudflare deployment; keep the shared-password gate and verify both Worker secrets afterward.
+It ships as:
 
-## What this is
-A private family-portal web app for Veritas Village, a Central Texas homeschool co-op. It sits alongside the co-op's public marketing site in the same repo. Three private workspaces: **Family** (parents), **Teacher's Lounge** (teachers), **Admin** (co-op leadership).
+- **Website** on a Cloudflare Worker (production domain `family.veritasvillage.org`).
+- **Installed web app (PWA)** from the same site.
+- **Native iPhone app**: a Swift "frame" (tab bar, navigation bar, Messages list, sheets) around the same site. See `docs/native-ios-frame.md`.
+- **Android**: a Capacitor shell around the site (`mobile/android`). Not in the stores yet.
 
-## Stack & where things live
-- **Framework**: A Next.js-style app using "vinext" (`@openai/sites-vite-plugin`), built with Vite, deployed as a **Cloudflare Worker**.
-- **Repo**: `https://github.com/msdyatt/vvcoop-familyportal`, local clone at `/Users/samdyatt/Documents/Projects/vvcoop-familyportal` on this Mac.
-- **Backend**: Supabase (Postgres + Auth + Storage). Project ref `jtwemgyhxylbhjzxgyvh`. All access control is via **Row Level Security (RLS)** — the app is a thin client talking directly to Supabase from the browser (`@supabase/supabase-js`), no custom API server.
-- **Hosting**: Cloudflare Worker named `veritas-village`. Real production domain is **`family.veritasvillage.org`** (a separate custom domain from the public marketing site at `veritasvillage.org` — same worker, different route). Always test/verify against `family.veritasvillage.org`, not the `workers.dev` URL — WebAuthn/passkey RP ID is locked to the real domain and will fail on `workers.dev`.
-- **App routes**: `/family-village` (sign-in), `/family-village/home` (Family), `/family-village/teacher` (Teacher's Lounge), `/family-village/admin` (Admin). Public marketing pages live at the site root (`app/page.tsx`, etc.) — separate from the private app.
+The app is mostly a thin web client that talks directly to Supabase with `@supabase/supabase-js`. There is no custom API server. Access control is Row Level Security plus `SECURITY DEFINER` functions.
 
-## Important environment quirk
-This Mac's shell has been seen with `NODE_ENV=production` set, which makes plain `npm install`/`npm ci` skip devDependencies (ESLint, TypeScript, Vite, wrangler, etc. all vanish). It is **not** set in `.zshrc`, `.zprofile`, `/etc/zprofile` or `/etc/zshrc`, and it was empty in a later session's shell — so it is probably exported ad hoc in some terminals and not others. **Keep prefixing build/lint/install commands with `NODE_ENV=development` regardless**: it is free when the variable is unset and essential when it isn't.
+Real families are **not** using it yet. A small test group may start in a later season. The owner is the co-op administrator; "the owner" below means that person.
+
+## 2. Rules of engagement (do not break these)
+
+1. **Production changes go through merged pull requests only.** CI deploys on every push to `main`. Do not run ad hoc deploys, direct database edits or one-off SQL against production.
+2. **Merge only when the owner says "merge"** for that PR.
+3. **Never put secrets in the repo, in chat or in logs.** Keys live in Supabase Vault, Supabase function secrets, Cloudflare Worker secrets and GitHub Actions secrets. Never commit the Apple push key, a Firebase service account, Stripe keys or the site password.
+4. **Never sign in to production, create accounts there, or use real family data in tests.** Use local or test data.
+5. **Children's information is sensitive.** Do not add anything that exposes one family's data to another. Test RLS changes with pgTAP.
+6. **Test builds go on the owner's phone only**, never on anyone else's device, even if it shows up in device lists.
+7. **Do not work around a permission denial.** Ask.
+8. Keep prose plain. No marketing tone in UI copy.
+
+## 3. Stack and layout
+
+- Node `>=22.13.0`, React 19, vinext (a Next-style framework on Vite) built for a Cloudflare Worker. Plain CSS (no Tailwind utilities; only preflight is imported and it is load-bearing).
+- Supabase: Postgres, Auth, Storage, Realtime, Edge Functions (Deno), pg_cron, pg_net, Vault. Project ref `jtwemgyhxylbhjzxgyvh`.
+
+| Path | What is there |
+| --- | --- |
+| `app/` | Pages. Signed-in app is under `app/family-village/**` (home, messages, calendar, photos, classes, documents, dues, admin, teacher). Public pages at the root. |
+| `app/globals.css`, `app/platform.css` | Styles. Colours are role tokens (see Theming). `platform.css` holds the iOS and Android approximations. |
+| `lib/` | Shared logic: `supabase.ts`, `nav-prefs.ts`, `platform.ts`, `native-frame.ts`, `calendar.ts`, `messages.ts`, `storage.ts`, `report-doc.ts`, `schedule.ts`, theme helpers. |
+| `worker/` | Cloudflare Worker entry: security headers, shared-password gate, calendar-feed pass-through, app-site-association file. |
+| `supabase/migrations/` | Every schema change. `supabase/tests/database/` pgTAP tests. `supabase/functions/` Edge Functions and `_shared/`. `supabase/ci-bootstrap/` CI-only stand-ins (never apply to production). |
+| `mobile/ios`, `mobile/android` | Native shells. iOS is built locally in Xcode (see `docs/native-ios-frame.md`). |
+| `tests/` | Node tests run by `npm test`. |
+| `docs/` | Feature and setup docs. Start with the index in section 6. |
+| `public/` | Static files, `brand/` logos, vendored PDF libraries. |
+
+## 4. Run, check, deploy
+
 ```
-NODE_ENV=development npm run build
-NODE_ENV=development npx eslint <files>
-NODE_ENV=development npx wrangler deploy --config dist/server/wrangler.json --name veritas-village dist/server/index.js
+NODE_ENV=development npm ci
+NODE_ENV=development npm run dev          # local dev server
+NODE_ENV=development npm run lint
+NODE_ENV=development npm run typecheck    # tsc --noEmit
+NODE_ENV=development npm test             # builds, then runs node tests
 ```
 
-## The site is password protected -- keep it that way
-The public site sits behind a shared password enforced in `worker/site-password.ts`,
-ahead of the app router so no route can bypass it. **Sam has asked that this stay on
-until he explicitly asks for it to be removed.**
+Always prefix with `NODE_ENV=development`: some shells on the owner's Mac export `NODE_ENV=production`, which makes npm skip dev dependencies. Local ESLint and `tsc` can hang on this machine; CI is the authority.
 
-It reads the `SITE_PASSWORD` and `SITE_AUTH_SECRET` worker secrets and **fails closed** --
-missing either one returns 503 rather than serving publicly. `/family-village` is exempt
-because it has its own Supabase auth; gating it too would mean two credentials for one
-household.
+Edge function tests: `cd supabase/functions && deno test --node-modules-dir=none --config invite-family-admin/deno.json _shared/ calendar-feed/` (plus the other function test files; CI lists them).
 
-History worth knowing: those secrets existed on the worker for a long time while *nothing
-in the repo read them*. The gate lived only in an uncommitted deployed build, so the first
-`wrangler deploy` from this repo silently replaced it and the site went public. That is why
-it is in version control now. Do not "simplify" the guard call out of `worker/index.ts`.
+Database tests are pgTAP files in `supabase/tests/database/` (numbered; use the next free number). CI runs them against a fresh local Supabase in Docker with every migration replayed. There is no Docker on the owner's Mac yet, so locally you can replay migrations into an in-memory Postgres (PGlite) with stand-ins for Supabase's schemas. That is a close approximation; CI's `database-tests` is the real run.
 
-To test locally, put throwaway values in `.dev.vars` (gitignored) -- never the real password.
+**CI** (`.github/workflows/ci.yml`) runs on PRs to `main` and on pushes to `main`:
 
-## Calendar subscription links live on the co-op's own domain
-Families subscribe to `https://family.veritasvillage.org/calendar/feed?scope=...` (Apple gets the `webcal://` form of the
-same address; Google's "Add by URL" gets the https one). The Worker route in `worker/calendar-feed.ts` is answered **ahead of
-the password gate** (calendar apps cannot sign in) and passes the request through to the `calendar-feed` Supabase edge
-function. It forwards only `scope`, `id` and `token`, rejects anything else with 400, sends none of the caller's headers or
-cookies, does not follow redirects, times out after 10 s, and never logs the query string (a personal feed's `token` is a
-bearer credential).
-- Moving the backend later means changing the upstream only: set the Worker var `SUPABASE_URL` (falls back to
-  `NEXT_PUBLIC_SUPABASE_URL`, then the current project URL). Subscribed calendars keep working untouched.
-- The address in the links is `NEXT_PUBLIC_SITE_URL` at build time (default `https://family.veritasvillage.org`), built by
-  `lib/calendar-links.ts`. It is never taken from `window.location`: previews and the iPhone app load pages from other hosts.
-- The Supabase function is unchanged, so subscriptions made before this route existed (`...supabase.co/functions/v1/calendar-feed?...`) still work.
-- **Cloudflare dashboard**: no WAF rule, Bot Fight/Super Bot Fight challenge, or caching rule should apply to `/calendar/feed`.
-  Google fetches feeds from its own servers; a challenge page would silently break "Add to Google Calendar".
+- `build-lint-test`, `edge-function-tests`, `database-tests` on every PR.
+- On push to `main` only: `deploy` (Cloudflare Worker), `supabase-functions` (deploy all functions), `supabase-migrations` (`supabase db push`).
+- `mobile.yml` builds the Android debug app when `mobile/**` changes.
+- Pinned versions: Node 22.13.0, Deno 2.8.2, Supabase CLI 2.122.1.
 
-## Deploy command (exact)
-```
-npm run build
-NODE_ENV=development npx wrangler deploy --config dist/server/wrangler.json --name veritas-village dist/server/index.js
-```
-`wrangler.json` in `dist/server/` is auto-generated by the build and defaults to a placeholder project name — the `--name veritas-village` override is what makes it hit the real worker. There is **no CI/CD** — every deploy is this manual command.
+If `supabase-migrations` fails because another merge landed a newer migration first, re-run the job on the latest `main`; `db push` then applies everything pending.
 
-## Working conventions established this session
-1. **Skim relevant SKILL.md files** before big frontend work if any exist for this stack.
-2. **Always view the current file before editing it** — don't trust memory of prior state.
-3. **Lint + full `npm run build` before every commit.** Both must be clean.
-4. **Supabase migrations**: every schema/RLS change goes through `supabase/migrations/<timestamp>_<name>.sql`, applied live via the Supabase MCP/CLI *and* committed to the repo so history matches reality. (Earlier in this project some hand-run changes weren't captured in migrations and the history drifted — don't repeat that.)
-5. **Never guess at existing schema/RLS** — query `information_schema.columns` and `pg_policies` before writing a migration that touches a table you haven't already inspected this session.
-6. **Git identity on this Mac**: commits use `Codex <codex@veritasvillage.com>` (matches the existing commit history from the AI agent that built the original site) — already configured locally, no action needed.
-7. **Commit messages**: multi-line, explaining *why* not just *what*, especially for RLS changes (state what was previously possible/impossible and what the policy now allows).
-8. **Design system**: plain CSS in `app/globals.css`, now formatted one declaration per line (it was 44KB minified onto 80 lines). Tokens live in the `:root` block at the top and **no literal hex belongs anywhere else** — if you need a colour, add or reuse a token.
-   - Palette is the **2026 Edition**: Ink Navy `#0B2A3D`, Parchment Cream `#FAF7F1`, Terracotta `#BB6141`, plus Hill Sage `#6F7D72` retained by Sam's choice. Morning Mist is gone.
-   - **Small text must use `--terracotta-text` / `--sage-text`**, not the raw brand colours — the brand hues are only ~4.0:1 on cream and fail AA below 18.66px bold.
-   - Headings are Playfair Display, UI text is Inter. The guide forbids the display serif for body, captions, labels, or anything under ~20px.
-   - Each portal sets `--portal-accent` / `--portal-band-*` on its root class (`.live-portal`, `.workspace-preview`, `.admin-live`). Add new accented styling by consuming those vars, not by hardcoding terracotta.
-   - **News attachments** live in `post_attachments`, not on `posts` -- `image_storage_path`, `attachment_url` and `video_url` were dropped. Render them with `PostAttachments` / `PostThumbnail` / `usePostAttachments` from `app/family-village/post-attachments.tsx` rather than signing URLs by hand; the bucket is private so every file needs a short-lived signed URL. Read access is `private.can_read_post()`, a SECURITY DEFINER mirror of `posts_read` -- if you change the audience rules on posts, change it there too.
-   - **Filled pills paint cream on `--terracotta-text` / `--sage-text`, never on the pure brand hues.** Cream on `--terracotta` is only 4.01:1 and on `--sage` 4.05:1, both failing AA for the small bold text a pill uses. The text-safe variants look the same and clear 4.5:1.
-   - Eyebrows on a **navy ground** must use `--terracotta-on-navy`; the canvas accents are only 2.85-3.47:1 there and fail AA. There is a rule listing those containers near the end of the stylesheet -- add to it when you introduce a new dark surface.
-  - `formatDate`/`formatMoney` in `lib/compliance.ts` pin locale and time zone deliberately. `toLocaleDateString(undefined, ...)` differs between server and client (hydration mismatch) and renders a date-only column a day early in Central Time.
-  - `@import "tailwindcss/preflight"` is load-bearing — the stylesheet depends on its reset. Do not remove it. No Tailwind utilities are used.
-9. **Brand assets** live in `public/brand/`. Use the horizontal lockup in headers, stacked in the hero, the cream variant on dark fields, and the compact mark below 64px. Full-resolution masters are outside the repo in `~/Downloads/veritas-village-logo-assets/`.
+Manual deploy is a fallback only, with the owner's say: `npm run build` then `NODE_ENV=development npx wrangler deploy --config dist/server/wrangler.json --name veritas-village dist/server/index.js`.
 
-## Production baseline before the 25 Aug local pass
-Everything below describes the previously deployed production baseline. The dated section at the top lists the newer local changes that still need release.
+Verify something is really live: `curl -s -o /dev/null -w "%{http_code}\n" https://family.veritasvillage.org/family-village` and `npx wrangler secret list --name veritas-village` (confirm the site password secrets survived).
 
-**Family portal**: dashboard with children (click a child → classes/assignments/family-visible teacher notes with read-receipts), clickable News/Events/Documents (open a detail modal instead of a flat list), self-service add-a-child (button-triggered form) and display-name edit, Account & Security accessible from the header's account menu (password change, passkeys, TOTP 2FA, phone/emergency contact, self-service account deletion).
+## 5. Database and security rules
 
-**Teacher's Lounge**: one class selection at the top drives the whole page — there are no per-section class dropdowns. Sections, in order: **Teaching team news** (read-only, narrowed to the `teachers` audience plus the teacher's own `class` posts -- co-op-wide news is deliberately excluded, they see that in the family portal), My classes (roster; clicking a student reveals their notes, hidden until then), **Class dates**, Handouts, Print queue.
+- Every schema or policy change is a migration file. **The filename timestamp must sort after the latest migration on `main`** and must match what `db push` records (exact version number). Two PRs that add migrations at once can race; rebase and renumber.
+- Writes go through `SECURITY DEFINER` functions with `set search_path to ''`, schema-qualified names, `revoke ... from public, anon`, then `grant execute ... to authenticated`. A function with no ACL is executable by `PUBLIC` and becomes callable at `/rest/v1/rpc/<name>`; the Supabase API is **not** behind the Cloudflare password gate.
+- A new table needs RLS **and** a `GRANT`; privileges are checked before RLS.
+- Admin functions check the admin role and the second-factor level (`aal_satisfied`) and exclude demo accounts.
+- Append-only tables (e-sign events, audit logs) block UPDATE and DELETE by trigger and revoked privileges.
+- Three CI bootstrap objects were created by hand early on and are not in any migration; CI stubs them from `supabase/ci-bootstrap/`.
+- Reviewer/demo accounts (`is_demo`) live in a sealed sample world. Exclude them from every audience, notification and report. Admin creates them from Admin, Integrations.
+- The site sits behind a shared-password gate (`worker/site-password.ts`) ahead of the app router, fail-closed. Exempt on purpose: sign-in, the calendar feed route, and the Apple app-site-association file. Keep the gate until the owner says remove it. Test locally with throwaway values in `.dev.vars` (gitignored).
 
-**Class dates replaced homework.** One entry says what is being worked on, the date, where, instructions, and a `requires_prework` flag -- families see "Something to do before class" on the date rather than a separate homework row. Stored in `events` with `audience = 'class'` at **midday UTC** so the date cannot slide across midnight when read in Central Time; the form is date-only on purpose, since a co-op class has a day not a start time. Class dates are kept **out of the family Village calendar**, which is co-op-wide only. The `assignments` table has been **dropped** -- homework is a flag on a class date now, and the child detail panel reads class dates too. Do not confuse it with `teacher_assignments`, which is who teaches what and is very much alive.
+## 6. Feature map and where the docs are
 
-**The print queue** lists every request the teacher has made across all classes, each labelled with its class, because someone printing for three classes needs one pile not three. It **empties automatically at 09:00 UTC each Sunday** (4am Central in summer, 3am in winter -- pg_cron schedules in UTC and does not follow DST) via the `clear-print-queue` job calling `public.clear_print_queue()`. That sets `cleared_at` rather than deleting, so the record and the uploaded file survive; the UI filters on `cleared_at is null`.
+| Area | Notes | Docs |
+| --- | --- | --- |
+| One portal | Family and Teaching share one bar and a flat Menu. Teaching items show when the person is assigned to a class this year. Admin stays separate (navy header). `lib/nav-prefs.ts`, `app/family-village/app-tab-bar.tsx`. | |
+| Messaging | Direct, group, class and channel conversations; system channels #Announcements, #General and admin-only #Reports; reactions, replies, mentions, edits, multi-photo/file messages, "Seen by"; "Message parents" and "Message <teacher>" buttons start one thread per child and teacher with both parents; reports post to #Reports. Native iPhone Messages screens. | `docs/messaging-look-and-feel`, `messaging-phase2`, `messaging-phase3`, `announcement-cards.md` |
+| Notifications | `notifications` table, push (Firebase, web push), email, optional text. Ladder: push first; email if unseen after a wait or no push; text only with recorded consent. Urgent broadcasts (admin screen, "Got it" banner, time-sensitive iOS push). Scheduled announcements. Event reminders 3 days and 1 day before at 9:00 AM Central. | `docs/notification-ladder.md`, `broadcasts.md`, `scheduled-announcements.md`, `event-reminders.md`, `native-push-setup.md` |
+| Calendar | Month, week, day, list. Subscription links on the co-op domain through a Worker route that passes through to the `calendar-feed` function (`worker/calendar-feed.ts`, `lib/calendar-links.ts`). Co-op time zone America/Chicago; all-day events are stored at UTC midnight and class dates at midday UTC, so always convert through `lib/calendar.ts` helpers. | |
+| Classes | Class pages for teachers and enrolled parents with a document repository (handouts for families, curriculum for teachers). Grade-based placement for History and Science. "Start next school year" wizard (Admin, Classes, Schedule & enrollment settings) with a returning-families choice. School years, terms, blocks, rooms and enrollment windows. | |
+| Documents and signing | In-house signing with sealed PDFs, audit trail and an RFC 3161 timestamp. Forms and dues live on one Documents page. | `docs/esign-timestamp-verification.md` |
+| Dues and Stripe | Stripe checkout and plans (card, bank, Apple Pay, Google Pay), receipts, expenses. Billing is test-mode until the owner finishes Stripe setup. The co-op banks with Crowded; Stripe pays out to the linked bank account. | `docs/stripe-dues-implementation.md`, `stripe-setup-checklist.md`, `native-apple-pay-setup.md` |
+| Admin | Reports (screen, CSV, PDF), activity log, families, invitations, classes, news and calendar, broadcasts, integrations. The admin home page does not list everything yet (issue #107). | |
+| Records vault | Database tables and storage policies for insurance, leases, nonprofit and tax records exist. There are no screens yet. | |
+| Theming | Light, Dark or System, switched in Account Settings and the Menu. Components use role tokens, never raw brand colours. A test checks token contrast. | `docs/theming.md` |
+| Native apps | iPhone: Swift frame, native bars, passkeys, share sheet, Face ID lock, push, Apple Pay. Android: Capacitor shell. | `docs/native-ios-frame.md`, `docs/store-readiness-review.md`, `docs/app-review-notes.md` |
 
-**Lead vs assistant.** `teacher_assignments.assignment_role` is now enforced through `private.leads_class()`. Assistants see everything and write student notes; leads additionally upload handouts, set homework and class dates, and send print requests. The UI hides what an assistant cannot do rather than letting them meet a denied write — if you add a control that writes, gate it on `isLead` *and* check the policy.
+Brand: Ink Navy `#0b2a3d`, Parchment Cream `#faf7f1`, Terracotta `#bb6141` (accent only), Hill Sage `#6f7d72`, Antique Gold `#aa7d38`. Playfair Display for headings, Inter for UI. The logo is a hand-engraved quill in an inkwell with "Veritas Village"; use the supplied files in `public/brand/` and never redraw or recolour it.
 
-**Admin**: a 7-card dashboard (Accounts/Relationships/Classes/Documents/Publishing/Oversight/Configuration) is the default view. Sections: Invitations, Families (parents-first with email/phone, then children, role-assignment chips for teacher/admin), Classes (create/assign teachers/manage enrollment), Documents (upload a PDF, place signature fields for one or two signers, send to households, follow per-signer status; see **E-signing** below), Village news (posts with multiple photos or files attached), Activity (audit log viewer), Integrations (status tracker; Resend and the office printer queue are live, the rest are notes).
+## 7. Accounts and services (no credentials here)
 
-**Compliance**: required documents and dues, tracked per family per school year. `school_years` scopes everything (one row flagged `is_current`, enforced by a partial unique index); `requirements` is what families owe that year, either a `document` to sign or `dues` to pay; `family_requirements` is the per-family matrix. Families see an outstanding-items banner and a **Paperwork & dues** list; admins get a **Compliance** tab with a families x requirements matrix, plus status chips on each card in Families. Shared presentation logic is in `lib/compliance.ts` -- use `statusLabel`/`statusTone` rather than restating the vocabulary.
+GitHub (this repo), Cloudflare (Worker and DNS), Supabase (database, auth, storage, functions), Stripe, Apple Developer (bundle id `org.veritasvillage.family`; push, Apple Pay and Time Sensitive Notifications capabilities), Firebase (push for iPhone and Android), Resend (outgoing email; the From address is set in Admin, Integrations), Google Workspace (staff addresses; a shared office inbox is planned), Crowded (the co-op's bank). A texting provider is not chosen yet.
 
-Dues amounts are captured when a requirement is opened, not derived on read, so enrolling a child mid-year cannot silently change a figure a family was already shown; admins press **Recalculate balances** on purpose. Dues are **tracked, not collected** -- the co-op banks with Crowded, whose API is a partner programme for software platforms rather than something an account holder can connect to, so the portal stores the Crowded payment link and an admin records receipt.
+Secrets are set in each provider's dashboard, in Supabase Vault (for example the Firebase service account) or in GitHub Actions secrets. If something needs a key, ask the owner to set it; do not ask for it in chat.
 
-**Shared**: one `AppHeader` component (the real horizontal lockup top-left, portal title, workspace switcher, account menu top-right) across all three portals. It renders as a full-bleed band whose colour identifies the workspace: cream with a terracotta rule for Family, a sage tint for Teacher, reversed navy with the cream lockup for Admin.
+## 8. State of play
 
-**Auth in the previous production bundle**: email/password, unconfigured Google/Apple buttons, and passkeys. The current local pass removes the Google/Apple options from sign-in and removes passkey management from Account settings, while retaining TOTP 2FA and the authenticator-assurance-level challenge.
+All features above are merged and deployed unless a section says otherwise. There are no open pull requests. Planned and open work is tracked in GitHub issues; start with the roadmap, issue #122, which links the rest (admin home, layout pass, edit dues, whimsy and seasonal logos, PWA bottom bar, shared office inbox, Stripe payouts, texting research, staging site, verification checklist, store readiness).
 
-## Known gaps / good next steps (raised but not yet built)
+Known open problems:
 
-### E-signing (built in; replaced OpenSign in Nov 2026)
+- The installed web app's bottom bar is reported missing on the owner's device and was not reproduced (issue #111).
+- The owner is documenting visual bugs in the apps (issue #115).
+- Push, time-sensitive alerts and email have not been verified end to end on a real device (issue #117).
 
-Signing happens inside the portal for a signed-in person. There is no public or emailed signing link and no outside signing service.
+## 9. Gotchas
 
-- **Tables** (`20261106235100_esign_schema.sql`): `sign_templates` (an uploaded PDF), `sign_fields` (page-relative fractions from the top-left, kind signature/initials/date/text/checkbox, signer slot 1 or 2), `sign_requests` (one per household; keeps the SHA-256 of the file it was sent with), `sign_signers`, `sign_field_values`, `sign_events`. `requirements.sign_template_id` ties a required document to its PDF.
-- **Writes only through functions** (SECURITY DEFINER, `search_path ''`): admin `sign_create_template`, `sign_save_fields`, `sign_archive_template`, `sign_send`, `sign_remind`, `sign_void`; signer `sign_eligibility`, `sign_record_view`, `sign_give_consent`, `sign_submit`, `sign_log_download`; service role only `sign_claim_seal`, `sign_mark_seal_failed`, `sign_complete`, `sign_log_timestamp`. Tables are read-only to clients, with RLS and the restrictive `aal2_required` policy. Tests: `supabase/tests/database/013_esign.test.sql`.
-- **Who may sign** (`private.signing_blockers`): active profile, invitation accepted (email confirmed, no unaccepted invite), and a name on the profile. A second factor is deliberately not required to sign (Nov 2026 decision), but anyone who has one is still challenged by the rest of the portal. Enforced inside consent and submit, not just in the page. A household with fewer adults than a document has signer slots is still sent it; the adults it has sign their own slots and the rest are left off the sealed copy.
-- **Audit trail**: `sign_events` and `sign_field_values` refuse UPDATE/DELETE/TRUNCATE by trigger and by revoked privileges (even for `service_role`). IP and user agent come from PostgREST's request headers (`cf-connecting-ip`, then `x-real-ip`, then `x-forwarded-for`), not from the browser. Event actors have no foreign key on purpose: an append-only table cannot take a `set null`.
-- **Locks**: once a template has a request, its fields and file are frozen; a request cannot be deleted, and a sealed request cannot be replaced or voided. To change fields, duplicate the document.
-- **Sealing** (`supabase/functions/esign-seal`, logic in `_shared/esign-seal.ts` and `_shared/esign-pdf.ts`, `pdf-lib`): the last signer's browser calls it; an admin can retry from Admin, Documents. It re-hashes the stored original against the request's hash, flattens the entries onto the pages, appends a certificate page, stores `signed-content.pdf`, `sealed.pdf` and the timestamp files under `sign/requests/<id>/` in `family-village-private`, then calls `sign_complete`, which files a `documents` row, marks the `family_requirements` row complete and notifies everyone. Text is drawn with the standard PDF fonts, so characters outside WinAnsi become `?` in the flattened copy.
-- **Timestamp** (`_shared/rfc3161.ts`): RFC 3161 token from DigiCert by default (`TIMESTAMP_AUTHORITY_URL` secret changes it; `disabled` turns it off). The first token covers the signed content (not the certificate page, which prints it); a second covers the finished file. Verification steps are in `docs/esign-timestamp-verification.md`. It is not a PAdES signature.
-- **Pages**: Admin, Documents tab (`admin/documents-tab.tsx`, `field-editor.tsx`, `send-panel.tsx`, `sent-list.tsx`); family signing page `/family-village/paperwork/sign?request=<id>` (`paperwork/sign/`); Paperwork list shows the status. The PDF viewer is `pdfjs-dist` (legacy build, worker emitted as our own asset via `?url`, `worker-src 'self'`); nothing loads from a CDN.
-- **Keeping records**: signing records outlive account and household deletion (`20261106235200_esign_account_erasure.sql`): the signer's email is cleared, the name stays, sealed files under `sign/` are not deleted. The privacy policy says so.
-- **Retired OpenSign** (migration `20261107000400_drop_opensign.sql`, edge functions removed from the repo). Kept on purpose: `family_requirements.provider_document_id` and `certificate_url`, and `documents.provider_document_id`/`signature_provider`, because the Family handbook signed through OpenSign on 23 Aug 2026 still points at them. **Deployed edge functions are not removed by `supabase functions deploy`**: `opensign-send`, `opensign-sync` and `opensign-webhook` must be deleted by hand (`supabase functions delete <name> --project-ref jtwemgyhxylbhjzxgyvh`), and the `OPENSIGN_API_TOKEN` and `OPENSIGN_WEBHOOK_SECRET` secrets unset.
-- Whether a parent's electronic signature is enough for a liability waiver involving a minor is a question for the co-op's attorney; the privacy policy and terms carry a flag.
+- **Stray files named like `... 2.xml` or `... 2.sql`** appear in the local folder when it is synced by iCloud. They are untracked artifacts. Do not commit them. Better: keep the working copy outside iCloud-synced folders.
+- **A stray git ref `origin/main 2`** can make `git fetch` fail or hang; use `git ls-remote origin refs/heads/main` to get main's commit.
+- **`globals.css` and `platform.css`** are very large and many branches append to the end, so they conflict often. Rebase on `origin/main`, rebuild the conflict from main plus your own block, and check that braces balance.
+- **Stacked PRs** that target a non-`main` base do not start CI. Open each PR against `main`, one at a time.
+- **GitHub Actions minutes:** the repo is private, so CI draws on a monthly allowance. Check Settings, Billing if checks stop starting.
+- **Server and client date formatting differ.** Use the pinned helpers (`formatDate`, `formatMoney`) to avoid hydration mismatches and day-early dates in Central Time.
+- **Migrations do not remove deployed edge functions.** Deleting a function folder does not delete it from Supabase.
 
-### Organization records vault (Admin, Records; Nov 2026)
+## 10. Making a change (checklist)
 
-Insurance, leases, nonprofit and tax paperwork, kept by administrators only. Not for families, teachers or reviewer (demo) accounts.
-
-- **Tables** (`20261114110000_records_vault.sql`): `org_records` (title, category, issuer, reference number, effective/expiry dates, amount, notes, tags, `sensitive`, optional `retain_until`, archive fields), `org_record_files` (one row per file *version*; the highest `version_no` is current; nothing is overwritten), `org_record_revisions` (snapshot of every metadata state), `org_record_file_grants` (two-minute read grants), `org_facts` and `org_fact_revisions` (the key facts card: legal name, EIN, address, registered agent, fiscal year end, insurance carrier and policy number, landlord contact).
-- **Writes only through functions** (SECURITY DEFINER, `search_path ''`, administrator + `aal_satisfied` + not a demo account): `admin_create_record`, `admin_update_record`, `admin_archive_record`, `admin_restore_record`, `admin_erase_record`, `admin_add_record_file`, `admin_open_record_file`, and for facts `admin_list_org_facts`, `admin_reveal_org_fact`, `admin_set_org_fact`, `admin_org_fact_history`, `admin_add_org_fact`. Tests: `supabase/tests/database/024_records.test.sql`.
-- **Files** live in `family-village-private` under `records/<record id>/<file id>.<ext>`. The browser uploads, then `admin_add_record_file` registers it (size and type come from what storage holds). **A file cannot be read without `admin_open_record_file`**, which writes the audit entry (`record_file_viewed` / `record_file_downloaded`) and makes a two-minute grant that the storage policy checks. The older bucket-wide administrator policies are not in migrations; `records_gate_*` restrictive policies stop them opening `records/`. Files cannot be updated, and only a file no record points at can be deleted from storage.
-- **Retention**: a record is archived, never silently deleted. `admin_erase_record` is a separate step: the record must be archived, past `retain_until` if one is set, and the title typed back. It deletes the rows, writes `record_erased` to the audit log and returns the file paths for the browser to clear from storage. No retention period is built in. How long to keep tax, insurance and lease records is a question for the co-op's attorney or accountant.
-- **Account deletion** never touches a record: uploader and editor columns are `on delete set null`, and the history guard allows exactly that change and nothing else.
-- **Key facts**: the EIN and policy number are masked (last four) in lists and history; `admin_reveal_org_fact` returns the real value and logs it. Facts are read only through functions (no table grant).
-
-- ~~**Google/Apple OAuth** buttons were visible but unconfigured.~~ **Closed locally 25 Aug:** the sign-in screen is email/password only. This is not live until the current site bundle is released.
-- **Dues/payments**: `docs/dues-processor-options.html` compares Stripe, Cheddar Up and Zeffy against the real dues structure. Recommendation is Stripe with ACH as the default method. No payments code exists yet; Sam still owes an actual family count and a board decision on absorbing vs passing on fees.
-- **A parent-only account does not exist yet.** Both current users are administrators, so the family-scoped RLS has been verified at the predicate level (`private.has_family_access` grants each user only their own family, checked both directions) but never exercised end to end by a non-admin. Worth confirming with a real parent account before the co-op relies on it.
-- **Print automation is designed but not built.** Decision made: a small agent on an always-on machine at Sam's house polling `print_requests` for `status = 'pending'`, printing via `lp`/CUPS, and setting `status = 'printed'`. Waiting on hardware. Email-to-print was rejected because it cannot report back whether anything printed — and HP retired ePrint's email service in 2023, Google Cloud Print in 2020, so it is mostly gone anyway. The agent will need its own edge function and secret; do not hand a service-role key to a home machine.
-- **Homeschool co-op features not yet built**, discussed as good candidates: attendance tracking, parent volunteer-hour tracking, field trip/event RSVP with headcount, per-class supply/curriculum lists, a lending library, carpool coordination, a "closed today" alert banner.
-- **Classes now have a real timetable.** `class_blocks` (label + `starts_at`/`ends_at`, per school year) is the single source of a class's meeting time — `classes.block_id` points at one, and `classes.meeting_time`/`block_label` are **dropped**. `rooms` is a managed list with `classes.room_id`. Both are managed from collapsible sections in Admin → Classes. Display goes through `lib/schedule.ts` (`describeSchedule`, `SCHEDULE_SELECT`) — do not format a block time with `toLocaleTimeString`, a bare `time` has no date and the browser timezone will shift it. **Neither table is seeded**: every class reads "No time block" until Sam defines the co-op day. A same-block-same-room double booking shows as a warning chip on the class card, deliberately not a constraint — a co-op does legitimately share a big room.
-- **Three table-level traps worth remembering** (all three bit this session): a new table with RLS and policies but **no `GRANT`** fails `42501` for everyone, because privileges are checked before RLS; a `SECURITY DEFINER` function with a null `proacl` is `EXECUTE` to `PUBLIC`, which PostgREST publishes at `/rest/v1/rpc/<name>` — the Supabase API is **not** behind the Cloudflare password gate; and **`GRANT ... TO authenticated` is not enough** — every admin-gated edge function bypasses RLS with a service-role client, and this project's default privileges for tables owned by `postgres` (every table created by a migration) never included `service_role`. It silently worked in the browser (as `authenticated`) and silently failed in every server-side call (as `service_role`) for every single table, discovered only when an admin check in an edge function returned a genuine Postgres `permission denied for table profiles` for a database-confirmed active admin. Fixed for good in `20260823041733_restore_service_role_grants.sql`, which both back-grants every existing table and corrects the default privilege for future ones — **a new table only needs `GRANT ... TO authenticated` from here on**, `service_role` now comes free. Run `get_advisors(type: "security")` after adding any of the three.
-- **Migration filenames must carry their real `apply_migration` timestamp, exactly.** `supabase db push` (now run by CI on every push to `main` — see the Supabase deploy job below) matches a local file against `supabase_migrations.schema_migrations` by exact version-number equality, not by name. Every migration this project authored through 27 Aug used an approximate, hand-typed timestamp in its filename rather than the real one `apply_migration` recorded — 50 of the 64 files were out of sync with their live version, which `db push` would have read as 50 "new" migrations and tried to reapply, erroring on the first non-idempotent `create table`/`create policy` it hit. Reconciled once via a bulk `git mv` matching by migration *name* against `list_migrations`' live version numbers (27 Aug). **Going forward: never hand-pick a migration's filename timestamp.** Use the value `apply_migration` actually returns/records, or run `list_migrations` right after applying and rename to match before committing.
-- ~~**Admin "Publishing" card** did not cover calendar events.~~ **Closed locally 25 Aug:** it is now **News & calendar**, with create/edit/delete support for co-op-wide events. This is not live until the current site bundle is released.
-- **Integrations tab** is notes-only for every service except Resend (email) and the office printer queue, which are wired.
-
-- ~~**MFA/passkey login gating** only on `/home`~~ — **closed.** `lib/use-portal-access.ts` performs the AAL check for every workspace, and all three portals share `MfaChallengeScreen`.
-- **`public.integration_settings` (and `enrollment_periods`, `enrollment_requests`, a few `classes` columns, one function) have never appeared in a migration.** They were created by hand early on, so replaying the history into an empty database cannot reproduce them. CI works around it with throwaway stand-ins in `supabase/ci-bootstrap/` (see Tests below); production is untouched. Replacing the stand-ins with one real baseline migration is the proper fix and is worth doing before anyone rebuilds the database from scratch. Two later gaps *were* closed with real, no-op-in-production migrations: `record_untracked_table_grants` (table privileges that existed only in production) and `record_protect_last_admin` (the trigger that stops the final admin role being deleted). Still hand-made and not recorded: the older `default_child_surname` / `default_family_surname` functions and triggers (they look like superseded duplicates of `default_child_last_name`), and about 39 extra per-command admin policies alongside the `_admin_write` ones.
-
-## Tests
-CI runs five jobs; the three deploy jobs wait for the first three.
-- `build-lint-test`: ESLint, `tsc`, and `tests/rendered-html.test.mjs`.
-- `edge-function-tests`: `deno check` on every function, then `deno test` for `supabase/functions/_shared/*.test.ts` (shared helpers; the invitation resend/delete logic against an in-memory fake database) and `calendar-feed/feed.test.ts`. Runs locally with `cd supabase/functions && deno test --node-modules-dir=none --config invite-family-admin/deno.json _shared/ calendar-feed/`.
-- `database-tests`: starts a fresh local Supabase (Docker), replays every migration, runs the pgTAP files in `supabase/tests/database/` with `supabase test db`. These pin the rules that have each broken in production (profile/child self-service triggers for user, service-role and direct-SQL access; an admin removing their own access; the last admin; column grants the admin screens need; class capacity and prerequisites; push subscriptions; the notification inbox; invitation acceptance). No Docker on the Mac, so run them through CI, or paste a file into a rolled-back transaction against the live project.
-- `supabase/ci-bootstrap/*.sql` are copied into the throwaway database's migration list **by CI only** (their filenames carry the version they slot in at). Never apply them to production.
-- The replayed database is *more permissive* than production for `anon`/new tables (local Supabase default privileges), so a test proving something is *refused* is meaningful, but do not read "the replay allows it" as "production allows it".
-- Pin: CI uses Supabase CLI 2.122.1 and Deno 2.8.2. Move either deliberately.
-
-## How to verify a change is really live
-```
-curl -s -o /dev/null -w "%{http_code}\n" https://family.veritasvillage.org/family-village/home
-NODE_ENV=development npx wrangler secret list --name veritas-village   # confirm SITE_AUTH_SECRET/SITE_PASSWORD survived the deploy
-```
+1. Read the current file before editing it. Do not trust memory.
+2. Branch from the latest `main`. Keep the PR small and about one thing.
+3. Schema or policy change: write the migration, add or extend pgTAP tests, and test refusal cases (a wrong person must be refused).
+4. Use role tokens for colour (`docs/theming.md`). Check light and dark.
+5. Run lint, typecheck and `npm test`. Wait for green CI.
+6. Describe in the PR what changed, why, and how to try it with test accounts. Say what you did not do.
+7. Wait for the owner to say "merge". After merge, confirm the deploy run finished, including `supabase-migrations`.
