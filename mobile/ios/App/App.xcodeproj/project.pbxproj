@@ -43,6 +43,13 @@
 		F4A1603747B324C874D4364F /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1CA3FE199119943AD944A /* ConversationListView.swift */; };
 		F4A1AA7695348ADA5DDA6863 /* NewConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A144C69B8915F1B87EB33B /* NewConversationView.swift */; };
 		F4A1E3D84C227BC22143AA00 /* NativeMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A14E91C0595E9F3273E7D3 /* NativeMessages.swift */; };
+		F4A15F455671E273C75339BA /* ThreadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A18AFDB750573FA18B54DB /* ThreadStore.swift */; };
+		F4A1AB337193E26B3092A47E /* EmojiData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1BCE341198A332748FC5F /* EmojiData.swift */; };
+		F4A11F95102E90584B70C949 /* MessageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1AD1C8A23402AA59ECC22 /* MessageViews.swift */; };
+		F4A1AB42165971CFA8285CDF /* MessageMediaViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1447441082202AD0702C6 /* MessageMediaViews.swift */; };
+		F4A1BD781CDCCE06155FF59F /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1D030C773A2AF9F816653 /* ComposerView.swift */; };
+		F4A1BF3C474C2CA66F39BA9D /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1F43A967B5CB3E7FA1DB2 /* ThreadView.swift */; };
+		F4A1ED9E83ABFF061A115C7D /* ThreadSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1BFC0F4C3FEB25F11CF35 /* ThreadSheets.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -83,6 +90,13 @@
 		F4A1CA3FE199119943AD944A /* ConversationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationListView.swift; sourceTree = "<group>"; };
 		F4A144C69B8915F1B87EB33B /* NewConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewConversationView.swift; sourceTree = "<group>"; };
 		F4A14E91C0595E9F3273E7D3 /* NativeMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMessages.swift; sourceTree = "<group>"; };
+		F4A18AFDB750573FA18B54DB /* ThreadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadStore.swift; sourceTree = "<group>"; };
+		F4A1BCE341198A332748FC5F /* EmojiData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiData.swift; sourceTree = "<group>"; };
+		F4A1AD1C8A23402AA59ECC22 /* MessageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageViews.swift; sourceTree = "<group>"; };
+		F4A1447441082202AD0702C6 /* MessageMediaViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageMediaViews.swift; sourceTree = "<group>"; };
+		F4A1D030C773A2AF9F816653 /* ComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerView.swift; sourceTree = "<group>"; };
+		F4A1F43A967B5CB3E7FA1DB2 /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
+		F4A1BFC0F4C3FEB25F11CF35 /* ThreadSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadSheets.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -152,6 +166,13 @@
 				F4A11E000000000000000106 /* FrameController.swift */,
 			); path = Frame; sourceTree = "<group>"; };
 		F4A19608AC8E2CE23160A831 /* Messages */ = {isa = PBXGroup; children = (
+				F4A1BFC0F4C3FEB25F11CF35 /* ThreadSheets.swift */,
+				F4A1F43A967B5CB3E7FA1DB2 /* ThreadView.swift */,
+				F4A1D030C773A2AF9F816653 /* ComposerView.swift */,
+				F4A1447441082202AD0702C6 /* MessageMediaViews.swift */,
+				F4A1AD1C8A23402AA59ECC22 /* MessageViews.swift */,
+				F4A1BCE341198A332748FC5F /* EmojiData.swift */,
+				F4A18AFDB750573FA18B54DB /* ThreadStore.swift */,
 				F4A14E91C0595E9F3273E7D3 /* NativeMessages.swift */,
 				F4A144C69B8915F1B87EB33B /* NewConversationView.swift */,
 				F4A1CA3FE199119943AD944A /* ConversationListView.swift */,
@@ -263,6 +284,13 @@
 				F4A11E000000000000000204 /* Navigator.swift in Sources */,
 				F4A11E000000000000000205 /* FrameNavigationController.swift in Sources */,
 				F4A11E000000000000000206 /* FrameController.swift in Sources */,
+				F4A1ED9E83ABFF061A115C7D /* ThreadSheets.swift in Sources */,
+				F4A1BF3C474C2CA66F39BA9D /* ThreadView.swift in Sources */,
+				F4A1BD781CDCCE06155FF59F /* ComposerView.swift in Sources */,
+				F4A1AB42165971CFA8285CDF /* MessageMediaViews.swift in Sources */,
+				F4A11F95102E90584B70C949 /* MessageViews.swift in Sources */,
+				F4A1AB337193E26B3092A47E /* EmojiData.swift in Sources */,
+				F4A15F455671E273C75339BA /* ThreadStore.swift in Sources */,
 				F4A1E3D84C227BC22143AA00 /* NativeMessages.swift in Sources */,
 				F4A1AA7695348ADA5DDA6863 /* NewConversationView.swift in Sources */,
 				F4A1603747B324C874D4364F /* ConversationListView.swift in Sources */,

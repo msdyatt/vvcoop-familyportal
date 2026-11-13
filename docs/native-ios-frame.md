@@ -259,6 +259,14 @@ native list is pushed over the tab on screen.
 **Look.** `MessagesTheme.swift` has the web's role colours for Light and Dark and the six person tints. The tint for a person is
 FNV-1a over the id modulo 6, the same function as `lib/message-colors.ts`, checked to give the same result for the same ids.
 
+**Thread (part 2).** `ThreadView` is the web thread as a native screen: the wash header, bubbles in runs (a run is one person's messages within ten
+minutes, same day), day pills, replies with the quoted message, reactions hung on the bubble's corner, @mentions, News and system messages as
+full-width cards, edited label, photos in a grid with a full-size viewer, files with a system preview, "Seen by" for staff. Tap a message
+for the reaction bar and Reply / Edit / Remove / Report (long-press gives the same in a context menu). The composer is a pill field with an
+emoji panel, @mention suggestions, a reply bar, and an edit mode (Edit puts the text in the composer, Send saves it). A conversation covers the
+tab bar (`NativeScreenController.hidesTabBar`) so the composer sits above the keyboard. `ThreadStore` does the reads and writes: the same
+RPCs and tables as `thread.tsx`, no new ones. Sending photos and files, and editing a channel, are part 3.
+
 **Minimum iOS.** The deployment target goes from 15.0 to 16.0 (`NavigationStack`, `scrollDismissesKeyboard`, `UIHostingController.sizingOptions`,
 photo picker). Firebase and Stripe both support 16.
 

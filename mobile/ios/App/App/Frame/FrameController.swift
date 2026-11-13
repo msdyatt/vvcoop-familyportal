@@ -367,6 +367,13 @@ final class FrameController: UIViewController, UITabBarDelegate {
         containerBottomToView.isActive = !visible
     }
 
+    /// A screen that covers the tab bar (a conversation) is on top, or has left. Only while signed in with a bar.
+    func setTabBarCovered(_ covered: Bool) {
+        guard isSignedIn, !(tabBar.items ?? []).isEmpty else { return }
+        setTabBarVisible(!covered)
+        view.layoutIfNeeded()
+    }
+
     private func show(_ stack: FrameNavigationController) {
         if content === stack, stack.parent === self { return }
         if let old = content, old.parent === self {

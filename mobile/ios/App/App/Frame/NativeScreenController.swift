@@ -13,6 +13,11 @@ final class NativeScreenController: UIViewController, ChromeRefreshing, UIGestur
         case strip
     }
 
+    /// A conversation hides the tab bar so the composer sits above the keyboard and the home indicator, as in the system's own chat apps.
+    var hidesTabBar = false
+    /// What this screen is about (the conversation's id), so the same one is not pushed twice.
+    var subject: String?
+
     private let chrome: Chrome
     private let content: UIViewController
     private let strip = UIView()
