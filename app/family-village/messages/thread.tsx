@@ -71,6 +71,10 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
   // The message whose actions (react, reply, remove, report) are showing; tap a message to open them.
   const [activeId, setActiveId] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  // For people who run a channel: how many have seen each message, and the list for one.
+  const [seenCounts, setSeenCounts] = useState<Map<string, { seen: number; total: number }>>(new Map());
+  const [seenOff, setSeenOff] = useState(false);
+  const [seenList, setSeenList] = useState<{ messageId: string; rows: { user_id: string; display_name: string; avatar_path: string | null; seen: boolean }[] | null } | null>(null);
   // A message of yours being edited in place: its id and the text so far.
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [replyingTo, setReplyingTo] = useState<MessageRow | null>(null);
@@ -164,6 +168,31 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     // eslint-disable-next-line react-hooks/set-state-in-effect -- load reactions when the set of messages changes
     void fetchReactions();
   }, [fetchReactions, tick]);
+
+  // "Seen by" is for administrators, teachers and the person who made the channel, in channels and class chats only.
+  const mayWatchReads = isChannel(conversation) && !seenOff && (roles.includes("admin") || roles.includes("teacher") || conversation.created_by === userId);
+  useEffect(() => {
+    if (!mayWatchReads || !loadedIds) return;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    let cancelled = false;
+    void supabase.rpc("message_seen_counts", { p_conversation_id: conversation.id, p_message_ids: loadedIds.split(",").slice(-100) }).then(({ data, error }) => {
+      if (cancelled) return;
+      // Someone the database does not count as staff (a teacher by class assignment only, say) just does not get the feature.
+      if (error) { setSeenOff(true); return; }
+      setSeenCounts(new Map(((data ?? []) as { message_id: string; seen_count: number; total_count: number }[]).map((row) => [row.message_id, { seen: row.seen_count, total: row.total_count }])));
+    });
+    return () => { cancelled = true; };
+  }, [mayWatchReads, loadedIds, tick, conversation.id]);
+
+  async function openSeen(messageId: string) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    setSeenList({ messageId, rows: null });
+    const { data, error } = await supabase.rpc("message_seen_by", { p_message_id: messageId });
+    if (error) { setSeenList(null); setStatus(error.message); return; }
+    setSeenList({ messageId, rows: (data ?? []) as { user_id: string; display_name: string; avatar_path: string | null; seen: boolean }[] });
+  }
 
   async function react(messageId: string, emoji: string) {
     const supabase = getSupabaseBrowserClient();
@@ -405,6 +434,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
         const own = reactions.filter((r) => r.message_id === message.id);
         const chips = REACTIONS.map((emoji) => ({ emoji, count: own.filter((r) => r.emoji === emoji).length, mine: own.some((r) => r.emoji === emoji && r.user_id === userId) })).filter((chip) => chip.count > 0);
         const open = activeId === message.id || pickerFor === message.id;
+        const seenInfo = mayWatchReads && !message.deleted_at ? seenCounts.get(message.id) : undefined;
         const senderName = sender?.display_name ?? message.system_label ?? "Former member";
         const personTone = card ? tone : toneFor(message.sender_id);
 
@@ -421,6 +451,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           <span className={`messages-meta${open ? " open" : ""}${showTime ? " timed" : ""}`}>
             {(showTime || open) && <time dateTime={message.created_at}>{shortTime(message.created_at)}</time>}
             {message.edited_at && !message.deleted_at && <span className="messages-edited">Edited</span>}
+            {seenInfo && open && !card && <button type="button" className="messages-seen" onClick={() => void openSeen(message.id)}>Seen by {seenInfo.seen} of {seenInfo.total}</button>}
             {!message.deleted_at && <span className="messages-actions">
               {!archivedBlock && <button type="button" onClick={() => setPickerFor(pickerFor === message.id ? null : message.id)}>React</button>}
               {!blocked && <button type="button" onClick={() => { setReplyingTo(message); setActiveId(null); composerRef.current?.focus(); }}>Reply</button>}
@@ -471,6 +502,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
                   ? (message.link_path ? <a className="messages-announce-link" href={message.link_path}>Open in review<span aria-hidden="true"> →</span></a> : <span />)
                   : <a className="messages-announce-link" href="/family-village/news">Read in News<span aria-hidden="true"> →</span></a>}
                 {!system && sender && <span className="messages-card-by">Posted by {sender.display_name}</span>}
+                {seenInfo && <button type="button" className="messages-seen-link" onClick={() => void openSeen(message.id)}>Seen by {seenInfo.seen} of {seenInfo.total}</button>}
                 {reactionChips}
               </div>
               {meta(false)}
@@ -592,6 +624,21 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
     {viewing && <DetailModal title="Photo" onClose={() => setViewing(null)}>
       {/* eslint-disable-next-line @next/next/no-img-element -- a signed link to private storage */}
       <img className="messages-lightbox" src={viewing} alt="Attachment, full size" />
+    </DetailModal>}
+
+    {seenList && <DetailModal title="Seen by" onClose={() => setSeenList(null)}>
+      {!seenList.rows && <p className="portal-empty">Loading…</p>}
+      {seenList.rows && <div className="messages-seen-lists">
+        {[{ label: "Seen", rows: seenList.rows.filter((row) => row.seen) }, { label: "Not yet", rows: seenList.rows.filter((row) => !row.seen) }].map((group) => <section key={group.label}>
+          <h3>{group.label} ({group.rows.length})</h3>
+          {group.rows.length === 0 ? <p className="portal-empty">No one.</p> : <ul className="messages-members">
+            {group.rows.map((row) => <li key={row.user_id}>
+              <span className="messages-member"><Avatar url={row.avatar_path ? avatarUrls.get(row.avatar_path) ?? null : null} label={row.display_name} size="sm" tone={toneFor(row.user_id)} /><span>{row.display_name}</span></span>
+            </li>)}
+          </ul>}
+        </section>)}
+      </div>}
+      <p className="field-note">Seen means they opened this conversation after it was posted.</p>
     </DetailModal>}
 
     {showMembers && channel && <DetailModal title={`# ${title}`} onClose={() => setShowMembers(false)}>

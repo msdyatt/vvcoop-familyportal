@@ -12324,3 +12324,8 @@ html[data-theme="dark"] { --pc-share:50%; }
    Messages takes the whole web view instead of leaving the header's 142px and the page padding empty. */
 html[data-frame] .messages-page { padding-top:0; padding-bottom:0; }
 html[data-frame][data-app] .messages-shell { height:100dvh; min-height:0; }
+
+/* Seen by (people who run a channel) */
+.messages-seen-link { padding:0; color:var(--text-accent); font:700 12.5px/1.4 var(--sans); background:none; border:0; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.messages-seen-lists { display:grid; gap:14px; }
+.messages-seen-lists h3 { margin:0 0 6px; color:var(--text-muted); font:700 11px/1.3 var(--sans); letter-spacing:.09em; text-transform:uppercase; }
