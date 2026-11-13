@@ -13,11 +13,13 @@ struct SupabaseAPI {
     static let shared = SupabaseAPI()
     static let bucket = "family-village-private"
 
-    static let decoder: JSONDecoder = {
+    /// Decoders are deliberately created per response. JSONDecoder is mutable while decoding and the Messages
+    /// store can have several requests in flight at once (list, unread badge, people and thread data).
+    private static func makeDecoder() -> JSONDecoder {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
         return d
-    }()
+    }
 
     private let session: URLSession = {
         let configuration = URLSessionConfiguration.default
@@ -84,7 +86,38 @@ struct SupabaseAPI {
     }
 
     private static func decodeBody<T: Decodable>(_ data: Data) throws -> T {
-        try decoder.decode(T.self, from: data)
+        do {
+            return try makeDecoder().decode(T.self, from: data)
+        } catch let error as DecodingError {
+            let detail = decodingDetail(error)
+            // Keep the response body out of logs: message bodies and private conversation data must not be logged.
+            FrameLog.event("Supabase decode failed for \(String(describing: T.self)) at \(detail)")
+            throw DecodeFailure(detail: detail)
+        }
+    }
+
+    private struct DecodeFailure: LocalizedError {
+        let detail: String
+        var errorDescription: String? { "Messages returned an unexpected format (\(detail))." }
+    }
+
+    private static func decodingDetail(_ error: DecodingError) -> String {
+        let context: DecodingError.Context
+        let kind: String
+        switch error {
+        case .keyNotFound(let key, let value):
+            context = value; kind = "missing \(key.stringValue)"
+        case .typeMismatch(let type, let value):
+            context = value; kind = "expected \(String(describing: type))"
+        case .valueNotFound(let type, let value):
+            context = value; kind = "missing value for \(String(describing: type))"
+        case .dataCorrupted(let value):
+            context = value; kind = "invalid value"
+        @unknown default:
+            return "unknown decode error"
+        }
+        let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+        return path.isEmpty ? kind : "\(path): \(kind)"
     }
 
     // MARK: Storage

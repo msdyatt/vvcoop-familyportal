@@ -131,6 +131,34 @@ struct MessageRow: Codable, Identifiable, Equatable {
     var linkPath: String?
     var reply: Reply?
 
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        conversationId = try c.decode(String.self, forKey: .conversationId)
+        senderId = try c.decodeIfPresent(String.self, forKey: .senderId)
+        body = try c.decodeIfPresent(String.self, forKey: .body)
+        imagePath = try c.decodeIfPresent(String.self, forKey: .imagePath)
+        createdAt = try c.decode(String.self, forKey: .createdAt)
+        deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
+        editedAt = try c.decodeIfPresent(String.self, forKey: .editedAt)
+        // Older rows/replicas may not include this newer flag; the absence means there are no extra attachments.
+        hasAttachments = try c.decodeIfPresent(Bool.self, forKey: .hasAttachments) ?? false
+        postId = try c.decodeIfPresent(String.self, forKey: .postId)
+        replyTo = try c.decodeIfPresent(String.self, forKey: .replyTo)
+        systemLabel = try c.decodeIfPresent(String.self, forKey: .systemLabel)
+        linkPath = try c.decodeIfPresent(String.self, forKey: .linkPath)
+
+        // PostgREST normally returns this many-to-one relation as an object. Accept a one-item array too,
+        // because older schema-cache metadata can serialize a self-relation that way.
+        if let nested = try? c.decode(Reply.self, forKey: .reply) {
+            reply = nested
+        } else if let nested = try? c.decode([Reply].self, forKey: .reply) {
+            reply = nested.first
+        } else {
+            reply = nil
+        }
+    }
+
     /// News posts and system messages (a report, say) are shown as cards, not bubbles.
     var isCard: Bool { (postId != nil || systemLabel != nil) && deletedAt == nil }
     var isSystem: Bool { systemLabel != nil && deletedAt == nil }
