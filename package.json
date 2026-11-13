@@ -11,7 +11,8 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs tests/calendar-feed.test.mjs tests/app-shell.test.mjs tests/one-portal.test.mjs tests/theme-contrast.test.mjs tests/theme.test.mjs tests/class-page-permissions.test.mjs tests/native-session.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:staging": "node scripts/seed-staging.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.112.3",
