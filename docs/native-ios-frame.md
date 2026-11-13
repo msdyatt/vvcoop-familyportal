@@ -233,6 +233,37 @@ the page gets `failed` back for a made-up secret. Not verified: the real sheet, 
 and the return URL (all need the Apple merchant ID and Stripe's Apple Pay certificate from `docs/native-apple-pay-setup.md`,
 a signed build with the Apple Pay capability, and a test-mode charge).
 
+## Native Messages (iPhone)
+
+Messages is written in Swift (SwiftUI inside the frame) and reads and writes the same Supabase data as the website, as the signed-in person,
+so row-level security decides everything. No database or RPC change. The web page is still there: `-VVNativeMessages NO` (debug builds) and
+the "Use the web version" button on the list's error screen show it, and `?web=1` on a Messages link opens the web page instead of the
+native screen.
+
+**Session.** The website is the only place that signs in and refreshes, because a refresh token can be used once and a second holder in the
+app would sign the web session out. `lib/native-session.ts` (mounted in `AppHeader`, and alone on `/family-village/native-session`) posts
+`session` to the frame: the public project URL and publishable key (already in every page) and the short-lived access token. The refresh token
+never leaves the web view. The frame keeps the token in memory only (`NativeSession`), and when it has less than a minute left, or the server
+answers 401, it emits `session.refresh` and waits for the page's answer. `SessionBroker` keeps a one-pixel, invisible web view on
+`/family-village/native-session` while someone is signed in, so there is always a page to answer, even when no web page is open.
+
+**Data.** `SupabaseAPI` is a small URLSession client for PostgREST (tables, RPCs) and Storage (signed links, upload, remove): no SDK. `LiveFeed`
+speaks Realtime's Phoenix protocol over a WebSocket for `messages` and `message_reactions` changes (the same subscription the web makes) and
+only says "something changed"; `MessagesStore` then refetches, with the web's 30 second poll as the safety net and a refresh when the app
+comes to the front. The tab badge counts with `unread_message_count` itself and wins over the number the pages report.
+
+**Routing.** The Messages tab's root is the native list. A link to `/family-village/messages` (a push tap, the notification list, a Menu row)
+is intercepted in `Navigator` and opened natively; `?c=<conversation>` opens that conversation. Where Messages is not on the person's bar the
+native list is pushed over the tab on screen.
+
+**Look.** `MessagesTheme.swift` has the web's role colours for Light and Dark and the six person tints. The tint for a person is
+FNV-1a over the id modulo 6, the same function as `lib/message-colors.ts`, checked to give the same result for the same ids.
+
+**Minimum iOS.** The deployment target goes from 15.0 to 16.0 (`NavigationStack`, `scrollDismissesKeyboard`, `UIHostingController.sizingOptions`,
+photo picker). Firebase and Stripe both support 16.
+
+Testing without signing in: `mobile/ios/test-pages/README.md` (a local mock Supabase with invented people stands in for the server).
+
 ## Web changes and the rule they follow
 
 Every web change is inert unless `window.VVNative` exists, which only the

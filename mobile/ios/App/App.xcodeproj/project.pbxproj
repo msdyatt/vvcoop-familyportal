@@ -31,6 +31,18 @@
 		F4A11F41668A32BFA72DB15C /* PaymentSheetPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E41668A32BFA72DB15C /* PaymentSheetPresenter.swift */; };
 		F4A11F9EA07930C5BDC87051 /* HeaderBand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E9EA07930C5BDC87051 /* HeaderBand.swift */; };
 		F4A11F04EDCC82A019C17B4E /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A11E04EDCC82A019C17B4E /* SplashView.swift */; };
+		F4A1F99143B2E80D93BDC45E /* NativeScreenController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1CCF75B9E8E06D4CF98B3 /* NativeScreenController.swift */; };
+		F4A153C1DB56E3B49F59EB21 /* MessagesModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A19176F89D057CA596DAB8 /* MessagesModels.swift */; };
+		F4A1B266AEBBBA5E605B835F /* NativeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A16893D19796AB46566159 /* NativeSession.swift */; };
+		F4A114D7B503C6D252DCF63D /* SupabaseAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A110D56457947605322359 /* SupabaseAPI.swift */; };
+		F4A1FE1A87CA28035ACB1605 /* MessagesTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1E304A9E3FBC6072FE6C4 /* MessagesTheme.swift */; };
+		F4A1B59DD6CD0165D3FB8D08 /* RemoteImages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A197D8692E85EC1C055413 /* RemoteImages.swift */; };
+		F4A19C8A1EB4E87FBDB5EB15 /* AvatarViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1E70CC2C0886844655BFD /* AvatarViews.swift */; };
+		F4A10EC4A195C6D9BC9F96FE /* LiveFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A178235EFBD3C7C1EC687B /* LiveFeed.swift */; };
+		F4A1DEB4F53350E325B4F724 /* MessagesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1B66DDE5667384096F0B9 /* MessagesStore.swift */; };
+		F4A1603747B324C874D4364F /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1CA3FE199119943AD944A /* ConversationListView.swift */; };
+		F4A1AA7695348ADA5DDA6863 /* NewConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A144C69B8915F1B87EB33B /* NewConversationView.swift */; };
+		F4A1E3D84C227BC22143AA00 /* NativeMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A14E91C0595E9F3273E7D3 /* NativeMessages.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -59,6 +71,18 @@
 		F4A11E41668A32BFA72DB15C /* PaymentSheetPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentSheetPresenter.swift; sourceTree = "<group>"; };
 		F4A11E9EA07930C5BDC87051 /* HeaderBand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderBand.swift; sourceTree = "<group>"; };
 		F4A11E04EDCC82A019C17B4E /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+		F4A1CCF75B9E8E06D4CF98B3 /* NativeScreenController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeScreenController.swift; sourceTree = "<group>"; };
+		F4A19176F89D057CA596DAB8 /* MessagesModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesModels.swift; sourceTree = "<group>"; };
+		F4A16893D19796AB46566159 /* NativeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSession.swift; sourceTree = "<group>"; };
+		F4A110D56457947605322359 /* SupabaseAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAPI.swift; sourceTree = "<group>"; };
+		F4A1E304A9E3FBC6072FE6C4 /* MessagesTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesTheme.swift; sourceTree = "<group>"; };
+		F4A197D8692E85EC1C055413 /* RemoteImages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImages.swift; sourceTree = "<group>"; };
+		F4A1E70CC2C0886844655BFD /* AvatarViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarViews.swift; sourceTree = "<group>"; };
+		F4A178235EFBD3C7C1EC687B /* LiveFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveFeed.swift; sourceTree = "<group>"; };
+		F4A1B66DDE5667384096F0B9 /* MessagesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesStore.swift; sourceTree = "<group>"; };
+		F4A1CA3FE199119943AD944A /* ConversationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationListView.swift; sourceTree = "<group>"; };
+		F4A144C69B8915F1B87EB33B /* NewConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewConversationView.swift; sourceTree = "<group>"; };
+		F4A14E91C0595E9F3273E7D3 /* NativeMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMessages.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +121,7 @@
 			children = (
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				F4A11E000000000000000300 /* Frame */,
+				F4A19608AC8E2CE23160A831 /* Messages */,
 				F4A11E000000000000000180 /* path-configuration.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -109,6 +134,7 @@
 			sourceTree = "<group>";
 		};
 		F4A11E000000000000000300 /* Frame */ = {isa = PBXGroup; children = (
+				F4A1CCF75B9E8E06D4CF98B3 /* NativeScreenController.swift */,
 				F4A11E04EDCC82A019C17B4E /* SplashView.swift */,
 				F4A11E9EA07930C5BDC87051 /* HeaderBand.swift */,
 				F4A11E41668A32BFA72DB15C /* PaymentSheetPresenter.swift */,
@@ -125,6 +151,19 @@
 				F4A11E000000000000000105 /* FrameNavigationController.swift */,
 				F4A11E000000000000000106 /* FrameController.swift */,
 			); path = Frame; sourceTree = "<group>"; };
+		F4A19608AC8E2CE23160A831 /* Messages */ = {isa = PBXGroup; children = (
+				F4A14E91C0595E9F3273E7D3 /* NativeMessages.swift */,
+				F4A144C69B8915F1B87EB33B /* NewConversationView.swift */,
+				F4A1CA3FE199119943AD944A /* ConversationListView.swift */,
+				F4A1B66DDE5667384096F0B9 /* MessagesStore.swift */,
+				F4A178235EFBD3C7C1EC687B /* LiveFeed.swift */,
+				F4A1E70CC2C0886844655BFD /* AvatarViews.swift */,
+				F4A197D8692E85EC1C055413 /* RemoteImages.swift */,
+				F4A1E304A9E3FBC6072FE6C4 /* MessagesTheme.swift */,
+				F4A110D56457947605322359 /* SupabaseAPI.swift */,
+				F4A16893D19796AB46566159 /* NativeSession.swift */,
+				F4A19176F89D057CA596DAB8 /* MessagesModels.swift */,
+			); path = Messages; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -224,6 +263,18 @@
 				F4A11E000000000000000204 /* Navigator.swift in Sources */,
 				F4A11E000000000000000205 /* FrameNavigationController.swift in Sources */,
 				F4A11E000000000000000206 /* FrameController.swift in Sources */,
+				F4A1E3D84C227BC22143AA00 /* NativeMessages.swift in Sources */,
+				F4A1AA7695348ADA5DDA6863 /* NewConversationView.swift in Sources */,
+				F4A1603747B324C874D4364F /* ConversationListView.swift in Sources */,
+				F4A1DEB4F53350E325B4F724 /* MessagesStore.swift in Sources */,
+				F4A10EC4A195C6D9BC9F96FE /* LiveFeed.swift in Sources */,
+				F4A19C8A1EB4E87FBDB5EB15 /* AvatarViews.swift in Sources */,
+				F4A1B59DD6CD0165D3FB8D08 /* RemoteImages.swift in Sources */,
+				F4A1FE1A87CA28035ACB1605 /* MessagesTheme.swift in Sources */,
+				F4A114D7B503C6D252DCF63D /* SupabaseAPI.swift in Sources */,
+				F4A1B266AEBBBA5E605B835F /* NativeSession.swift in Sources */,
+				F4A153C1DB56E3B49F59EB21 /* MessagesModels.swift in Sources */,
+				F4A1F99143B2E80D93BDC45E /* NativeScreenController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -290,7 +341,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -341,7 +392,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -360,7 +411,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				DEVELOPMENT_TEAM = VQUCJB5C7M;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -384,7 +435,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				DEVELOPMENT_TEAM = VQUCJB5C7M;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session | Veritas Village</title>
+</head>
+<body>
+<!-- Stands in for /family-village/native-session (lib/native-session.ts): hands the frame a session for the local mock
+     Supabase (mock-msgs.mjs, port 54431, invented people) and answers `session.refresh`. Never talks to production.
+     Add ?sb=http://localhost:PORT to point somewhere else. -->
+<script>
+(function () {
+  if (!window.VVNative) return;
+  var sb = new URLSearchParams(location.search).get('sb') || 'http://localhost:54431';
+  function send() {
+    VVNative.post('session', {
+      signedIn: true, url: sb, key: 'test-publishable-key', userId: '00000000-0000-4000-8000-000000000001',
+      accessToken: 'test.access.token', expiresAt: Math.floor(Date.now() / 1000) + 3000
+    });
+  }
+  send();
+  VVNative.on('session.refresh', function () { VVNative.post('log', { text: 'session.refresh asked' }); send(); });
+})();
+</script>
+</body>
+</html>

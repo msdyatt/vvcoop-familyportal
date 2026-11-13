@@ -10,6 +10,9 @@ final class Navigator {
 
     init(frame: FrameController) { self.frame = frame }
 
+    /// The navigation stack on screen, for native screens that push.
+    var currentNavigation: UINavigationController? { frame.content }
+
     /// `page` is the page the request came from (nil for the native side, such as a notification tap).
     func open(_ url: URL, from page: WebPageController?) {
         guard FrameConfig.isPortal(url) else { openExternally(url); return }
@@ -17,6 +20,9 @@ final class Navigator {
         // A double tap should not stack the same page twice.
         if let last = lastOpened, last.url == url, Date().timeIntervalSince(last.at) < 0.6 { return }
         lastOpened = (url, Date())
+
+        // Messages is native: the list, and a conversation named by ?c=. `web=1` asks for the website's version instead.
+        if NativeMessages.shared.isEnabled, frame.isSignedIn, frame.openMessagesIfNative(url) { return }
 
         let rules = PathRules.shared
         let properties = rules.properties(for: url)

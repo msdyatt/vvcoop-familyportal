@@ -4,6 +4,11 @@ let client: SupabaseClient | null = null;
 const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://jtwemgyhxylbhjzxgyvh.supabase.co";
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "sb_publishable_ev8c0iwH-f2Q2lO5WkSAQw_EaDc52Vd";
 
+/** Where the project is and its public (publishable) key, for the iPhone app's native screens (lib/native-session.ts). */
+export function supabaseConnection() {
+  return { url: projectUrl, key: publishableKey };
+}
+
 export function isSupabaseConfigured() {
   return Boolean(projectUrl && publishableKey);
 }

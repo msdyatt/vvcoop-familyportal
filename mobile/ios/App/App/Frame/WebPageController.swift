@@ -9,7 +9,7 @@ import WebKit
 /// `history.pushState`, stay in the page. Those are how popups, reports, conversations and admin
 /// tabs become history steps (lib/back-layers.ts), and the back button and back-swipe close them
 /// first: `webView.canGoBack` is true exactly while the page has one open.
-final class WebPageController: UIViewController, UIGestureRecognizerDelegate {
+final class WebPageController: UIViewController, UIGestureRecognizerDelegate, ChromeRefreshing {
     let url: URL
     private(set) var webView: WKWebView!
     weak var navigator: Navigator?
@@ -509,6 +509,10 @@ extension WebPageController: WKScriptMessageHandler {
 
         case "push.disable":
             PushManager.shared.disable { Bridge.reply(to: request, value: NSNull(), in: self.webView) }
+
+        case "session":
+            // The signed-in session, for the native screens (lib/native-session.ts).
+            NativeSession.shared.update(from: request.payload)
 
         case "notifications":
             navigator?.chromeSource?.setNotificationUnread(request.payload["unread"] as? Int ?? 0)

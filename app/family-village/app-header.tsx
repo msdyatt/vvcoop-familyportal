@@ -15,6 +15,7 @@ import MessagesLink from "./messages/messages-link";
 import { clearAvatarUrlCache, getSignedFileUrl } from "../../lib/storage";
 import { disablePush } from "../../lib/push";
 import AppTabBar from "./app-tab-bar";
+import NativeSessionReporter from "./native-session-reporter";
 import { TOUR_VERSION, isReturning } from "../../lib/onboarding";
 import OnboardingTour from "./onboarding-tour";
 import { nativeFrame } from "../../lib/native-frame";
@@ -110,6 +111,7 @@ export default function AppHeader({ current, roles: held, title, subtitle }: { c
         </div>
       </div>
     </header>
+    <NativeSessionReporter />
     <AppTabBar current={current} roles={roles} onOpenAccount={() => setAccountOpen(true)} onTour={() => setTourOpen(true)} onSignOut={signOut} />
     {tourOpen && <OnboardingTour roles={roles} returning={returning} onFinish={finishTour} onOpenAccount={() => setAccountOpen(true)} />}
     {accountOpen && <DetailModal title="Account & security" onClose={() => setAccountOpen(false)}>
