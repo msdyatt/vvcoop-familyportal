@@ -11936,7 +11936,7 @@ html[data-theme="dark"] { --pc-share:50%; }
   display:inline-flex;
   align-items:center;
   gap:3px;
-  padding:1px 7px 1px 5px;
+  padding:1px 8px 1px 2px;
   color:var(--danger-text);
   font:700 11.5px/1.5 var(--sans);
   background:var(--warm-tint);
@@ -12481,3 +12481,7 @@ a.messages-file:hover { text-decoration:underline; }
 .messages-versions li { padding:10px 12px; background:var(--surface-sunken); border-radius:12px; }
 .messages-versions p { margin:4px 0 0; overflow-wrap:anywhere; white-space:pre-wrap; }
 .messages-version-when { color:var(--text-muted); font:700 11px/1.3 var(--sans); letter-spacing:.06em; text-transform:uppercase; }
+
+/* The drawn reactions */
+.reaction-icon { display:block; flex:0 0 auto; }
+.messages-seen-lists h3.messages-reaction-head { display:flex; align-items:center; gap:8px; color:var(--text); font:600 14px/1.3 var(--sans); letter-spacing:0; text-transform:none; }

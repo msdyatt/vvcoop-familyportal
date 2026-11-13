@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { PRIVATE_BUCKET, getSignedFileUrls, uploadPrivateFile } from "../../../lib/storage";
 import { resizeImage } from "../../../lib/image-resize";
-import { ATTACH_ACCEPT, ATTACH_MAX, FILE_MAX_BYTES, MESSAGE_COLUMNS, REACTIONS, canEditMessage, classifyFile, formatBytes, type Attachment, conversationTitle, dayLabel, isChannel, postingBlock, shortTime, snippet, splitMentions, type ConversationRow, type MessageRow, type Person, type Reaction } from "../../../lib/messages";
+import { ATTACH_ACCEPT, ATTACH_MAX, FILE_MAX_BYTES, MESSAGE_COLUMNS, REACTIONS, REACTION_NAMES, canEditMessage, classifyFile, formatBytes, type Attachment, conversationTitle, dayLabel, isChannel, postingBlock, shortTime, snippet, splitMentions, type ConversationRow, type MessageRow, type Person, type Reaction } from "../../../lib/messages";
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
 import ChannelDetails from "./channel-details";
 import { EMOJI_GROUPS } from "../../../lib/emoji";
+import ReactionIcon from "./reaction-icons";
 import ConversationAvatar from "./conversation-avatar";
 import { FLAVOUR_LABEL, conversationFlavour, conversationTone, roleRing, toneFor } from "../../../lib/message-colors";
 
@@ -488,7 +489,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
 
         const reactionChips = chips.length > 0 && !message.deleted_at && <span className="messages-reactions">
           {chips.map((chip) => <button key={chip.emoji} type="button" className={`messages-chip${chip.mine ? " mine" : ""}`} onClick={() => void react(message.id, chip.emoji)}
-            aria-label={`${chip.emoji} ${chip.count}${chip.mine ? ", you reacted" : ""}`} aria-pressed={chip.mine}><span aria-hidden="true">{chip.emoji}</span>{chip.count}</button>)}
+            aria-label={`${REACTION_NAMES[chip.emoji]} ${chip.count}${chip.mine ? ", you reacted" : ""}`} aria-pressed={chip.mine}><ReactionIcon emoji={chip.emoji} size={20} />{chip.count}</button>)}
         </span>;
 
         // The small line under a message: its time, and when the message is tapped (or focused), what can be done with it.
@@ -496,7 +497,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           {!message.deleted_at && !archivedBlock && <span className="messages-picker" role="group" aria-label="React to this message">
             {REACTIONS.map((emoji) => {
               const mineNow = own.some((r) => r.emoji === emoji && r.user_id === userId);
-              return <button key={emoji} type="button" className={mineNow ? "mine" : ""} aria-pressed={mineNow} onClick={() => void react(message.id, emoji)} aria-label={`React ${emoji}`}>{emoji}</button>;
+              return <button key={emoji} type="button" className={mineNow ? "mine" : ""} aria-pressed={mineNow} onClick={() => void react(message.id, emoji)} aria-label={`React: ${REACTION_NAMES[emoji]}`} title={REACTION_NAMES[emoji]}><ReactionIcon emoji={emoji} size={32} /></button>;
             })}
           </span>}
           <span className={`messages-meta${open ? " open" : ""}${showTime ? " timed" : ""}`}>
@@ -729,7 +730,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           {REACTIONS.filter((emoji) => list.some((r) => r.emoji === emoji)).map((emoji) => {
             const who = list.filter((r) => r.emoji === emoji);
             return <section key={emoji}>
-              <h3><span className="messages-reaction-glyph" aria-hidden="true">{emoji}</span> {who.length}</h3>
+              <h3 className="messages-reaction-head"><ReactionIcon emoji={emoji} size={26} /> {REACTION_NAMES[emoji]} · {who.length}</h3>
               <ul className="messages-members">
                 {who.map((r) => {
                   const person = people.get(r.user_id);

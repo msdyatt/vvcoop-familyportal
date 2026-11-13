@@ -31,6 +31,9 @@ export type Reaction = { message_id: string; user_id: string; emoji: string };
 
 /** The reactions on offer. The same list is enforced in the database. */
 export const REACTIONS = ["👍", "❤️", "😂", "🎉", "🙏", "😮"] as const;
+export type ReactionEmoji = (typeof REACTIONS)[number];
+/** What each reaction is called, for screen readers and tooltips. */
+export const REACTION_NAMES: Record<ReactionEmoji, string> = { "👍": "Thumbs up", "❤️": "Heart", "😂": "Laughing", "🎉": "Party", "🙏": "Thank you", "😮": "Wow" };
 
 export const MESSAGE_COLUMNS = "id,conversation_id,sender_id,body,image_path,created_at,deleted_at,edited_at,has_attachments,post_id,reply_to,system_label,link_path,reply:messages!reply_to(id,sender_id,body,image_path,deleted_at)";
 
