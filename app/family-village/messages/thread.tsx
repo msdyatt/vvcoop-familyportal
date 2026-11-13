@@ -490,7 +490,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           </span>}
           <span className={`messages-meta${open ? " open" : ""}${showTime ? " timed" : ""}`}>
             {(showTime || open) && <time dateTime={message.created_at}>{shortTime(message.created_at)}</time>}
-            {message.edited_at && !message.deleted_at && <span className="messages-edited">Edited</span>}
+            {message.edited_at && !message.deleted_at && !card && <span className="messages-edited">Edited</span>}
             {seenInfo && open && !card && <button type="button" className="messages-seen" onClick={() => void openSeen(message.id)}>Seen by {seenInfo.seen} of {seenInfo.total}</button>}
             {!message.deleted_at && <span className="messages-actions">
               {!blocked && <button type="button" onClick={() => { setReplyingTo(message); setActiveId(null); composerRef.current?.focus(); }}>Reply</button>}
@@ -557,7 +557,10 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
             <article className={`messages-card pc-${personTone}${system ? " is-system" : " is-news"}`} onClick={toggle}>
               <header>
                 <span className="messages-announce-tag">{system ? message.system_label : "News"}</span>
-                <time dateTime={message.created_at}>{shortTime(message.created_at)}</time>
+                <span className="messages-card-when">
+                  <time dateTime={message.created_at}>{shortTime(message.created_at)}</time>
+                  {message.edited_at && <span className="messages-edited">Edited</span>}
+                </span>
               </header>
               <h3>{headline}</h3>
               {photo}
