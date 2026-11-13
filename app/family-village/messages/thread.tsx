@@ -753,7 +753,7 @@ export default function Thread({ conversation, userId, roles, tick, onBack, onCh
           <p>{version.body ?? "No words (photos or files only)"}</p>
         </li>)}
       </ol>}
-      <p className="field-note">Only administrators can see this. The sender and everyone else see only the current words and "Edited".</p>
+      <p className="field-note">Only administrators can see this. The sender and everyone else see only the current words and the word Edited.</p>
     </DetailModal>}
 
     {seenList && <DetailModal title="Seen by" onClose={() => setSeenList(null)}>
