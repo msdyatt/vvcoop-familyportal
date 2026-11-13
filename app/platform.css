@@ -303,7 +303,7 @@ html[data-app][data-platform="ios"] dialog.child-detail-panel::backdrop {
 
 /* Capsule controls with a comfortable touch target. */
 html[data-app][data-platform="ios"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab):not(.report-picker button),
-html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-msg button):not(.messages-field button):not(.messages-emoji-tray button):not(.messages-people button):not(.messages-tabs button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
+html[data-app][data-platform="ios"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-msg button):not(.messages-field button):not(.messages-emoji-panel button):not(.messages-people button):not(.messages-tabs button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
 html[data-app][data-platform="ios"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab):not(.report-picker button),
 html[data-app][data-platform="ios"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn):not(.messages-people button):not(.messages-tabs button) {
   min-height: 44px;
@@ -389,7 +389,7 @@ html[data-app][data-platform="android"] dialog.child-detail-panel::before {
 }
 
 html[data-app][data-platform="android"] .workspace-preview .workspace-main button:not(.app-header button):not(.app-tab):not(.report-picker button),
-html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-msg button):not(.messages-field button):not(.messages-emoji-tray button):not(.messages-people button):not(.messages-tabs button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
+html[data-app][data-platform="android"] .messages-page button:not(.messages-row):not(.messages-photo):not(.messages-linkish):not(.messages-icon-btn):not(.messages-msg button):not(.messages-field button):not(.messages-emoji-panel button):not(.messages-people button):not(.messages-tabs button):not(.messages-suggest button):not(.app-header button):not(.app-tab):not(.report-picker button),
 html[data-app][data-platform="android"] .photos-page button:not(.photos-thumb):not(.app-header button):not(.app-tab):not(.report-picker button),
 html[data-app][data-platform="android"] dialog button:not(.child-detail-close):not(.app-menu button):not(.bar-icon-btn):not(.messages-people button):not(.messages-tabs button) {
   min-height: 48px;
