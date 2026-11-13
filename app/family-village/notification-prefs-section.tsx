@@ -25,6 +25,7 @@ export default function NotificationPrefsSection({ email }: { email: string }) {
   const [push, setPush] = useState(true);
   const [mail, setMail] = useState(true);
   const [quiet, setQuiet] = useState(false);
+  const [reminders, setReminders] = useState(true);
   const [phone, setPhone] = useState("");
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,11 +35,13 @@ export default function NotificationPrefsSection({ email }: { email: string }) {
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    const [{ data: rows }, { data: words }, { data: user }] = await Promise.all([
+    const [{ data: rows }, { data: words }, { data: user }, { data: remindersOn }] = await Promise.all([
       supabase.rpc("my_notification_preferences"),
       supabase.rpc("sms_consent_wording"),
       supabase.auth.getUser(),
+      supabase.rpc("my_event_reminders"),
     ]);
+    if (typeof remindersOn === "boolean") setReminders(remindersOn);
     const row = (rows as Prefs[] | null)?.[0];
     if (row) { setPrefs(row); setPush(row.push_enabled); setMail(row.email_enabled); setQuiet(row.quiet_mode); }
     if (words) setWording(words as Wording);
@@ -56,7 +59,9 @@ export default function NotificationPrefsSection({ email }: { email: string }) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setBusy(true); setStatus("");
-    const { error } = await supabase.rpc("set_my_notification_preferences", { p_push: push, p_email: mail, p_quiet: quiet });
+    const { error: prefsError } = await supabase.rpc("set_my_notification_preferences", { p_push: push, p_email: mail, p_quiet: quiet });
+    const { error: remindersError } = prefsError ? { error: null } : await supabase.rpc("set_my_event_reminders", { p_on: reminders });
+    const error = prefsError ?? remindersError;
     setBusy(false);
     if (error) { setStatus(error.message); return; }
     setStatus("Saved.");
@@ -98,6 +103,11 @@ export default function NotificationPrefsSection({ email }: { email: string }) {
         <input type="checkbox" checked={quiet} disabled={busy} onChange={(event) => setQuiet(event.target.checked)} />
         <b>Only tell me about urgent things</b>
         <span className="field-note">Routine news and notes wait in the bell. Urgent alerts still reach you.</span>
+      </label>
+      <label className="checkbox-field">
+        <input type="checkbox" checked={reminders} disabled={busy} onChange={(event) => setReminders(event.target.checked)} />
+        <b>Event reminders</b>
+        <span className="field-note">A reminder 3 days and 1 day before calendar events that are yours to attend. Turn off to stop them; the calendar still shows everything.</span>
       </label>
       <button disabled={busy}>{busy ? "Saving…" : "Save"}</button>
       <p className="admin-form-status" role="status">{status}</p>

@@ -8,6 +8,7 @@ import { inlineImagePaths, sanitizeRichText, stripRichText } from "../../../lib/
 import { PostThumbnail, usePostAttachments } from "../post-attachments";
 import RichTextEditor from "../rich-text-editor";
 import { addCalendarDays, coopWallTime, coopWallTimeToDate, formatCoopDateTime } from "../../../lib/coop-time";
+import { reminderLine, type ReminderRow } from "./event-reminders";
 
 type Post = {
   id: string; title: string; body: string; audience: string; class_id: string | null; published_at: string | null;
@@ -239,6 +240,28 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
   const [allDay, setAllDay] = useState(true);
   const [startsAt, setStartsAt] = useState(""); const [endsAt, setEndsAt] = useState(""); const [audience, setAudience] = useState("families"); const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Automatic reminders before the event, on unless this switch is off. The flags and the planned reminders are
+  // fetched here so the event list above this form does not need to know about them.
+  const [sendReminders, setSendReminders] = useState(true);
+  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [planned, setPlanned] = useState<Record<string, ReminderRow[]>>({});
+
+  async function loadReminders() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const ids = events.map((row) => row.id);
+    const [{ data: flagRows }, { data: plannedRows }] = await Promise.all([
+      ids.length ? supabase.from("events").select("id,send_reminders").in("id", ids) : Promise.resolve({ data: [] }),
+      supabase.rpc("admin_upcoming_event_reminders", { p_days: 60 }),
+    ]);
+    setFlags(Object.fromEntries(((flagRows ?? []) as { id: string; send_reminders: boolean }[]).map((row) => [row.id, row.send_reminders])));
+    const grouped: Record<string, ReminderRow[]> = {};
+    for (const row of (plannedRows ?? []) as ReminderRow[]) (grouped[row.event_id] ??= []).push(row);
+    setPlanned(grouped);
+  }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- reload the reminder schedule whenever the event list changes
+  useEffect(() => { void loadReminders(); }, [events]);
 
   function inputDateTime(value: string | null) {
     if (!value) return "";
@@ -261,14 +284,14 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
       title: title.trim(), description: description.trim() || null, location: location.trim() || null,
       starts_at: allDay ? `${startsAt}T00:00:00.000Z` : new Date(startsAt).toISOString(),
       ends_at: endsAt ? (allDay ? `${endsAt}T00:00:00.000Z` : new Date(endsAt).toISOString()) : null,
-      all_day: allDay, audience, class_id: null,
+      all_day: allDay, audience, class_id: null, send_reminders: sendReminders,
     };
     const { error } = editingId
       ? await supabase.from("events").update(payload).eq("id", editingId)
       : await supabase.from("events").insert(payload);
     setBusy(false);
     if (error) { onStatus(error.message); return; }
-    onStatus(editingId ? `Updated ${title.trim()}.` : `Added ${title.trim()} to the Village calendar.`); setTitle(""); setDescription(""); setLocation(""); setStartsAt(""); setEndsAt(""); setAllDay(true); setAudience("families"); setEditingId(null); onSaved();
+    onStatus(editingId ? `Updated ${title.trim()}.` : `Added ${title.trim()} to the Village calendar.`); setTitle(""); setDescription(""); setLocation(""); setStartsAt(""); setEndsAt(""); setAllDay(true); setAudience("families"); setSendReminders(true); setEditingId(null); onSaved();
   }
 
   function editEvent(row: CalendarEvent) {
@@ -276,11 +299,11 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
     setAllDay(row.all_day);
     setStartsAt(row.all_day ? inputDate(row.starts_at) : inputDateTime(row.starts_at));
     setEndsAt(row.all_day ? inputDate(row.ends_at) : inputDateTime(row.ends_at));
-    setAudience(row.audience); onStatus(`Editing “${row.title}”.`);
+    setAudience(row.audience); setSendReminders(flags[row.id] ?? true); onStatus(`Editing “${row.title}”.`);
   }
 
   function cancelEdit() {
-    setEditingId(null); setTitle(""); setDescription(""); setLocation(""); setStartsAt(""); setEndsAt(""); setAllDay(true); setAudience("families"); onStatus("");
+    setEditingId(null); setTitle(""); setDescription(""); setLocation(""); setStartsAt(""); setEndsAt(""); setAllDay(true); setAudience("families"); setSendReminders(true); onStatus("");
   }
 
   async function removeEvent(row: CalendarEvent) {
@@ -319,8 +342,9 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
       <label><span className="field-caption">Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={busy} /></label>
       <label><span className="field-caption">Audience</span><select value={audience} onChange={(event) => setAudience(event.target.value)} disabled={busy}><option value="families">Every family</option><option value="teachers">Teaching team</option><option value="public">Public audience</option></select></label>
     </div>
+    <label className="checkbox-field"><input type="checkbox" checked={sendReminders} onChange={(event) => setSendReminders(event.target.checked)} disabled={busy} /> Send reminders before this event (3 days and 1 day, unless you changed that in Integrations). Everyone who can see the event gets one.</label>
     <div className="row-actions"><button disabled={busy}>{busy ? "Saving…" : editingId ? "Save event" : "Add calendar event"}</button>{editingId && <button type="button" className="ghost" onClick={cancelEdit} disabled={busy}>Cancel edit</button>}</div><p className="admin-form-status" role="status">{status}</p>
-  </form><div className="news-list calendar-admin-list">{events.map((row) => <article className="news-item" key={row.id}><time>{new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: row.all_day ? "UTC" : undefined })}</time><div><b>{row.title}</b><span>{row.all_day ? "All day" : new Date(row.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}{row.location ? ` · ${row.location}` : ""} · {row.audience}</span></div><div className="row-actions"><button onClick={() => editEvent(row)}>Edit</button><button className="danger" onClick={() => removeEvent(row)}>Delete</button></div></article>)}{!events.length && <p className="portal-empty">No co-op-wide events have been added yet.</p>}</div>
+  </form><div className="news-list calendar-admin-list">{events.map((row) => <article className="news-item" key={row.id}><time>{new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: row.all_day ? "UTC" : undefined })}</time><div><b>{row.title}</b><span>{row.all_day ? "All day" : new Date(row.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}{row.location ? ` · ${row.location}` : ""} · {row.audience}</span>{flags[row.id] === false ? <small>Reminders are off for this event.</small> : (planned[row.id] ?? []).map((reminder) => <small key={reminder.offset_days} className={reminder.status === "skipped" ? "reminder-skipped" : undefined}>{reminderLine(reminder)}</small>)}</div><div className="row-actions"><button onClick={() => editEvent(row)}>Edit</button><button className="danger" onClick={() => removeEvent(row)}>Delete</button></div></article>)}{!events.length && <p className="portal-empty">No co-op-wide events have been added yet.</p>}</div>
   <SubscribeLink query="scope=public" label="Subscribe to this calendar" />
   </>;
 }

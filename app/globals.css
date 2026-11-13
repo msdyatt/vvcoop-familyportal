@@ -12496,3 +12496,12 @@ a.messages-file:hover { text-decoration:underline; }
 .news-composer .schedule-boxes > * { min-width:140px; }
 .news-waiting { display:grid; gap:8px; }
 .news-item small.schedule-held { color:var(--terracotta-deep); font-weight:700; }
+
+/* ---- Event reminders ---- */
+.reminder-upcoming { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+.reminder-upcoming li { display:grid; gap:2px; padding-bottom:10px; border-bottom:1px solid rgba(var(--navy-rgb),.1); }
+.reminder-upcoming li > span { font-size:13px; color:var(--sage-text); }
+.reminder-upcoming small, .news-item small.reminder-skipped { font-size:13px; }
+.reminder-skipped { color:var(--sage-text); font-style:italic; }
+.event-reminder-card .schedule-held { color:var(--terracotta-deep); font-weight:700; }
+.event-reminder-card textarea { min-height:60px; }
