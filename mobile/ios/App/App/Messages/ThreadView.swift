@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -31,6 +32,12 @@ struct ThreadView: View {
     @State private var seenFor: String?
     @State private var viewer: PhotoSet?
     @State private var confirmRemove: MessageRow?
+    // Photos and files chosen for the next message.
+    @State private var pending: [PendingAttachment] = []
+    @State private var showPhotoPicker = false
+    @State private var showFilePicker = false
+    @State private var showCamera = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
     @FocusState private var focused: Bool
     @Environment(\.scenePhase) private var scenePhase
 
@@ -116,6 +123,18 @@ struct ThreadView: View {
             SeenBySheet(load: { try await store.seenBy(box.id) })
         }
         .fullScreenCover(item: $viewer) { set in PhotoViewer(set: set) }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $pickedPhotos, maxSelectionCount: max(1, AttachmentRules.maxCount - pending.count), matching: .images)
+        .onChange(of: pickedPhotos) { items in
+            guard !items.isEmpty else { return }
+            pickedPhotos = []
+            Task { await addPhotos(items) }
+        }
+        .fileImporter(isPresented: $showFilePicker, allowedContentTypes: AttachmentRules.pickerTypes, allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { addFiles(urls) }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker(onPicked: { data in showCamera = false; addPhotoData(data) }, onCancel: { showCamera = false }).ignoresSafeArea()
+        }
         .alert("Remove this message for everyone?", isPresented: Binding(get: { confirmRemove != nil }, set: { if !$0 { confirmRemove = nil } })) {
             Button("Remove", role: .destructive) { if let message = confirmRemove { Task { await store.remove(message); Haptics.play("success") } } }
             Button("Cancel", role: .cancel) {}
@@ -212,7 +231,7 @@ struct ThreadView: View {
                             }
                             .frame(maxWidth: .infinity).padding(.vertical, 48)
                         }
-                        if !store.loaded {
+                        if !store.loaded && items.isEmpty {
                             if let failure = store.loadFailure { Text(failure).font(.subheadline).foregroundColor(MT.muted).padding(40) } else { ProgressView().padding(40) }
                         }
                         ForEach(items) { item in
@@ -263,7 +282,11 @@ struct ThreadView: View {
         ComposerView(
             draft: $draft,
             replyingTo: replyingTo.map { (store.people[$0.senderId ?? ""].map { $0.userId == userId ? "yourself" : $0.displayName } ?? "Former member", MessageRow.snippet(body: $0.body, imagePath: $0.imagePath, deletedAt: $0.deletedAt, max: 60)) },
-            editing: editing != nil, mentionMatches: mentionMatches, busy: busy, emojiOpen: $emojiOpen, focus: $focused,
+            editing: editing != nil, mentionMatches: mentionMatches, busy: busy,
+            pending: pending, canAttach: pending.count < AttachmentRules.maxCount,
+            onPickPhotos: { focused = false; showPhotoPicker = true }, onTakePhoto: { focused = false; showCamera = true },
+            onPickFile: { focused = false; showFilePicker = true }, onRemovePending: { item in pending.removeAll { $0.id == item.id } },
+            emojiOpen: $emojiOpen, focus: $focused,
             onCancelContext: {
                 if editing != nil { draft = stashedDraft; editing = nil } else { replyingTo = nil }
             },
@@ -274,6 +297,38 @@ struct ThreadView: View {
                 }
             },
             onSend: { send() })
+    }
+
+    // MARK: Adding photos and files
+
+    private func add(_ items: [PendingAttachment]) {
+        var room = AttachmentRules.maxCount - pending.count
+        for item in items {
+            if room <= 0 { store.status = "Add up to \(AttachmentRules.maxCount) photos or files to one message."; break }
+            pending.append(item)
+            room -= 1
+        }
+    }
+
+    private func addPhotos(_ items: [PhotosPickerItem]) async {
+        var ready: [PendingAttachment] = []
+        for item in items {
+            if let data = try? await item.loadTransferable(type: Data.self), let photo = try? AttachmentRules.photo(from: data) { ready.append(photo) }
+            else { store.status = "A photo could not be read." }
+        }
+        add(ready)
+    }
+
+    private func addPhotoData(_ data: Data) {
+        if let photo = try? AttachmentRules.photo(from: data) { add([photo]) } else { store.status = "The photo could not be prepared." }
+    }
+
+    private func addFiles(_ urls: [URL]) {
+        var ready: [PendingAttachment] = []
+        for url in urls {
+            do { ready.append(try AttachmentRules.file(at: url)) } catch { store.status = error.localizedDescription }
+        }
+        add(ready)
     }
 
     private func send() {
@@ -287,8 +342,8 @@ struct ThreadView: View {
                 if ok { draft = stashedDraft; editing = nil }
             } else {
                 let mentions = mentionIds.filter { body.contains("@\($0.key)") }.map(\.value)
-                ok = await store.send(body: body, replyTo: replyingTo?.id, mentions: mentions)
-                if ok { draft = ""; replyingTo = nil; mentionIds = [:] }
+                ok = await store.send(body: body, replyTo: replyingTo?.id, mentions: mentions, attachments: pending)
+                if ok { draft = ""; replyingTo = nil; mentionIds = [:]; pending = [] }
             }
             busy = false
             emojiOpen = false

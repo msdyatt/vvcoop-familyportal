@@ -31,10 +31,9 @@ final class ThreadStore: ObservableObject {
 
     /// Opening a conversation: who is in it, the latest messages, mark it read.
     func open(childThread: Bool) async {
+        // Who is in the conversation is not worth failing the whole screen for: names fill in on the next refresh.
+        await refreshPeople()
         do {
-            let list: [Person] = try await SupabaseAPI.shared.rpc("conversation_people", ["p_conversation_id": conversationId])
-            people = Dictionary(uniqueKeysWithValues: list.map { ($0.userId, $0) })
-            await SignedURLCache.shared.prefetch(list.compactMap(\.avatarPath))
             if childThread, let missing: [String] = try? await SupabaseAPI.shared.rpc("child_thread_not_in_portal", ["p_conversation_id": conversationId]) {
                 notInPortal = missing
             }
@@ -139,6 +138,7 @@ final class ThreadStore: ObservableObject {
 
     /// A live event or the poll: look again.
     func refresh(markRead read: Bool, seenAllowed: Bool) async {
+        if people.isEmpty { await refreshPeople() }
         try? await fetchLatest()
         if read { await markRead() }
         await loadSeenCounts(allowed: seenAllowed)
@@ -146,26 +146,38 @@ final class ThreadStore: ObservableObject {
 
     func refreshPeople() async {
         if let list: [Person] = try? await SupabaseAPI.shared.rpc("conversation_people", ["p_conversation_id": conversationId]) {
-            people = Dictionary(uniqueKeysWithValues: list.map { ($0.userId, $0) })
+            people = Dictionary(list.map { ($0.userId, $0) }, uniquingKeysWith: { first, _ in first })
+            await SignedURLCache.shared.prefetch(list.compactMap(\.avatarPath))
         }
     }
 
     // MARK: Writing
 
     /// Sends a message; returns true when it went. Mentions are the ids of people whose @name is still in the text.
-    func send(body: String, replyTo: String?, mentions: [String]) async -> Bool {
+    func send(body: String, replyTo: String?, mentions: [String], attachments: [PendingAttachment] = []) async -> Bool {
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return false }
+        guard !text.isEmpty || !attachments.isEmpty else { return false }
+        var uploaded: [String] = []
         do {
+            // Photos were shrunk when they were chosen; documents go up as they are.
+            var sent: [[String: Any]] = []
+            for item in attachments {
+                let path = AttachmentRules.storagePath(conversationId: conversationId, name: item.name)
+                try await SupabaseAPI.shared.upload(item.data, path: path, mime: item.mime)
+                uploaded.append(path)
+                sent.append(["path": path, "name": String(item.name.prefix(160)), "mime": item.mime, "size": item.size])
+            }
             let _: String = try await SupabaseAPI.shared.rpc("send_message", [
-                "p_conversation_id": conversationId, "p_body": text,
-                "p_reply_to": replyTo.map { $0 as Any } ?? NSNull(), "p_mentions": mentions, "p_attachments": [Any](),
+                "p_conversation_id": conversationId, "p_body": text.isEmpty ? NSNull() : text as Any,
+                "p_reply_to": replyTo.map { $0 as Any } ?? NSNull(), "p_mentions": mentions, "p_attachments": sent,
             ])
             try await fetchLatest()
             newestStamp += 1
             await MessagesStore.shared.refresh()
             return true
         } catch {
+            // A message that did not go leaves no orphaned files behind.
+            if !uploaded.isEmpty { await SupabaseAPI.shared.remove(uploaded) }
             status = error.localizedDescription
             return false
         }

@@ -93,34 +93,44 @@ struct FileList: View {
     }
 }
 
-/// Small terracotta-washed pills hung on the bubble's lower edge: each reaction with its count; a tap toggles yours.
+/// The reactions on a message, as one small cluster: each reaction's picture, overlapping, and how many people reacted. It sits on the
+/// bubble's top corner (iMessage's place for it): the top right of a message from someone else, the top left of yours. A tap shows who
+/// reacted; yours have a terracotta ring.
 struct ReactionChips: View {
     let message: MessageRow
     let reactions: [Reaction]
     let env: ThreadEnv
 
+    private var kinds: [(emoji: String, count: Int, mine: Bool)] {
+        reactionChoices.compactMap { emoji in
+            let count = reactions.filter { $0.emoji == emoji }.count
+            return count > 0 ? (emoji, count, reactions.contains { $0.emoji == emoji && $0.userId == env.userId }) : nil
+        }
+    }
+
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(reactionChoices, id: \.self) { emoji in
-                let count = reactions.filter { $0.emoji == emoji }.count
-                if count > 0 {
-                    let mine = reactions.contains { $0.emoji == emoji && $0.userId == env.userId }
-                    Button { env.react(message.id, emoji) } label: {
-                        HStack(spacing: 3) {
-                            Text(emoji).font(.system(size: 12.5))
-                            Text("\(count)").font(.system(size: 11.5, weight: .bold))
-                        }
-                        .foregroundColor(MT.dangerText).padding(.leading, 5).padding(.trailing, 7).padding(.vertical, 1)
-                        .background(mine ? MT.terracotta.opacity(0.3) : MT.warmTint, in: Capsule())
-                        .overlay(Capsule().stroke(mine ? MT.terracotta : MT.surface, lineWidth: 1.5))
-                        .shadow(color: .black.opacity(0.2), radius: 1.5, y: 1)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(emoji) \(count)\(mine ? ", you reacted" : "")")
+        let list = kinds
+        Button { env.whoReacted(message.id) } label: {
+            HStack(spacing: -5) {
+                ForEach(Array(list.enumerated()), id: \.element.emoji) { index, kind in
+                    ReactionIcon(emoji: kind.emoji, size: 22)
+                        .padding(1.5)
+                        .background(Circle().fill(kind.mine ? MT.terracotta : MT.surface))
+                        .zIndex(Double(list.count - index))
+                }
+                if reactions.count > 1 {
+                    Text("\(reactions.count)").font(.system(size: 11.5, weight: .bold)).foregroundColor(MT.dangerText).padding(.leading, 9).padding(.trailing, 2)
                 }
             }
+            .padding(2)
+            .background(Capsule().fill(MT.surface))
+            .overlay(Capsule().stroke(MT.line, lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.22), radius: 2, y: 1)
         }
+        .buttonStyle(.plain)
         .fixedSize()
+        .accessibilityLabel("Reactions: " + list.map { "\(reactionName($0.emoji)) \($0.count)\($0.mine ? ", you" : "")" }.joined(separator: ", "))
+        .accessibilityHint("Shows who reacted")
     }
 }
 
@@ -177,7 +187,7 @@ struct CardView: View {
                         ForEach(reactionChoices, id: \.self) { emoji in
                             let mineNow = own.contains { $0.emoji == emoji && $0.userId == env.userId }
                             Button { env.react(message.id, emoji) } label: {
-                                Text(emoji).font(.system(size: 23)).frame(width: 42, height: 42)
+                                ReactionIcon(emoji: emoji, size: 32).frame(width: 42, height: 42)
                                     .background(Circle().fill(mineNow ? MT.terracotta.opacity(0.28) : Color.clear))
                                     .overlay(Circle().stroke(mineNow ? MT.terracotta : Color.clear, lineWidth: 1.5))
                             }

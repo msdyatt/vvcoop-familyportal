@@ -50,6 +50,8 @@
 		F4A1BD781CDCCE06155FF59F /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1D030C773A2AF9F816653 /* ComposerView.swift */; };
 		F4A1BF3C474C2CA66F39BA9D /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1F43A967B5CB3E7FA1DB2 /* ThreadView.swift */; };
 		F4A1ED9E83ABFF061A115C7D /* ThreadSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1BFC0F4C3FEB25F11CF35 /* ThreadSheets.swift */; };
+		F4A1DCDD8632500F6181F305 /* Attachments.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A188A665ABD49AFEFAB35A /* Attachments.swift */; };
+		F4A17E4B9E1AE264BE005163 /* ReactionIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1CDE603AC540BFCCB2541 /* ReactionIcons.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -97,6 +99,8 @@
 		F4A1D030C773A2AF9F816653 /* ComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerView.swift; sourceTree = "<group>"; };
 		F4A1F43A967B5CB3E7FA1DB2 /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
 		F4A1BFC0F4C3FEB25F11CF35 /* ThreadSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadSheets.swift; sourceTree = "<group>"; };
+		F4A188A665ABD49AFEFAB35A /* Attachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attachments.swift; sourceTree = "<group>"; };
+		F4A1CDE603AC540BFCCB2541 /* ReactionIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReactionIcons.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,6 +170,8 @@
 				F4A11E000000000000000106 /* FrameController.swift */,
 			); path = Frame; sourceTree = "<group>"; };
 		F4A19608AC8E2CE23160A831 /* Messages */ = {isa = PBXGroup; children = (
+				F4A1CDE603AC540BFCCB2541 /* ReactionIcons.swift */,
+				F4A188A665ABD49AFEFAB35A /* Attachments.swift */,
 				F4A1BFC0F4C3FEB25F11CF35 /* ThreadSheets.swift */,
 				F4A1F43A967B5CB3E7FA1DB2 /* ThreadView.swift */,
 				F4A1D030C773A2AF9F816653 /* ComposerView.swift */,
@@ -284,6 +290,8 @@
 				F4A11E000000000000000204 /* Navigator.swift in Sources */,
 				F4A11E000000000000000205 /* FrameNavigationController.swift in Sources */,
 				F4A11E000000000000000206 /* FrameController.swift in Sources */,
+				F4A17E4B9E1AE264BE005163 /* ReactionIcons.swift in Sources */,
+				F4A1DCDD8632500F6181F305 /* Attachments.swift in Sources */,
 				F4A1ED9E83ABFF061A115C7D /* ThreadSheets.swift in Sources */,
 				F4A1BF3C474C2CA66F39BA9D /* ThreadView.swift in Sources */,
 				F4A1BD781CDCCE06155FF59F /* ComposerView.swift in Sources */,

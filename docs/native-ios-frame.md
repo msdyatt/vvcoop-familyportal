@@ -267,6 +267,18 @@ emoji panel, @mention suggestions, a reply bar, and an edit mode (Edit puts the 
 tab bar (`NativeScreenController.hidesTabBar`) so the composer sits above the keyboard. `ThreadStore` does the reads and writes: the same
 RPCs and tables as `thread.tsx`, no new ones. Sending photos and files, and editing a channel, are part 3.
 
+**Photos and files, channel details (part 3).** The composer's plus offers Photo Library (the system photo picker, no library permission needed), Take Photo
+and Choose File. The same limits as the web: up to 10 per message, documents (PDF, Word, PowerPoint, Excel, CSV) up to 10 MB, photos shrunk to 1600 px
+and re-encoded as JPEG before they go, which drops the GPS position and camera details. Each file is uploaded to `messages/<conversation>/<id>-<name>` in
+the private bucket and the message is sent with `p_attachments`; if sending fails the uploads are removed again. For people who run a channel (an
+administrator, or its creator) the details sheet edits the name, description and who may post (`update_channel`), follows a class
+(`set_channel_class`, administrators), adds and removes people (`add_channel_members`, `remove_channel_member`) and archives or restores
+(`archive_channel`).
+
+**Reaction icons.** The six reactions are the co-op's own drawings (`ReactionIcons.swift`, the geometry of `reaction-icons.tsx` drawn with a small SVG path
+reader and `Canvas`): a flat disc in a brand colour, a cream shape with an ink outline and a gold wash. The database still stores the six emoji. On a bubble they
+sit as one cluster on its top corner, as iMessage does (top right on others' messages, top left on yours); a tap shows who reacted.
+
 **Minimum iOS.** The deployment target goes from 15.0 to 16.0 (`NavigationStack`, `scrollDismissesKeyboard`, `UIHostingController.sizingOptions`,
 photo picker). Firebase and Stripe both support 16.
 
