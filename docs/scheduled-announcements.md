@@ -3,8 +3,8 @@
 An administrator writes a news post now and chooses **Publish later**: a date and a time in the co-op's time zone
 (America/Chicago, whatever zone the administrator's computer is in). It is saved as *scheduled* and goes out by itself.
 
-Code: `supabase/migrations/20261114090000_scheduled_announcements.sql`, `app/family-village/admin/news-tab.tsx`,
-`lib/coop-time.ts`. Tests: `supabase/tests/database/023_scheduled_announcements.test.sql`, `lib/coop-time.test.ts`.
+Code: `supabase/migrations/20261116100000_scheduled_announcements.sql`, `app/family-village/admin/news-tab.tsx`,
+`lib/coop-time.ts`. Tests: `supabase/tests/database/029_scheduled_announcements.test.sql`, `lib/coop-time.test.ts`.
 
 ## What "scheduled" means
 
