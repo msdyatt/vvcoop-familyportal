@@ -46,8 +46,8 @@ insert into public.message_reactions (message_id, user_id, emoji) values (curren
 update public.conversations set last_message_at = '2020-01-01' where system_key = 'announcements';
 
 -- ---- edits flow to the card --------------------------------------------------------------------
-update public.posts set body = '<p>Bring boots and <b>sunscreen</b>.</p>' where id = 'aaaaaaaa-0000-0000-0000-000000000001';
-select is((select body from public.messages where id = current_setting('test.card')::uuid), E'Field trip\nBring boots and sunscreen.', 'editing the text updates the card');
+update public.posts set body = '<p>Bring boots and <b>sunscreen</b> too.</p>' where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+select is((select body from public.messages where id = current_setting('test.card')::uuid), E'Field trip\nBring boots and sunscreen too.', 'editing the text updates the card');
 select ok((select edited_at is not null from public.messages where id = current_setting('test.card')::uuid), 'and marks it Edited');
 select is((select count(*)::int from public.messages where post_id = 'aaaaaaaa-0000-0000-0000-000000000001'), 1, 'it is still one card');
 select is((select count(*)::int from public.message_reactions where message_id = current_setting('test.card')::uuid), 1, 'its reactions stay, because it is the same message');
@@ -62,7 +62,7 @@ select is((select edited_at::date from public.messages where id = current_settin
 
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
 set local role authenticated;
-select is((select body from public.messages where id = current_setting('test.card')::uuid), E'Field trip (moved)\nBring boots and sunscreen.', 'a family member reading the channel sees the edited text');
+select is((select body from public.messages where id = current_setting('test.card')::uuid), E'Field trip (moved)\nBring boots and sunscreen too.', 'a family member reading the channel sees the edited text');
 reset role;
 
 -- ---- public site or every family: same channel, same card ---------------------------------------
