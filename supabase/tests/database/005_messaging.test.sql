@@ -69,7 +69,7 @@ select is((select count(*)::int from public.conversations), 1, 'the same two peo
 
 select lives_ok($$select public.send_message((select id from public.conversations limit 1), 'Hello teacher')$$, 'a member can send a message');
 select throws_ok($$insert into public.messages (conversation_id, sender_id, body) values ((select id from public.conversations limit 1), '00000000-0000-0000-0000-0000000000b1', 'sneaky')$$, '42501', null, 'messages cannot be inserted directly, only through the function');
-select throws_ok($$select public.send_message((select id from public.conversations limit 1), '   ')$$, 'P0001', 'Write a message or add a photo.', 'an empty message is refused');
+select throws_ok($$select public.send_message((select id from public.conversations limit 1), '   ')$$, 'P0001', 'Write a message or add a photo or file.', 'an empty message is refused');
 reset role;
 
 select is((select count(*)::int from public.notifications where kind = 'message' and recipient_user_id = '00000000-0000-0000-0000-0000000000a2'), 1, 'the teacher is notified of the message');
