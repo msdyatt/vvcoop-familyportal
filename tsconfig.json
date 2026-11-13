@@ -32,6 +32,7 @@
     "lib/calendar-links.test.ts",
     "lib/broadcast.test.ts",
     "lib/schedule.test.ts",
+    "lib/coop-time.test.ts",
     "mobile"
   ]
 }
