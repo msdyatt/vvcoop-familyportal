@@ -1,0 +1,135 @@
+name: Staging
+
+# Runs on every PR against main. Builds, tests, and deploys to the staging
+# environment (separate Supabase project, separate Cloudflare Worker at
+# staging.veritasvillage.org). Production is never touched by this workflow.
+#
+# The staging environment is seeded with fake data and is for internal testing
+# only. Beta is a separate environment and is out of scope here.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+
+      - run: npm ci
+        env:
+          NODE_ENV: development
+
+      - run: npm run lint
+        env:
+          NODE_ENV: development
+
+      - run: npm run typecheck
+        env:
+          NODE_ENV: development
+
+      - run: npm test
+        env:
+          NODE_ENV: development
+
+  deploy-staging:
+    needs: [build-lint-test]
+    runs-on: ubuntu-latest
+    environment: Staging
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+
+      - run: npm ci
+        env:
+          NODE_ENV: development
+
+      - run: npm run build
+        env:
+          NODE_ENV: development
+
+      # Deploy to the staging Worker. The Worker name differs from production
+      # (veritas-village-staging vs veritas-village) to keep the deployments
+      # fully separate. The custom domain staging.veritasvillage.org is
+      # attached to this Worker via Cloudflare's Custom Domain feature.
+      - run: npx wrangler deploy --config dist/server/wrangler.json --name veritas-village-staging dist/server/index.js
+        env:
+          NODE_ENV: development
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  supabase-functions-staging:
+    needs: [build-lint-test]
+    runs-on: ubuntu-latest
+    environment: Staging
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.115.0
+
+      # Deploy edge functions to the staging Supabase project. The project ref
+      # is different from production (set as a staging environment secret).
+      - run: supabase functions deploy --project-ref ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
+
+  supabase-migrations-staging:
+    needs: [build-lint-test]
+    runs-on: ubuntu-latest
+    environment: Staging
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.115.0
+
+      - run: supabase link --project-ref ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
+
+      - run: supabase db push
+
+  seed-staging:
+    needs: [supabase-migrations-staging]
+    runs-on: ubuntu-latest
+    environment: Staging
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+
+      - run: npm ci
+        env:
+          NODE_ENV: development
+
+      # Seed the staging database with fake data. The seed script is idempotent
+      # and can be run multiple times safely.
+      - run: npm run seed:staging
+        env:
+          NODE_ENV: development
