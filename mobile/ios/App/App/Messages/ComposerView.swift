@@ -8,6 +8,12 @@ struct ComposerView: View {
     var editing: Bool
     var mentionMatches: [Person]
     var busy: Bool
+    var pending: [PendingAttachment] = []
+    var canAttach = true
+    var onPickPhotos: () -> Void = {}
+    var onTakePhoto: () -> Void = {}
+    var onPickFile: () -> Void = {}
+    var onRemovePending: (PendingAttachment) -> Void = { _ in }
     @Binding var emojiOpen: Bool
     var focus: FocusState<Bool>.Binding
     var onCancelContext: () -> Void
@@ -16,13 +22,15 @@ struct ComposerView: View {
 
     @State private var emojiGroup = emojiGroups[0].id
 
-    private var canSend: Bool { !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !busy }
+    private var canSend: Bool { (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !pending.isEmpty) && !busy }
 
     var body: some View {
         VStack(spacing: 0) {
             if !mentionMatches.isEmpty { mentions }
             if replyingTo != nil || editing { context }
+            if !pending.isEmpty && !editing { PendingStrip(items: pending, onRemove: onRemovePending) }
             HStack(alignment: .bottom, spacing: 8) {
+                if !editing { plusButton }
                 field
                 Button(action: onSend) {
                     Image(systemName: "arrow.up").font(.system(size: 18, weight: .bold)).foregroundColor(Color(MT.cream))
@@ -37,6 +45,20 @@ struct ComposerView: View {
         }
         .background(MT.surface.ignoresSafeArea(edges: .bottom))
         .overlay(alignment: .top) { MT.line.frame(height: 1) }
+    }
+
+    /// Photos and files, from the library, the camera or Files.
+    private var plusButton: some View {
+        Menu {
+            Button(action: onPickPhotos) { Label("Photo Library", systemImage: "photo.on.rectangle") }
+            if CameraPicker.isAvailable { Button(action: onTakePhoto) { Label("Take Photo", systemImage: "camera") } }
+            Button(action: onPickFile) { Label("Choose File", systemImage: "doc") }
+        } label: {
+            Image(systemName: "plus").font(.system(size: 19, weight: .semibold)).foregroundColor(MT.text)
+                .frame(width: 42, height: 42).background(Circle().fill(MT.sunken))
+        }
+        .disabled(busy || !canAttach)
+        .accessibilityLabel("Add photos or files")
     }
 
     private var field: some View {

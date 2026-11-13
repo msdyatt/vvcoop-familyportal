@@ -109,6 +109,7 @@ struct MessageRowView: View {
     private var tone: Int { item.card ? env.conversation.tone : MessageTone.toneFor(message.senderId) }
     private var own: [Reaction] { env.reactions.filter { $0.messageId == message.id } }
     private var media: [Attachment] { MessageMedia.attachments(for: message, loaded: env.attachments) }
+    private var hasReactions: Bool { !own.isEmpty && message.deletedAt == nil }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -142,8 +143,7 @@ struct MessageRowView: View {
             else if item.endsRun || message.editedAt != nil { meta }
         }
         .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
-        .padding(.top, item.startsRun ? 12 : 2)
-        .padding(.bottom, own.isEmpty || message.deletedAt != nil ? 0 : 14)
+        .padding(.top, (item.startsRun ? 12 : 2) + (hasReactions ? 20 : 0))
     }
 
     // MARK: Bubble
@@ -181,8 +181,8 @@ struct MessageRowView: View {
             .fixedSize(horizontal: false, vertical: true)
             .background(photoOnly ? Color.clear : (mine ? MT.action : MT.wash(tone)), in: shape)
             .clipShape(shape)
-            .overlay(alignment: mine ? .bottomTrailing : .bottomLeading) {
-                if !own.isEmpty { ReactionChips(message: message, reactions: own, env: env).offset(x: mine ? -8 : 8, y: 14) }
+            .overlay(alignment: mine ? .topLeading : .topTrailing) {
+                if !own.isEmpty { ReactionChips(message: message, reactions: own, env: env).offset(x: mine ? -12 : 12, y: -21) }
             }
             .overlay(shape.stroke(MT.text.opacity(open ? 0.22 : 0), lineWidth: 3))
             .contentShape(shape)
@@ -232,12 +232,12 @@ struct MessageRowView: View {
                     ForEach(reactionChoices, id: \.self) { emoji in
                         let mineNow = own.contains { $0.emoji == emoji && $0.userId == env.userId }
                         Button { env.react(message.id, emoji) } label: {
-                            Text(emoji).font(.system(size: 23)).frame(width: 42, height: 42)
+                            ReactionIcon(emoji: emoji, size: 32).frame(width: 42, height: 42)
                                 .background(Circle().fill(mineNow ? MT.terracotta.opacity(0.28) : Color.clear))
                                 .overlay(Circle().stroke(mineNow ? MT.terracotta : Color.clear, lineWidth: 1.5))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("React \(emoji)").accessibilityAddTraits(mineNow ? .isSelected : [])
+                        .accessibilityLabel("React: \(reactionName(emoji))").accessibilityAddTraits(mineNow ? .isSelected : [])
                     }
                 }
                 .padding(3).background(MT.surface, in: Capsule()).overlay(Capsule().stroke(MT.line, lineWidth: 1))
