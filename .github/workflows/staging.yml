@@ -69,7 +69,7 @@ jobs:
       # (veritas-village-staging vs veritas-village) to keep the deployments
       # fully separate. The custom domain staging.veritasvillage.org is
       # attached to this Worker via Cloudflare's Custom Domain feature.
-      - run: npx wrangler deploy --config dist/server/wrangler.json --name veritas-village-staging --var STAGING_ROOT_REDIRECT:true --var SUPABASE_URL:https://axfikwoazkvtnwcgpyhg.supabase.co dist/server/index.js
+      - run: npx wrangler deploy dist/server/index.js --config dist/server/wrangler.json --name veritas-village-staging --var STAGING_ROOT_REDIRECT:true --var SUPABASE_URL:https://axfikwoazkvtnwcgpyhg.supabase.co
         env:
           NODE_ENV: development
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
