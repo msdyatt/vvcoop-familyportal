@@ -55,15 +55,21 @@ jobs:
         env:
           NODE_ENV: development
 
+      # These values are deliberately build-time values: Vite embeds them into
+      # browser assets, so omitting them would make staging browser code target
+      # the production Supabase project.
       - run: npm run build
         env:
           NODE_ENV: development
+          NEXT_PUBLIC_SUPABASE_URL: https://axfikwoazkvtnwcgpyhg.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_nwN_JMOLmAe_PIb65Ppy1w_s2nZmkDk
+          NEXT_PUBLIC_SITE_URL: https://staging.veritasvillage.org
 
       # Deploy to the staging Worker. The Worker name differs from production
       # (veritas-village-staging vs veritas-village) to keep the deployments
       # fully separate. The custom domain staging.veritasvillage.org is
       # attached to this Worker via Cloudflare's Custom Domain feature.
-      - run: npx wrangler deploy --config dist/server/wrangler.json --name veritas-village-staging dist/server/index.js
+      - run: npx wrangler deploy --config dist/server/wrangler.json --name veritas-village-staging --var STAGING_ROOT_REDIRECT:true dist/server/index.js
         env:
           NODE_ENV: development
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
