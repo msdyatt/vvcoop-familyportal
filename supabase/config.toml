@@ -544,3 +544,25 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/dues-daily/deno.json"
 entrypoint = "./functions/dues-daily/index.ts"
+
+# Office inbox (issue #112). The OAuth function receives Google's redirect, which carries no
+# Supabase session; the sync function is called by pg_cron with the Vault secret; the send
+# function and the POST actions check the administrator's session, role, second factor and
+# reviewer flag themselves. So the platform JWT gate stays off for all three.
+[functions.office-inbox-oauth]
+enabled = true
+verify_jwt = false
+import_map = "./functions/office-inbox-oauth/deno.json"
+entrypoint = "./functions/office-inbox-oauth/index.ts"
+
+[functions.office-inbox-sync]
+enabled = true
+verify_jwt = false
+import_map = "./functions/office-inbox-sync/deno.json"
+entrypoint = "./functions/office-inbox-sync/index.ts"
+
+[functions.office-inbox-send]
+enabled = true
+verify_jwt = false
+import_map = "./functions/office-inbox-send/deno.json"
+entrypoint = "./functions/office-inbox-send/index.ts"
