@@ -41,6 +41,10 @@ html[data-theme="dark"] {
   --wash-on-action:rgba(2,10,16,.3);
   --chip-on-action:rgba(2,10,16,.2);
   --gold:#e0b56a;                        /* Antique Gold, lifted for night: focus rings and the lantern glow */
+  --status-new:#e8a98d;
+  --status-open:#8fbfe0;
+  --status-waiting:#e0b56a;
+  --status-done:#9aa99e;
 
   /* Lines, washes and shadows */
   --line-strong:#d9d3c4;
@@ -94,6 +98,10 @@ html[data-theme="dark"] {
     --wash-on-action:rgba(2,10,16,.3);
     --chip-on-action:rgba(2,10,16,.2);
     --gold:#e0b56a;                        /* Antique Gold, lifted for night: focus rings and the lantern glow */
+    --status-new:#e8a98d;
+    --status-open:#8fbfe0;
+    --status-waiting:#e0b56a;
+    --status-done:#9aa99e;
 
     /* Lines, washes and shadows */
     --line-strong:#d9d3c4;

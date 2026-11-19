@@ -111,6 +111,10 @@ const PAIRS = [
   ["cream", "cal-class", 4.5, "class event pill"],
   ["fg-rgb@.66", "canvas", 4.5, "inactive tab label (iOS style)"],
   ["fg-rgb@.72", "canvas", 4.5, "inactive tab label (Android style)"],
+  ["status-new", "surface", 3, "office inbox: New status mark"],
+  ["status-open", "surface", 3, "office inbox: Open status mark"],
+  ["status-waiting", "surface", 3, "office inbox: Waiting on family status mark"],
+  ["status-done", "surface", 3, "office inbox: Done status mark"],
   ["line-strong", "canvas", 3, "strong outline on the page"],
   ["line-strong", "surface", 3, "strong outline on a card"],
   ["gold", "canvas", 3, "focus ring"],
@@ -146,8 +150,8 @@ test("paper keeps the light roles: every role the dark theme changes is put back
   assert.ok(paperBody, "missing the Paper block in app/theme.css");
   const paper = props(paperBody);
   const dark = { ...light, ...props(darkAttr) };
-  // Roles that only matter on bands, glass bars, the calendar or the Android bar never appear inside a document.
-  const notInDocuments = /^--(glass-|m3-|cal-|ink-surface|canvas-rgb|panel-rgb|accent-on-action|wash-on-action|chip-on-action)/;
+  // Roles that only matter on bands, glass bars, the calendar, the Android bar or the office inbox never appear inside a document.
+  const notInDocuments = /^--(glass-|m3-|cal-|status-|ink-surface|canvas-rgb|panel-rgb|accent-on-action|wash-on-action|chip-on-action)/;
   for (const name of Object.keys(props(darkAttr))) {
     if (name === "--cal-coop" || notInDocuments.test(name)) continue;
     const lightValue = resolve(name, light), darkValue = resolve(name, dark);
