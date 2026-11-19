@@ -26,9 +26,10 @@ const ReportsTab = dynamic(() => import("./reports-tab"));
 const DuesTab = dynamic(() => import("./dues-tab"));
 const ExpensesTab = dynamic(() => import("./expenses-tab"));
 const BroadcastsTab = dynamic(() => import("./broadcasts-tab"));
+const InboxTab = dynamic(() => import("./inbox-tab"));
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-const TABS = ["dashboard", "invitations", "families", "classes", "documents", "dues", "expenses", "news", "broadcasts", "reports", "activity", "message-reports", "integrations"] as const;
+const TABS = ["dashboard", "inbox", "invitations", "families", "classes", "documents", "dues", "expenses", "news", "broadcasts", "reports", "activity", "message-reports", "integrations"] as const;
 type Tab = (typeof TABS)[number];
 
 async function signOutToEntry() {
@@ -83,11 +84,12 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Dashboard</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Dashboard</option><option value="inbox">Office inbox</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="integrations">Integrations</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
       <button className={tab === "dashboard" ? "active" : ""} onClick={() => setTab("dashboard")}>Dashboard</button>
+      <button className={tab === "inbox" ? "active" : ""} onClick={() => setTab("inbox")}>Office inbox</button>
       <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}>Invitations</button>
       <button className={tab === "families" ? "active" : ""} onClick={() => setTab("families")}>Families</button>
       <button className={tab === "classes" ? "active" : ""} onClick={() => setTab("classes")}>Classes</button>
@@ -110,6 +112,7 @@ export default function AdminWorkspace() {
       <section className="recent-invitations"><p className="eyebrow">Recent invitations</p><h2>Invitations in motion</h2><p className="admin-form-status" role="status">{listMessage}</p>{invitations.length ? <div>{invitations.map(item => <article key={item.id}><div><b>{item.families?.display_name ?? "Household"}</b><span>{item.email}</span></div><span className={item.accepted_at ? "accepted" : "pending"}>{item.accepted_at ? "Accepted" : new Date(item.expires_at) < new Date() ? "Expired" : "Awaiting response"}</span>{!item.accepted_at && <div className="invitation-actions"><button type="button" className="ghost" disabled={rowBusy === item.id} onClick={() => manageInvitation(item, "resend")}>{rowBusy === item.id ? "Working…" : new Date(item.expires_at) < new Date() ? "Send a new link" : "Resend"}</button><button type="button" className="danger" disabled={rowBusy === item.id} onClick={() => manageInvitation(item, "delete")}>Delete</button></div>}</article>)}</div> : <p>No invitations have been sent yet.</p>}</section>
     </>}
 
+    {tab === "inbox" && <InboxTab />}
     {tab === "families" && <FamiliesTab actorUserId={userId} />}
     {tab === "classes" && <ClassesTab actorUserId={userId} />}
         {tab === "documents" && <DocumentsTab actorUserId={userId} />}
