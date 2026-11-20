@@ -152,3 +152,50 @@
 /* The co-op's support contact on the sign-in page (app/coop-support-line.tsx). */
 .coop-support-line { margin:14px 0 0; color:var(--text-muted); font:400 13px/1.45 var(--sans); }
 .coop-support-line a { color:var(--text-accent); font-weight:600; }
+
+/* ---- Larger text (Account settings, Appearance; lib/personal-appearance.ts) ----------------------------------------
+   Every font size and line height in the stylesheets is multiplied by --text-scale at build time
+   (scripts/postcss-text-scale.mjs). COOP_SCRIPT sets data-text-size before the first paint. */
+:root { --text-scale:1; }
+html[data-text-size="large"] { --text-scale:1.15; }
+
+/* ---- Personal choices in Account settings (app/family-village/personal-appearance.tsx) ---------------------------- */
+.personal-label { margin:18px 0 0; color:var(--text-muted); font:700 11px var(--sans); letter-spacing:.8px; text-transform:uppercase; }
+.personal-accents { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin:10px 0 0; }
+.personal-accents button {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  min-height:44px;
+  padding:10px 12px;
+  color:var(--text);
+  background:transparent;
+  font:600 14px var(--sans);
+  text-align:left;
+  border:1px solid rgba(var(--fg-rgb),.3);
+  border-radius:2px;
+  cursor:pointer;
+}
+.personal-accents button[aria-checked="true"] { border-color:var(--line-strong); box-shadow:inset 0 0 0 1px var(--line-strong); }
+.personal-accents button:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+.personal-swatch { flex:none; width:20px; height:20px; border-radius:50%; border:1px solid rgba(var(--fg-rgb),.25); }
+.theme-choice.personal-text { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.personal-note { margin-top:14px; }
+
+/* ---- Admin, Appearance: the palettes members may choose ----------------------------------------------------------- */
+.appearance-personal { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; }
+.appearance-personal label {
+  display:flex !important;
+  gap:10px;
+  align-items:center;
+  min-height:44px;
+  padding:8px 10px;
+  color:var(--text) !important;
+  font:600 14px var(--sans) !important;
+  letter-spacing:0 !important;
+  text-transform:none !important;
+  border:1px solid rgba(var(--fg-rgb),.2);
+  border-radius:2px;
+  cursor:pointer;
+}
+.appearance-personal input { width:18px; height:18px; accent-color:var(--action); }

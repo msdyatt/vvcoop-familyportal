@@ -9,11 +9,11 @@
  */
 import { useSyncExternalStore } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { COOP_THEME_KEY, DEFAULT_THEME, LOGO_BUCKET, THEME_VAR_NAMES, parseTheme, themeFromRow, themeVars, type CoopTheme } from "./coop-theme";
+import { COOP_THEME_KEY, DEFAULT_THEME, LOGO_BUCKET, PERSONAL_ACCENT_KEY, THEME_VAR_NAMES, effectiveAccent, parseTheme, themeFromRow, themeVars, type CoopTheme } from "./coop-theme";
 import { nativeFrame } from "./native-frame";
 
 export const COOP_SETTINGS_COLUMNS =
-  "name,palette_id,accent,heading_font,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,support_email,support_phone,updated_at";
+  "name,palette_id,accent,heading_font,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,support_email,support_phone,personal_palettes,updated_at";
 
 let current: CoopTheme | null = null;
 const listeners = new Set<() => void>();
@@ -30,6 +30,10 @@ export function readCachedTheme(): CoopTheme | null {
   } catch { return null; }
 }
 
+function readPersonalAccent(): string | null {
+  try { return storage()?.getItem(PERSONAL_ACCENT_KEY) ?? null; } catch { return null; }
+}
+
 function writeCachedTheme(theme: CoopTheme) {
   try { storage()?.setItem(COOP_THEME_KEY, JSON.stringify(theme)); } catch { /* the page still shows it */ }
 }
@@ -40,10 +44,14 @@ export function coopTheme(): CoopTheme {
   return current;
 }
 
-/** Dresses the document in a theme: the custom properties, and the iPhone frame's bars through the bridge. */
+/**
+ * Dresses the document in a theme: the custom properties, and the iPhone frame's bars through the bridge. On the
+ * document, the person's own palette (lib/personal-appearance.ts) replaces the co-op's when the co-op allows it.
+ */
 export function applyCoopTheme(theme: CoopTheme, element?: HTMLElement) {
   if (typeof document === "undefined") return;
   const target = element ?? document.documentElement;
+  if (!element) theme = { ...theme, accent: effectiveAccent(theme, readPersonalAccent()) };
   const vars = themeVars(theme);
   for (const name of THEME_VAR_NAMES) {
     if (name in vars) target.style.setProperty(name, vars[name]);

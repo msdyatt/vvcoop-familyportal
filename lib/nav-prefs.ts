@@ -85,6 +85,10 @@ export type NavPrefs = {
   legacy?: { home?: string[]; teacher?: string[] };
   /** Light, Dark or System (lib/theme.ts). Not a bar setting, but it lives in the same small per-person record. */
   theme?: "system" | "light" | "dark";
+  /** The person's accent: "coop" or a ready-made palette id (lib/personal-appearance.ts). */
+  accent?: string;
+  /** Larger text (lib/personal-appearance.ts). */
+  textSize?: "normal" | "large";
 };
 
 const byId = new Map(DESTINATIONS.map((d) => [d.id, d]));
@@ -164,6 +168,9 @@ export function cleanPrefs(value: unknown): NavPrefs {
   }
   if (Array.isArray(raw.admin)) out.admin = known(raw.admin).slice(0, MAX_SLOTS);
   if (raw.theme === "system" || raw.theme === "light" || raw.theme === "dark") out.theme = raw.theme;
+  // Checked against the palettes where it is used; here only kept short and plain.
+  if (typeof raw.accent === "string" && /^[a-z][a-z0-9-]{1,30}$/.test(raw.accent)) out.accent = raw.accent;
+  if (raw.textSize === "normal" || raw.textSize === "large") out.textSize = raw.textSize;
 
   // Carry the earlier lists along, untouched by later saves.
   const legacy = raw.legacy;
