@@ -19,6 +19,24 @@ html[data-theme="dark"] { --nav-on:var(--accent-night-tint); --nav-on-ink:var(--
   html:not([data-theme]) { --nav-on:var(--accent-night-tint); --nav-on-ink:var(--accent-night-tint-ink); }
 }
 
+/* Every browser width: the sidebar (a drawer on a narrow screen) replaces the header's old Menu, Photos and
+   Messages links, Admin's own list and the Teacher side links. The installed apps keep theirs. */
+html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header .portal-nav,
+html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header .messages-link,
+html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .admin-workspace-layout > .admin-tabs,
+html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .workspace-grid > .workspace-nav,
+html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .admin-mobile-nav {
+  display:none;
+}
+html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .admin-workspace-layout,
+html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .workspace-grid {
+  grid-template-columns:minmax(0,1fr);
+}
+
+.mobile-nav-trigger,
+.side-nav-close,
+.side-nav-scrim { display:none; }
+
 @media (min-width:1024px) {
   html:not([data-app]):not([data-frame]) {
     --sidenav-w:256px;
@@ -28,322 +46,17 @@ html[data-theme="dark"] { --nav-on:var(--accent-night-tint); --nav-on-ink:var(--
   }
 
   /* The page makes room; the header still runs edge to edge of what is left. */
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) {
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) {
     padding-left:calc(var(--sidenav-w) + var(--portal-pad));
     transition:padding-left .22s ease;
   }
 
-  /* The sidebar replaces the header's Menu, Photos and Messages links and the logo. */
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) .app-header-brand,
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) .app-header .portal-nav,
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) .app-header .messages-link {
-    display:none;
-  }
-
-  /* The Admin list and the Teacher side links become the sidebar and the tab strip. */
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) .admin-workspace-layout,
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) .workspace-grid {
-    grid-template-columns:minmax(0,1fr);
-  }
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) .admin-workspace-layout > .admin-tabs,
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) .workspace-grid > .workspace-nav,
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) .admin-mobile-nav {
-    display:none;
-  }
-
-  /* ---------- The sidebar ---------- */
+  /* The logo moves into the sidebar. */
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header-brand { display:none; }
 
   html:not([data-app]):not([data-frame]) .side-nav {
-    --row:46px;
-    position:fixed;
-    z-index:30;
-    top:0;
-    bottom:0;
-    left:0;
+    display:flex;
     width:var(--sidenav-w);
-    box-sizing:border-box;
-    display:flex;
-    flex-direction:column;
-    padding:18px 14px 12px;
-    background:var(--surface);
-    color:var(--text);
-    border-right:1px solid rgba(var(--fg-rgb),.12);
-    overflow-x:hidden;
-    overflow-y:auto;
-    overscroll-behavior:contain;
-    scrollbar-width:thin;
-    transition:width .22s ease;
-  }
-
-  html:not([data-app]):not([data-frame]) .side-nav-admin {
-    --row:56px;
-    background:var(--ink-surface);
-    color:var(--cream);
-    border-right-color:rgba(var(--cream-rgb),.14);
-  }
-
-  .side-nav-top {
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    min-height:52px;
-    padding:0 6px;
-  }
-
-  .side-nav-brand {
-    display:flex;
-    align-items:center;
-    border-radius:8px;
-  }
-
-  .side-nav-brand .side-nav-lockup { width:170px; }
-  .side-nav-admin .side-nav-brand .side-nav-lockup { width:132px; }
-  .side-nav-brand .side-nav-mark { display:none; width:44px; }
-
-  .side-nav-admin-chip {
-    padding:3px 9px;
-    border-radius:999px;
-    background:var(--cream);
-    color:var(--navy);
-    font:700 11px var(--sans);
-    letter-spacing:.08em;
-    text-transform:uppercase;
-  }
-
-  .side-nav-hello {
-    display:flex;
-    align-items:center;
-    gap:9px;
-    min-height:28px;
-    margin:12px 8px 16px;
-    color:var(--text-muted);
-    font:italic 500 16px/1.25 var(--serif);
-  }
-
-  .side-nav-hello span { animation:vv-hello .6s ease-out both; }
-  .side-nav-daypart { flex:none; color:var(--text-accent); animation:vv-rise .9s cubic-bezier(.34,1.5,.64,1) both; }
-  .side-nav-admin .side-nav-hello { color:var(--sage-on-navy); }
-  .side-nav-admin .side-nav-daypart { color:var(--terracotta-on-navy); }
-
-  .side-nav-back {
-    display:flex;
-    align-items:center;
-    gap:10px;
-    min-height:44px;
-    margin:0 0 12px;
-    padding:0 12px;
-    border:1px solid rgba(var(--cream-rgb),.28);
-    border-radius:12px;
-    color:var(--cream);
-    font:600 14px var(--sans);
-    text-decoration:none;
-  }
-  .side-nav-back:hover { background:rgba(var(--cream-rgb),.08); }
-
-  .side-nav-list {
-    position:relative;
-    display:grid;
-    gap:2px;
-    margin:0;
-    padding:0;
-    list-style:none;
-  }
-
-  /* The ink diamond: starts where you were, springs to where you are. */
-  .side-nav-marker {
-    position:absolute;
-    top:calc(var(--row) / 2 - 5px);
-    left:7px;
-    width:9px;
-    height:9px;
-    background:var(--text-accent);
-    transform:translateY(calc(var(--marker, 0) * (var(--row) + 2px))) rotate(45deg);
-    transition:transform .5s cubic-bezier(.34,1.45,.64,1);
-    pointer-events:none;
-    z-index:1;
-  }
-  .side-nav-admin .side-nav-marker { background:var(--terracotta-on-navy); }
-
-  .side-nav-item {
-    position:relative;
-    display:flex;
-    align-items:center;
-    gap:12px;
-    height:var(--row);
-    box-sizing:border-box;
-    padding:0 12px 0 24px;
-    border-radius:12px;
-    color:inherit;
-    font:500 15px var(--sans);
-    text-decoration:none;
-    transition:background .15s ease, color .15s ease;
-  }
-
-  .side-nav-item:hover { background:rgba(var(--fg-rgb),.06); }
-  .side-nav-admin .side-nav-item:hover { background:rgba(var(--cream-rgb),.08); }
-
-  .side-nav-item .side-nav-icon {
-    flex:none;
-    transition:transform .3s cubic-bezier(.34,1.6,.64,1);
-  }
-  .side-nav-item:hover .side-nav-icon { transform:rotate(-9deg) scale(1.08); }
-
-  .side-nav-item.active {
-    background:var(--nav-on);
-    color:var(--nav-on-ink);
-    font-weight:600;
-  }
-  .side-nav-admin .side-nav-item.active {
-    background:rgba(var(--cream-rgb),.14);
-    color:var(--cream);
-  }
-
-  .side-nav-label {
-    display:flex;
-    flex-direction:column;
-    min-width:0;
-    line-height:1.2;
-  }
-
-  .side-nav-text { position:relative; white-space:nowrap; }
-
-  .side-nav-label small {
-    overflow:hidden;
-    color:var(--sage-on-navy);
-    font:400 12px var(--sans);
-    white-space:nowrap;
-    text-overflow:ellipsis;
-  }
-
-  /* The quill underline, drawn once when the page opens. */
-  .side-nav-quill {
-    position:absolute;
-    left:-2px;
-    bottom:-6px;
-    width:calc(100% + 8px);
-    height:7px;
-    color:var(--text-accent);
-    overflow:visible;
-  }
-  .side-nav-admin .side-nav-quill { color:var(--terracotta-on-navy); }
-  .side-nav-quill path {
-    stroke-dasharray:100;
-    stroke-dashoffset:100;
-    animation:vv-quill .7s .35s ease-out forwards;
-  }
-
-  .side-nav-badge {
-    margin-left:auto;
-    min-width:22px;
-    height:22px;
-    box-sizing:border-box;
-    display:grid;
-    place-items:center;
-    padding:0 6px;
-    border-radius:11px;
-    background:var(--action);
-    color:var(--cream);
-    font:700 12px var(--sans);
-    animation:vv-pop .4s cubic-bezier(.34,1.6,.64,1) both;
-  }
-
-  .side-nav-rule {
-    display:block;
-    width:140px;
-    margin:14px auto;
-    color:var(--text-accent);
-    opacity:.75;
-  }
-
-  .side-nav-list.secondary { --row:42px; }
-  .side-nav-item.quiet { color:var(--text-muted); font-size:14px; }
-  .side-nav-item.quiet.active { color:var(--nav-on-ink); }
-
-  .side-nav-foot {
-    display:grid;
-    gap:6px;
-    margin-top:auto;
-    padding-top:16px;
-  }
-
-  .side-nav-to-admin {
-    --row:44px;
-    border:1px dashed rgba(var(--fg-rgb),.28);
-    color:var(--text-muted);
-    font-size:14px;
-    font-weight:600;
-  }
-  .side-nav-to-admin:hover { color:var(--text); }
-
-  /* The engraved village; the season blows through when the page opens, and again on a tap. */
-  .side-nav-village {
-    position:relative;
-    display:block;
-    width:100%;
-    margin:4px 0 0;
-    padding:44px 4px 0;
-    border:0;
-    border-radius:10px;
-    overflow:hidden;
-    background:transparent;
-    color:var(--text-muted);
-    cursor:pointer;
-    transition:color .2s ease;
-  }
-  .side-nav-village:hover { color:var(--text); }
-  .side-nav-admin .side-nav-village { color:var(--sage-on-navy); }
-  .side-nav-admin .side-nav-village:hover { color:var(--cream); }
-  .side-nav-village > svg { display:block; width:100%; height:auto; }
-
-  .side-nav-smoke { animation:vv-smoke 7s ease-in-out infinite; transform-origin:35px 22px; }
-
-  .side-nav-weather {
-    position:absolute;
-    inset:0 0 6px;
-    overflow:hidden;
-    pointer-events:none;
-  }
-  .side-nav-bit {
-    position:absolute;
-    top:-14px;
-    display:block;
-    color:var(--text-accent);
-    opacity:0;
-    animation:vv-fall 5.5s ease-in forwards;
-  }
-  .side-nav-admin .side-nav-bit { color:var(--terracotta-on-navy); }
-  .side-nav-bit svg { display:block; }
-  .side-nav-bit.bit-0 { left:6%;  animation-delay:.2s; }
-  .side-nav-bit.bit-1 { left:22%; animation-delay:1.1s; }
-  .side-nav-bit.bit-2 { left:40%; animation-delay:.5s; }
-  .side-nav-bit.bit-3 { left:57%; animation-delay:1.7s; }
-  .side-nav-bit.bit-4 { left:72%; animation-delay:.9s; }
-  .side-nav-bit.bit-5 { left:88%; animation-delay:2.2s; }
-  .season-winter .side-nav-bit { animation-duration:7s; animation-timing-function:linear; }
-  .season-summer .side-nav-bit { top:40%; animation-name:vv-firefly; animation-duration:4.5s; }
-
-  .side-nav-collapse {
-    display:flex;
-    align-items:center;
-    gap:8px;
-    min-height:40px;
-    margin:4px 0 0;
-    padding:0 10px;
-    border:0;
-    border-radius:10px;
-    background:transparent;
-    color:var(--text-muted);
-    font:500 13px var(--sans);
-    cursor:pointer;
-  }
-  .side-nav-collapse:hover { background:rgba(var(--fg-rgb),.06); color:var(--text); }
-  .side-nav-admin .side-nav-collapse { color:var(--sage-on-navy); }
-  .side-nav-admin .side-nav-collapse:hover { background:rgba(var(--cream-rgb),.08); color:var(--cream); }
-
-  .side-nav :focus-visible {
-    outline:2px solid var(--gold);
-    outline-offset:2px;
   }
 
   /* ---------- Tucked away: a labelled rail ---------- */
@@ -377,55 +90,6 @@ html[data-theme="dark"] { --nav-on:var(--accent-night-tint); --nav-on-ink:var(--
     position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;
   }
 
-  /* ---------- The tab strip under the header ---------- */
-
-  html:not([data-app]):not([data-frame]) .area-tabs {
-    display:flex;
-    flex-wrap:wrap;
-    gap:4px;
-    margin:-18px 0 30px;
-    border-bottom:1px solid rgba(var(--fg-rgb),.12);
-  }
-
-  .area-tabs a {
-    position:relative;
-    display:inline-flex;
-    align-items:center;
-    min-height:44px;
-    padding:0 14px;
-    border-radius:10px 10px 0 0;
-    color:var(--text-muted);
-    font:600 15px var(--sans);
-    text-decoration:none;
-    transition:color .15s ease, background .15s ease;
-  }
-  .area-tabs a:hover { color:var(--text); background:rgba(var(--fg-rgb),.05); }
-  .area-tabs a:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
-  .area-tabs a[aria-current="page"] { color:var(--text); }
-  .area-tabs a[aria-current="page"]::after {
-    content:"";
-    position:absolute;
-    left:12px;
-    right:16px;
-    bottom:-1px;
-    height:3px;
-    border-radius:3px;
-    background:var(--text-accent);
-    transform-origin:left center;
-    animation:vv-ink .45s ease-out both;
-  }
-  .area-tabs a[aria-current="page"]::before {
-    content:"";
-    position:absolute;
-    right:9px;
-    bottom:-3px;
-    width:7px;
-    height:7px;
-    background:var(--text-accent);
-    transform:rotate(45deg);
-    animation:vv-pop .4s .3s cubic-bezier(.34,1.6,.64,1) both;
-  }
-
   /* ---------- Jump to a page ---------- */
 
   html:not([data-app]):not([data-frame]) .jump-to-trigger {
@@ -457,6 +121,453 @@ html[data-theme="dark"] { --nav-on:var(--accent-night-tint); --nav-on-ink:var(--
   }
   .jump-to-trigger kbd { border-color:var(--portal-band-rule); color:var(--portal-band-muted); }
 }
+
+/* ---------- The sidebar ---------- */
+
+html:not([data-app]):not([data-frame]) .side-nav {
+  --row:46px;
+  position:fixed;
+  z-index:30;
+  top:0;
+  bottom:0;
+  left:0;
+  box-sizing:border-box;
+  flex-direction:column;
+  padding:18px 14px 12px;
+  background:var(--surface);
+  color:var(--text);
+  border-right:1px solid rgba(var(--fg-rgb),.12);
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  transition:width .22s ease;
+}
+
+html:not([data-app]):not([data-frame]) .side-nav-admin {
+  --row:56px;
+  background:var(--ink-surface);
+  color:var(--cream);
+  border-right-color:rgba(var(--cream-rgb),.14);
+}
+
+.side-nav-top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  min-height:52px;
+  padding:0 6px;
+}
+
+.side-nav-brand {
+  display:flex;
+  align-items:center;
+  border-radius:8px;
+}
+
+.side-nav-brand .side-nav-lockup { width:170px; }
+.side-nav-admin .side-nav-brand .side-nav-lockup { width:132px; }
+.side-nav-brand .side-nav-mark { display:none; width:44px; }
+
+.side-nav-admin-chip {
+  padding:3px 9px;
+  border-radius:999px;
+  background:var(--cream);
+  color:var(--navy);
+  font:700 11px var(--sans);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.side-nav-hello {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:28px;
+  margin:12px 8px 16px;
+  color:var(--text-muted);
+  font:italic 500 16px/1.25 var(--serif);
+}
+
+.side-nav-hello span { animation:vv-hello .6s ease-out both; }
+.side-nav-daypart { flex:none; color:var(--text-accent); animation:vv-rise .9s cubic-bezier(.34,1.5,.64,1) both; }
+.side-nav-admin .side-nav-hello { color:var(--sage-on-navy); }
+.side-nav-admin .side-nav-daypart { color:var(--terracotta-on-navy); }
+
+.side-nav-back {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:44px;
+  margin:0 0 12px;
+  padding:0 12px;
+  border:1px solid rgba(var(--cream-rgb),.28);
+  border-radius:12px;
+  color:var(--cream);
+  font:600 14px var(--sans);
+  text-decoration:none;
+}
+.side-nav-back:hover { background:rgba(var(--cream-rgb),.08); }
+
+.side-nav-list {
+  position:relative;
+  display:grid;
+  gap:2px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+
+/* The ink diamond: starts where you were, springs to where you are. */
+.side-nav-marker {
+  position:absolute;
+  top:calc(var(--row) / 2 - 5px);
+  left:7px;
+  width:9px;
+  height:9px;
+  background:var(--text-accent);
+  transform:translateY(calc(var(--marker, 0) * (var(--row) + 2px))) rotate(45deg);
+  transition:transform .5s cubic-bezier(.34,1.45,.64,1);
+  pointer-events:none;
+  z-index:1;
+}
+.side-nav-admin .side-nav-marker { background:var(--terracotta-on-navy); }
+
+.side-nav-item {
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  height:var(--row);
+  box-sizing:border-box;
+  padding:0 12px 0 24px;
+  border-radius:12px;
+  color:inherit;
+  font:500 15px var(--sans);
+  text-decoration:none;
+  transition:background .15s ease, color .15s ease;
+}
+
+.side-nav-item:hover { background:rgba(var(--fg-rgb),.06); }
+.side-nav-admin .side-nav-item:hover { background:rgba(var(--cream-rgb),.08); }
+
+.side-nav-item .side-nav-icon {
+  flex:none;
+  transition:transform .3s cubic-bezier(.34,1.6,.64,1);
+}
+.side-nav-item:hover .side-nav-icon { transform:rotate(-9deg) scale(1.08); }
+
+.side-nav-item.active {
+  background:var(--nav-on);
+  color:var(--nav-on-ink);
+  font-weight:600;
+}
+.side-nav-admin .side-nav-item.active {
+  background:rgba(var(--cream-rgb),.14);
+  color:var(--cream);
+}
+
+.side-nav-label {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  line-height:1.2;
+}
+
+.side-nav-text { position:relative; white-space:nowrap; }
+
+.side-nav-label small {
+  overflow:hidden;
+  color:var(--sage-on-navy);
+  font:400 12px var(--sans);
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+
+/* The quill underline, drawn once when the page opens. */
+.side-nav-quill {
+  position:absolute;
+  left:-2px;
+  bottom:-6px;
+  width:calc(100% + 8px);
+  height:7px;
+  color:var(--text-accent);
+  overflow:visible;
+}
+.side-nav-admin .side-nav-quill { color:var(--terracotta-on-navy); }
+.side-nav-quill path {
+  stroke-dasharray:100;
+  stroke-dashoffset:100;
+  animation:vv-quill .7s .35s ease-out forwards;
+}
+
+.side-nav-badge {
+  margin-left:auto;
+  min-width:22px;
+  height:22px;
+  box-sizing:border-box;
+  display:grid;
+  place-items:center;
+  padding:0 6px;
+  border-radius:11px;
+  background:var(--action);
+  color:var(--cream);
+  font:700 12px var(--sans);
+  animation:vv-pop .4s cubic-bezier(.34,1.6,.64,1) both;
+}
+
+.side-nav-rule {
+  display:block;
+  width:140px;
+  margin:14px auto;
+  color:var(--text-accent);
+  opacity:.75;
+}
+
+.side-nav-list.secondary { --row:42px; }
+.side-nav-item.quiet { color:var(--text-muted); font-size:14px; }
+.side-nav-item.quiet.active { color:var(--nav-on-ink); }
+
+.side-nav-foot {
+  display:grid;
+  gap:6px;
+  margin-top:auto;
+  padding-top:16px;
+}
+
+.side-nav-to-admin {
+  --row:44px;
+  border:1px dashed rgba(var(--fg-rgb),.28);
+  color:var(--text-muted);
+  font-size:14px;
+  font-weight:600;
+}
+.side-nav-to-admin:hover { color:var(--text); }
+
+/* The engraved village; the season blows through when the page opens, and again on a tap. */
+.side-nav-village {
+  position:relative;
+  display:block;
+  width:100%;
+  margin:4px 0 0;
+  padding:44px 4px 0;
+  border:0;
+  border-radius:10px;
+  overflow:hidden;
+  background:transparent;
+  color:var(--text-muted);
+  cursor:pointer;
+  transition:color .2s ease;
+}
+.side-nav-village:hover { color:var(--text); }
+.side-nav-admin .side-nav-village { color:var(--sage-on-navy); }
+.side-nav-admin .side-nav-village:hover { color:var(--cream); }
+.side-nav-village > svg { display:block; width:100%; height:auto; }
+
+.side-nav-smoke { animation:vv-smoke 7s ease-in-out infinite; transform-origin:35px 22px; }
+
+.side-nav-weather {
+  position:absolute;
+  inset:0 0 6px;
+  overflow:hidden;
+  pointer-events:none;
+}
+.side-nav-bit {
+  position:absolute;
+  top:-14px;
+  display:block;
+  color:var(--text-accent);
+  opacity:0;
+  animation:vv-fall 5.5s ease-in forwards;
+}
+.side-nav-admin .side-nav-bit { color:var(--terracotta-on-navy); }
+.side-nav-bit svg { display:block; }
+.side-nav-bit.bit-0 { left:6%;  animation-delay:.2s; }
+.side-nav-bit.bit-1 { left:22%; animation-delay:1.1s; }
+.side-nav-bit.bit-2 { left:40%; animation-delay:.5s; }
+.side-nav-bit.bit-3 { left:57%; animation-delay:1.7s; }
+.side-nav-bit.bit-4 { left:72%; animation-delay:.9s; }
+.side-nav-bit.bit-5 { left:88%; animation-delay:2.2s; }
+.season-winter .side-nav-bit { animation-duration:7s; animation-timing-function:linear; }
+.season-summer .side-nav-bit { top:40%; animation-name:vv-firefly; animation-duration:4.5s; }
+
+.side-nav-collapse {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:40px;
+  margin:4px 0 0;
+  padding:0 10px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--text-muted);
+  font:500 13px var(--sans);
+  cursor:pointer;
+}
+.side-nav-collapse:hover { background:rgba(var(--fg-rgb),.06); color:var(--text); }
+.side-nav-admin .side-nav-collapse { color:var(--sage-on-navy); }
+.side-nav-admin .side-nav-collapse:hover { background:rgba(var(--cream-rgb),.08); color:var(--cream); }
+
+.side-nav :focus-visible {
+  outline:2px solid var(--gold);
+  outline-offset:2px;
+}
+
+
+/* ---------- The tab strip under the header ---------- */
+
+html:not([data-app]):not([data-frame]) .area-tabs {
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  margin:-18px 0 30px;
+  border-bottom:1px solid rgba(var(--fg-rgb),.12);
+}
+
+.area-tabs a {
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  min-height:44px;
+  padding:0 14px;
+  border-radius:10px 10px 0 0;
+  color:var(--text-muted);
+  font:600 15px var(--sans);
+  text-decoration:none;
+  transition:color .15s ease, background .15s ease;
+}
+.area-tabs a:hover { color:var(--text); background:rgba(var(--fg-rgb),.05); }
+.area-tabs a:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
+.area-tabs a[aria-current="page"] { color:var(--text); }
+.area-tabs a[aria-current="page"]::after {
+  content:"";
+  position:absolute;
+  left:12px;
+  right:16px;
+  bottom:-1px;
+  height:3px;
+  border-radius:3px;
+  background:var(--text-accent);
+  transform-origin:left center;
+  animation:vv-ink .45s ease-out both;
+}
+.area-tabs a[aria-current="page"]::before {
+  content:"";
+  position:absolute;
+  right:9px;
+  bottom:-3px;
+  width:7px;
+  height:7px;
+  background:var(--text-accent);
+  transform:rotate(45deg);
+  animation:vv-pop .4s .3s cubic-bezier(.34,1.6,.64,1) both;
+}
+
+
+/* ---------- Narrow screens in a browser: a compact header and the sidebar as a drawer ---------- */
+
+@media (max-width:1023.98px) {
+  /* One row for the logo and the buttons, the page title under it. */
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header {
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    grid-template-areas:"brand actions" "title title";
+    align-items:center;
+    gap:14px 12px;
+    margin-bottom:28px;
+    padding-top:calc(14px + env(safe-area-inset-top));
+    padding-bottom:18px;
+  }
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header-brand { grid-area:brand; }
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header-brand .app-header-lockup { width:116px; }
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header-title { grid-area:title; min-width:0; }
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header-title h1 { font-size:28px; line-height:1.15; }
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .app-header-actions {
+    grid-area:actions;
+    width:auto;
+    flex-wrap:nowrap;
+    justify-content:flex-end;
+    gap:8px;
+  }
+
+  html:not([data-app]):not([data-frame]) .mobile-nav-trigger {
+    position:relative;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    min-height:44px;
+    padding:0 16px 0 12px;
+    border:1px solid var(--portal-band-rule);
+    border-radius:22px;
+    background:transparent;
+    color:var(--portal-band-fg);
+    font:600 15px var(--sans);
+    cursor:pointer;
+  }
+  .mobile-nav-trigger:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+  .mobile-nav-dot {
+    position:absolute;
+    top:6px;
+    right:8px;
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:var(--text-accent);
+    box-shadow:0 0 0 2px var(--canvas);
+  }
+
+  /* The tab strips: one row you can swipe sideways. */
+  html:not([data-app]):not([data-frame]) .area-tabs {
+    flex-wrap:nowrap;
+    margin:-12px calc(-1 * var(--portal-pad)) 24px;
+    padding:0 var(--portal-pad);
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  html:not([data-app]):not([data-frame]) .area-tabs::-webkit-scrollbar { display:none; }
+  .area-tabs a { flex:none; white-space:nowrap; }
+
+  /* The drawer. */
+  html:not([data-app]):not([data-frame])[data-drawer="open"] { overflow:hidden; }
+  html:not([data-app]):not([data-frame])[data-drawer="open"] .side-nav-scrim {
+    display:block;
+    position:fixed;
+    inset:0;
+    z-index:1000;
+    border:0;
+    background:rgba(var(--scrim-rgb),.42);
+    animation:vv-fade .2s ease-out;
+  }
+  html:not([data-app]):not([data-frame])[data-drawer="open"] .side-nav {
+    display:flex;
+    z-index:1001;
+    width:min(320px, 86vw);
+    padding-top:calc(18px + env(safe-area-inset-top));
+    padding-bottom:calc(12px + env(safe-area-inset-bottom));
+    box-shadow:12px 0 40px rgba(var(--shadow-rgb),.25);
+    animation:vv-drawer .32s cubic-bezier(.22,1.2,.36,1);
+  }
+  html:not([data-app]):not([data-frame])[data-drawer="open"] .side-nav-close {
+    display:grid;
+    place-items:center;
+    width:44px;
+    height:44px;
+    margin-left:auto;
+    border:0;
+    border-radius:22px;
+    background:transparent;
+    color:inherit;
+    cursor:pointer;
+  }
+  .side-nav-close:hover { background:rgba(var(--fg-rgb),.08); }
+  .side-nav-admin .side-nav-close:hover { background:rgba(var(--cream-rgb),.1); }
+  /* Tucking away is a desktop choice; the drawer is always the full list. */
+  .side-nav .side-nav-collapse { display:none; }
+}
+
+@keyframes vv-drawer { from { transform:translateX(-104%); } }
 
 /* The dialog itself is only ever opened from the desktop button or its keys, so it needs no media query. */
 .jump-to-scrim {
@@ -605,7 +716,7 @@ html[data-theme="dark"] { --nav-on:var(--accent-night-tint); --nav-on-ink:var(--
   .side-nav *, .side-nav,
   .area-tabs a, .area-tabs a::before, .area-tabs a::after,
   .jump-to-scrim, .jump-to-panel, .jump-to-diamond, .jump-to-empty svg,
-  html:not([data-app]):not([data-frame]) main:has(> .side-nav) {
+  html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) {
     animation:none !important;
     transition:none !important;
   }

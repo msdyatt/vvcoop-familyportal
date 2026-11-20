@@ -22,6 +22,7 @@ import OnboardingTour from "./onboarding-tour";
 import SideNav from "./side-nav";
 import AreaTabs from "./area-tabs";
 import JumpTo from "./jump-to";
+import MenuButton from "./menu-button";
 import { nativeFrame } from "../../lib/native-frame";
 import { clearNavCache, readCachedTeaches, sectionOf, withTeaching, writeCachedTeaches, type PortalKey } from "../../lib/nav-prefs";
 import { teachesThisYear } from "../../lib/teaching-access";
@@ -118,6 +119,7 @@ export default function AppHeader({ current, roles: held, title, subtitle }: { c
             <button role="menuitem" onClick={signOut}>Sign out</button>
           </div>}
         </div>
+        <MenuButton />
       </div>
     </header>
     <AreaTabs current={current} roles={roles} />
