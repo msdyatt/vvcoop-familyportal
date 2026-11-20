@@ -10,6 +10,7 @@ import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
 import AppHeader from "../app-header";
 import AdminDashboard from "./dashboard";
+import { ADMIN_TAB_EVENT } from "../../../lib/desktop-nav";
 
 // Every tab used to be a static import, so an admin session downloaded all
 // eight tabs' code (and everything they pull in -- rich text, CSV export,
@@ -52,7 +53,7 @@ export default function AdminWorkspace() {
   });
   // The tab the page opened on; switching to another is a step Back can undo.
   const [startTab] = useState<Tab>(tab);
-  useBackLayer(tab !== startTab, () => { setTabState(startTab); window.dispatchEvent(new Event("vv-locationchange")); });
+  useBackLayer(tab !== startTab, () => setTab(startTab));
 
   function setTab(next: Tab) {
     setTabState(next);
@@ -60,6 +61,20 @@ export default function AdminWorkspace() {
     window.history.replaceState(null, "", next === "dashboard" ? window.location.pathname : `?tab=${next}`);
     window.dispatchEvent(new Event("vv-locationchange"));
   }
+
+  // The desktop sidebar, the tab strip and "Jump to" switch tabs in place with this event (lib/desktop-nav.ts).
+  useEffect(() => {
+    const onTab = (event: Event) => {
+      const next = (event as CustomEvent<string>).detail;
+      if (!(TABS as readonly string[]).includes(next)) return;
+      setTabState(next as Tab);
+      window.history.replaceState(null, "", next === "dashboard" ? window.location.pathname : `?tab=${next}`);
+      window.dispatchEvent(new Event("vv-locationchange"));
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener(ADMIN_TAB_EVENT, onTab);
+    return () => window.removeEventListener(ADMIN_TAB_EVENT, onTab);
+  }, []);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [familyName, setFamilyName] = useState(""); const [adminName, setAdminName] = useState(""); const [email, setEmail] = useState(""); const [note, setNote] = useState("");
   const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false); const [rowBusy, setRowBusy] = useState<string | null>(null); const [listMessage, setListMessage] = useState("");
@@ -87,11 +102,11 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Dashboard</option><option value="inbox">Office inbox</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Messaging</option><option value="appearance">Appearance</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Overview</option><option value="inbox">Office inbox</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="activity">Activity</option><option value="message-reports">Reported messages</option><option value="appearance">Appearance</option><option value="integrations">Integrations</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
-      <button className={tab === "dashboard" ? "active" : ""} onClick={() => setTab("dashboard")}>Dashboard</button>
+      <button className={tab === "dashboard" ? "active" : ""} onClick={() => setTab("dashboard")}>Overview</button>
       <button className={tab === "inbox" ? "active" : ""} onClick={() => setTab("inbox")}>Office inbox</button>
       <button className={tab === "invitations" ? "active" : ""} onClick={() => setTab("invitations")}>Invitations</button>
       <button className={tab === "families" ? "active" : ""} onClick={() => setTab("families")}>Families</button>
@@ -103,7 +118,7 @@ export default function AdminWorkspace() {
       <button className={tab === "broadcasts" ? "active" : ""} onClick={() => setTab("broadcasts")}>Broadcasts</button>
       <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
       <button className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}>Activity</button>
-      <button className={tab === "message-reports" ? "active" : ""} onClick={() => setTab("message-reports")}>Messaging</button>
+      <button className={tab === "message-reports" ? "active" : ""} onClick={() => setTab("message-reports")}>Reported messages</button>
       <button className={tab === "appearance" ? "active" : ""} onClick={() => setTab("appearance")}>Appearance</button>
       <button className={tab === "integrations" ? "active" : ""} onClick={() => setTab("integrations")}>Integrations</button>
     </nav>
