@@ -4,6 +4,8 @@ import handler from "vinext/server/app-router-entry";
 import { APPLE_APP_SITE_ASSOCIATION_PATH, guardRequest } from "./site-password";
 import { httpsRedirect, withSecurityHeaders } from "./security-headers";
 import { CALENDAR_FEED_PATH, handleCalendarFeed, type CalendarFeedEnv } from "./calendar-feed";
+import { MANIFEST_PATH, handleManifest } from "./manifest";
+import { supabaseConnection } from "../lib/supabase";
 
 // Minimal shape of the Workers runtime's Fetcher binding -- just enough to
 // type-check this file's own use of it (ASSETS.fetch(...)), same call as
@@ -63,6 +65,12 @@ const worker = {
     // See worker/calendar-feed.ts.
     if (url.pathname === CALENDAR_FEED_PATH) {
       return withSecurityHeaders(await handleCalendarFeed(request, env));
+    }
+
+    // The installed app's manifest, with the co-op's name from its settings (worker/manifest.ts). Ahead of the
+    // gate: browsers fetch a manifest without cookies, and it says nothing the sign-in page does not.
+    if (url.pathname === MANIFEST_PATH && request.method === "GET") {
+      return withSecurityHeaders(await handleManifest(request, env.ASSETS, supabaseConnection()));
     }
 
     const gated = await guardRequest(request, env);

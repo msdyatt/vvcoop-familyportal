@@ -3,10 +3,13 @@ import "./globals.css";
 import "./platform.css";
 import "./public-site.css";
 import "./theme.css";
+import "./appearance.css";
 import "./class-pages.css";
 import { PLATFORM_SCRIPT } from "../lib/platform";
 import { THEME_COLORS, THEME_SCRIPT } from "../lib/theme";
+import { COOP_SCRIPT } from "../lib/coop-theme";
 import ThemeSync from "./theme-sync";
+import CoopThemeSync from "./coop-theme-sync";
 import ErrorReporter from "./error-reporter";
 import SwipeBack from "./swipe-back";
 import Toaster from "./toaster";
@@ -34,7 +37,8 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://family.veritasvillage.org"),
   title: "Veritas Village | Central Texas Homeschool Co-op",
   description: "A shared place for Central Texas homeschool families to learn with intention and grow in community.",
-  manifest: "/manifest.webmanifest",
+  // Served by the Worker with the co-op's name (worker/manifest.ts); public/manifest.webmanifest is its template.
+  manifest: "/app.webmanifest",
   // "black-translucent" makes the installed iPhone app's status bar fully
   // transparent, so the page draws under it. With "default", iOS paints its own
   // frosted-glass strip there, which showed as a haze above the header. The
@@ -67,6 +71,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <script dangerouslySetInnerHTML={{ __html: PLATFORM_SCRIPT }} />
       {/* Light, Dark or System, decided from the device's saved choice and setting before the first paint, so there is no flash of the wrong theme. */}
       <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      {/* The co-op's accent, heading font and logos, from the copy kept on this device (lib/coop-theme.ts), also before the first paint. */}
+      <script dangerouslySetInnerHTML={{ __html: COOP_SCRIPT }} />
       {/* Playfair Display carries the high-contrast display serif the brand
           guide specifies for headings. Inter is the body face; the CSS stack
           falls through to the platform UI sans, which the guide allows. Both
@@ -79,6 +85,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <ErrorReporter />
       <Toaster />
       <ThemeSync />
+      <CoopThemeSync />
       <SwipeBack />
       <NativePushRouter />
       <GlobalErrorBoundary>{children}</GlobalErrorBoundary>

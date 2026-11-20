@@ -1,13 +1,10 @@
-import Image from "next/image";
+import CoopLogo from "./coop-logo";
 
 /**
- * The horizontal Veritas Village lockup in both colourways: navy for the light theme, cream for the dark one.
- * Both are in the page; CSS (theme.css) shows the one that suits the theme, so the swap needs no script and
- * cannot flash. The cream copy is decorative (the navy one carries the name) and loads only when it is shown.
+ * The co-op's horizontal lockup, following Light/Dark (the dark-ground version in the dark theme). Kept under its
+ * old name so pages did not have to change; the drawing is CoopLogo's (app/coop-logo.tsx). The image props are
+ * accepted and ignored: the size comes from the stylesheet and the co-op's own logo's shape.
  */
-export default function BrandLockup({ className = "", priority = false, sizes, width = 900, height = 310 }: { className?: string; priority?: boolean; sizes?: string; width?: number; height?: number }) {
-  return <>
-    <Image className={`${className} logo-on-light`.trim()} src="/brand/lockup-horizontal-navy.png" alt="Veritas Village" width={width} height={height} priority={priority} sizes={sizes} />
-    <Image className={`${className} logo-on-dark`.trim()} src="/brand/lockup-horizontal-cream.png" alt="" aria-hidden="true" width={width} height={height} sizes={sizes} />
-  </>;
+export default function BrandLockup({ className = "" }: { className?: string; priority?: boolean; sizes?: string; width?: number; height?: number }) {
+  return <CoopLogo className={className} />;
 }

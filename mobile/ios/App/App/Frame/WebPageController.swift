@@ -466,6 +466,10 @@ extension WebPageController: WKScriptMessageHandler {
             // The person's Light / Dark / System choice (lib/theme.ts). Re-colours the native bars, Menu and sheets.
             if let choice = request.payload["choice"] as? String { Brand.setTheme(choice) }
 
+        case "coopTheme":
+            // The co-op's palette and name (lib/coop-settings.ts). Kept for the next launch; the header is redrawn now.
+            if Brand.setCoopTheme(request.payload) { refreshChrome() }
+
         case "title":
             pageTitle = request.payload["title"] as? String
             themeName = request.payload["theme"] as? String

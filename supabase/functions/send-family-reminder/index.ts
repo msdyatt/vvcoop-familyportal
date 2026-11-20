@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { sendAndLog } from "../_shared/resend.ts";
 import { escapeHtml, renderEmail } from "../_shared/email-template.ts";
+import { loadEmailBrand } from "../_shared/coop-brand.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
 
@@ -83,7 +84,9 @@ async function handle(req: Request): Promise<Response> {
   }).join("");
   const householdName = escapeHtml(family.last_name || family.display_name);
 
+  const brand = await loadEmailBrand(adminClient);
   const html = renderEmail({
+    brand,
     eyebrow: "A reminder",
     heading: "A few things still need your attention.",
     preheader: `${householdName} has ${outstanding.length} outstanding item${outstanding.length === 1 ? "" : "s"} in Family Village.`,
@@ -94,7 +97,7 @@ async function handle(req: Request): Promise<Response> {
 
   const results = await Promise.all(recipients.map((recipient) =>
     sendAndLog(adminClient, {
-      to: recipient.email, subject: "A reminder from Veritas Village",
+      to: recipient.email, subject: `A reminder from ${brand.name}`,
       html, kind: "manual_reminder", subjectType: "family", subjectId: family.id,
     }),
   ));

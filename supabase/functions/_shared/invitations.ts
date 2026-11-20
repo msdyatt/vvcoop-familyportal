@@ -2,7 +2,8 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
 import { json } from "./http.ts";
 import type { AdminClient } from "./types.ts";
 import { sendAndLog } from "./resend.ts";
-import { buildInviteEmail, INVITE_SUBJECT } from "./invite-email.ts";
+import { buildInviteEmail, inviteSubject } from "./invite-email.ts";
+import { loadEmailBrand } from "./coop-brand.ts";
 
 /** What manageInvitation needs to send mail; a test can pass a stub instead of Resend. */
 export type SendInviteEmail = (admin: SupabaseClient, opts: { to: string; subject: string; html: string; kind: string; subjectType?: string; subjectId?: string }) => Promise<{ ok: boolean; error?: string }>;
@@ -55,14 +56,15 @@ export async function manageInvitation(
     await adminClient.from("invitations").update({ expires_at: expiresAt }).eq("id", invitation.id);
 
     const note = typeof account.user_metadata?.note === "string" ? account.user_metadata.note : undefined;
+    const brand = await loadEmailBrand(adminClient);
     const html = buildInviteEmail({
       adminName: profile.display_name || invitation.email, familyName,
       // The original send used the "join this household" wording whenever the
       // household already had someone in it; this person is one of those members.
       existingHousehold: (memberCount ?? 0) > 1, note, actionLink,
-    });
+    }, brand);
     const emailResult = await send(adminClient, {
-      to: invitation.email, subject: INVITE_SUBJECT, html, kind: "invite",
+      to: invitation.email, subject: inviteSubject(brand), html, kind: "invite",
       subjectType: "family", subjectId: invitation.family_id ?? undefined,
     });
     await adminClient.from("audit_log").insert({ actor_user_id: actorId, action: "invitation_resent", subject_type: "invitation", subject_id: invitation.id, detail: { email: invitation.email } });

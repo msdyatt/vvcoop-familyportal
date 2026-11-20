@@ -86,6 +86,20 @@
   --terracotta-text:#a85539;
   --sage-text:#5f6b61;
 
+  /* The rest of the accent family. A co-op's own palette (Admin, Appearance; lib/coop-theme.ts ACCENT_VARS)
+     replaces these and the three terracotta colours above -- --terracotta, --terracotta-text and
+     --terracotta-on-navy -- and nothing else. The roles in both themes read them, so a palette never has to
+     know about light and dark. --terracotta-deep is not part of it: it is the alert colour and never changes. */
+  --accent-deep:#6b3826;          /* a deep accent fill with cream text (today's date) */
+  --accent-tint:#efd9cd;          /* a light accent wash (Android's selected tab) */
+  --accent-tint-ink:#4a2417;      /* text on that wash */
+  --accent-night:#e8a98d;         /* dark theme: large emphasis and status marks */
+  --accent-night-fill:#a85539;    /* dark theme: primary buttons, selected tabs, class pills (cream text) */
+  --accent-night-tint:#5b3324;    /* dark theme: Android's selected tab */
+  --accent-night-tint-ink:#f6d9cb;
+  /* Lines on alerts and destructive buttons. Terracotta, like the accent, but fixed: alerts are never themed. */
+  --danger-line:#bb6141;
+
   /* --- Type -------------------------------------------------------------
      Display serif for headings only; a grotesque sans for all UI text.
      The guide permits "Inter or similar system sans", so the sans stack falls
@@ -130,7 +144,7 @@
   --status-open:var(--navy);
   --status-waiting:var(--antique-gold);
   --status-done:var(--sage);
-  --accent-fill:var(--terracotta-deep);   /* a deep terracotta fill that is not an alert, e.g. today's date */
+  --accent-fill:var(--accent-deep);       /* a deep accent fill that is not an alert, e.g. today's date */
 
   /* Lines, washes and shadows. The alpha is chosen where each is used. */
   --line-strong:var(--navy);              /* a strong outline or rule: selected cards, links, emphasis */
@@ -148,8 +162,8 @@
 
   /* Material 3 tonal roles for the Android tab bar (platform.css) */
   --m3-surface-container:#f1ebe0;
-  --m3-secondary-container:#efd9cd;
-  --m3-on-secondary-container:#4a2417;
+  --m3-secondary-container:var(--accent-tint);
+  --m3-on-secondary-container:var(--accent-tint-ink);
 
   color-scheme:light;
 }
@@ -288,7 +302,7 @@ a {
   background:transparent;
   color:var(--danger-text);
   font:600 12px var(--sans);
-  border:1px solid var(--terracotta);
+  border:1px solid var(--danger-line);
   border-radius:2px;
   cursor:pointer;
 }
@@ -363,7 +377,8 @@ a {
   outline-offset:6px;
 }
 
-.brand-transition img {
+.brand-transition img,
+.brand-transition .coop-logo {
   width:100%;
   height:auto;
 }
@@ -2041,7 +2056,8 @@ footer nav a:hover {
   align-items:center;
 }
 
-.portal-entry-brand img {
+.portal-entry-brand img,
+.portal-entry-brand .coop-logo {
   width:100%;
   height:auto;
 }
@@ -2222,7 +2238,8 @@ footer nav a:hover {
   text-decoration:none;
 }
 
-.portal-wordmark img {
+.portal-wordmark img,
+.portal-wordmark .coop-logo {
   width:150px;
   height:auto;
 }
@@ -3724,7 +3741,7 @@ footer nav a:hover {
 .row-actions button.danger {
   background:transparent;
   color:var(--danger-text);
-  border:1px solid var(--terracotta);
+  border:1px solid var(--danger-line);
 }
 
 .row-actions button.danger:hover {
@@ -4262,7 +4279,7 @@ footer nav a:hover {
 .note-actions button.danger,.note-card button.danger {
   background:transparent;
   color:var(--danger-text);
-  border:1px solid var(--terracotta);
+  border:1px solid var(--danger-line);
   padding:6px 10px;
   font-size:11px;
   font-weight:700;
@@ -5465,7 +5482,7 @@ footer nav a:hover {
 }
 
 .dues-test-banner { background:var(--warm-tint); border-left-color:var(--terracotta); color:var(--danger-text); }
-.dues-error { background:var(--warm-tint); border-left-color:var(--terracotta); color:var(--danger-text); }
+.dues-error { background:var(--warm-tint); border-left-color:var(--danger-line); color:var(--danger-text); }
 
 .dues-card {
   display:grid;
@@ -6349,7 +6366,7 @@ footer nav a:hover {
 
 .child-line button.danger {
   color:var(--danger-text);
-  border-color:var(--terracotta);
+  border-color:var(--danger-line);
 }
 
 .add-child-button {
@@ -7923,7 +7940,7 @@ button.sign-big:focus-visible, a.sign-big:focus-visible { outline:3px solid var(
 button.sign-big:disabled { opacity:.45; cursor:not-allowed; }
 button.sign-big.secondary, a.sign-big.secondary { background:transparent; color:var(--text); }
 button.sign-big.secondary:hover:not(:disabled), a.sign-big.secondary:hover { background:var(--panel); }
-button.sign-big.danger { background:transparent; color:var(--danger-text); border-color:var(--terracotta); }
+button.sign-big.danger { background:transparent; color:var(--danger-text); border-color:var(--danger-line); }
 button.sign-big.danger:hover:not(:disabled) { background:var(--warm-tint); }
 button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px; font-size:15px; }
 .pdf-page-failed { position:absolute; inset:0; display:grid; place-content:center; justify-items:center; gap:12px; background:rgba(var(--cream-rgb),.9); color:var(--text); text-align:center; }
@@ -8282,7 +8299,7 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
   display:flex; align-items:center; justify-content:space-between; gap:16px;
   padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
   background:var(--danger-fill); color:var(--cream);
-  border-bottom:4px solid var(--cream); box-shadow:0 4px 0 var(--terracotta);
+  border-bottom:4px solid var(--cream); box-shadow:0 4px 0 var(--danger-line);
 }
 .urgent-banner-text { min-width:0; }
 .urgent-banner-label { margin:0 0 2px; font:800 12px var(--sans); letter-spacing:2px; text-transform:uppercase; color:var(--cream); }
@@ -8736,7 +8753,7 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 }
 
 .dues-test-banner { background:var(--warm-tint); border-left-color:var(--terracotta); color:var(--danger-text); }
-.dues-error { background:var(--warm-tint); border-left-color:var(--terracotta); color:var(--danger-text); }
+.dues-error { background:var(--warm-tint); border-left-color:var(--danger-line); color:var(--danger-text); }
 
 .dues-card {
   display:grid;
@@ -9620,7 +9637,7 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 
 .child-line button.danger {
   color:var(--danger-text);
-  border-color:var(--terracotta);
+  border-color:var(--danger-line);
 }
 
 .add-child-button {
@@ -11194,7 +11211,7 @@ button.sign-big:focus-visible, a.sign-big:focus-visible { outline:3px solid var(
 button.sign-big:disabled { opacity:.45; cursor:not-allowed; }
 button.sign-big.secondary, a.sign-big.secondary { background:transparent; color:var(--text); }
 button.sign-big.secondary:hover:not(:disabled), a.sign-big.secondary:hover { background:var(--panel); }
-button.sign-big.danger { background:transparent; color:var(--danger-text); border-color:var(--terracotta); }
+button.sign-big.danger { background:transparent; color:var(--danger-text); border-color:var(--danger-line); }
 button.sign-big.danger:hover:not(:disabled) { background:var(--warm-tint); }
 button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px; font-size:15px; }
 .pdf-page-failed { position:absolute; inset:0; display:grid; place-content:center; justify-items:center; gap:12px; background:rgba(var(--cream-rgb),.9); color:var(--text); text-align:center; }
@@ -11553,7 +11570,7 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
   display:flex; align-items:center; justify-content:space-between; gap:16px;
   padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
   background:var(--danger-fill); color:var(--cream);
-  border-bottom:4px solid var(--cream); box-shadow:0 4px 0 var(--terracotta);
+  border-bottom:4px solid var(--cream); box-shadow:0 4px 0 var(--danger-line);
 }
 .urgent-banner-text { min-width:0; }
 .urgent-banner-label { margin:0 0 2px; font:800 12px var(--sans); letter-spacing:2px; text-transform:uppercase; color:var(--cream); }

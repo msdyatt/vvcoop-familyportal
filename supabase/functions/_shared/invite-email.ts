@@ -1,9 +1,9 @@
-import { escapeHtml, renderEmail } from "./email-template.ts";
+import { DEFAULT_EMAIL_BRAND, escapeHtml, renderEmail, type EmailBrand } from "./email-template.ts";
 
 export type InviteEmailInput = { adminName: string; familyName: string; existingHousehold: boolean; note?: string; actionLink: string };
 
 /** The invitation email, shared by the first send and a resend so they can never drift apart. */
-export function buildInviteEmail({ adminName, familyName, existingHousehold, note, actionLink }: InviteEmailInput): string {
+export function buildInviteEmail({ adminName, familyName, existingHousehold, note, actionLink }: InviteEmailInput, brand: EmailBrand = DEFAULT_EMAIL_BRAND): string {
   // adminName/familyName are admin-typed free text, not markup -- escape
   // before splicing into the *Html fields below, or a stray "&"/"<" (or a
   // deliberate tag) breaks the card layout or rides along inside an email
@@ -12,18 +12,22 @@ export function buildInviteEmail({ adminName, familyName, existingHousehold, not
   const safeAdminName = escapeHtml(adminName);
   const safeFamilyName = escapeHtml(familyName);
   const safeNote = note ? escapeHtml(note).replace(/\n/g, "<br>") : undefined;
+  const coop = escapeHtml(brand.name);
   return renderEmail({
     eyebrow: "You're invited",
     heading: existingHousehold ? "There is a place for you at the table." : "There is a place for your family at the table.",
-    preheader: `${safeAdminName}, ${safeFamilyName}'s invitation to Veritas Village is ready.`,
+    preheader: `${safeAdminName}, ${safeFamilyName}'s invitation to ${coop} is ready.`,
     bodyHtml: existingHousehold
-      ? `<p>Hello ${safeAdminName},</p><p>You have been invited to join the <b>${safeFamilyName}</b> household in Family Village, Veritas Village's private portal for classes, schedules, notes, and paperwork.</p>`
-      : `<p>Hello ${safeAdminName},</p><p>You have been invited to join Family Village, the private home for Veritas Village families.</p>`,
+      ? `<p>Hello ${safeAdminName},</p><p>You have been invited to join the <b>${safeFamilyName}</b> household in Family Village, ${coop}'s private portal for classes, schedules, notes, and paperwork.</p>`
+      : `<p>Hello ${safeAdminName},</p><p>You have been invited to join Family Village, the private home for ${coop} families.</p>`,
     noteHtml: safeNote,
     ctaLabel: "Accept your invitation",
     ctaUrl: actionLink,
     footerHtml: "This private link expires in 24 hours.",
+    brand,
   });
 }
 
-export const INVITE_SUBJECT = "You're invited to Veritas Village Family Village";
+export function inviteSubject(brand: EmailBrand = DEFAULT_EMAIL_BRAND): string {
+  return `You're invited to ${brand.name} Family Village`;
+}

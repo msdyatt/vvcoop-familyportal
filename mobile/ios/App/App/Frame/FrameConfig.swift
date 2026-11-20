@@ -49,7 +49,62 @@ enum FrameConfig {
 enum Brand {
     static let navy = UIColor(red: 0x0B / 255, green: 0x2A / 255, blue: 0x3D / 255, alpha: 1)
     static let cream = UIColor(red: 0xFA / 255, green: 0xF7 / 255, blue: 0xF1 / 255, alpha: 1)
-    static let terracotta = UIColor(red: 0xBB / 255, green: 0x61 / 255, blue: 0x41 / 255, alpha: 1)
+    /// Alerts and destructive actions. Terracotta like the Veritas accent, but fixed: a co-op's palette never changes it.
+    static let danger = UIColor(red: 0xBB / 255, green: 0x61 / 255, blue: 0x41 / 255, alpha: 1)
+
+    // MARK: The co-op's accent
+    // The co-op's palette (Admin, Appearance; lib/coop-theme.ts). The page reports it with the `coopTheme` message on every
+    // load (lib/coop-settings.ts); the frame keeps it so the next launch starts in the right colours. Only the accent family
+    // follows it: navy, cream, the surfaces and the alert colour stay as they are.
+    struct Accent: Equatable {
+        var accent: UInt32       // web --terracotta: rules, the unread badge, progress
+        var accentText: UInt32   // web --terracotta-text: small accent text on light grounds
+        var accentOnInk: UInt32  // web --terracotta-on-navy: accent on navy, and small accent text in Dark
+        var nightFill: UInt32    // web --accent-night-fill: buttons and selections in Dark
+    }
+    static let veritasAccent = Accent(accent: 0xBB6141, accentText: 0xA85539, accentOnInk: 0xD7A590, nightFill: 0xA85539)
+    private static let accentKey = "vv.coop.accent"
+    private static let nameKey = "vv.coop.name"
+    private(set) static var coopAccent: Accent = storedAccent()
+    /// The co-op's name, for the logo's spoken label.
+    private(set) static var coopName: String = UserDefaults.standard.string(forKey: nameKey) ?? "Veritas Village"
+
+    private static func storedAccent() -> Accent {
+        guard let saved = UserDefaults.standard.dictionary(forKey: accentKey) as? [String: Int],
+              let a = saved["accent"], let t = saved["accentText"], let o = saved["accentOnInk"], let f = saved["nightFill"]
+        else { return veritasAccent }
+        return Accent(accent: UInt32(a), accentText: UInt32(t), accentOnInk: UInt32(o), nightFill: UInt32(f))
+    }
+    /// "#rrggbb" as a number, or nil.
+    static func parseHex(_ value: Any?) -> UInt32? {
+        guard let text = value as? String, text.count == 7, text.hasPrefix("#"), let n = UInt32(text.dropFirst(), radix: 16) else { return nil }
+        return n
+    }
+    /// Takes the page's `coopTheme` message. Returns true when something changed. A malformed palette is ignored whole.
+    @discardableResult
+    static func setCoopTheme(_ payload: [String: Any]) -> Bool {
+        var changed = false
+        if let a = parseHex(payload["accent"]), let t = parseHex(payload["accentText"]), let o = parseHex(payload["accentOnInk"]), let f = parseHex(payload["nightFill"]) {
+            let next = Accent(accent: a, accentText: t, accentOnInk: o, nightFill: f)
+            if next != coopAccent {
+                coopAccent = next
+                UserDefaults.standard.set(["accent": Int(a), "accentText": Int(t), "accentOnInk": Int(o), "nightFill": Int(f)], forKey: accentKey)
+                changed = true
+            }
+        }
+        if let name = payload["name"] as? String, !name.isEmpty, name.count <= 80, name != coopName {
+            coopName = name
+            UserDefaults.standard.set(name, forKey: nameKey)
+            changed = true
+        }
+        return changed
+    }
+    static func color(_ rgb: UInt32) -> UIColor { hex(rgb) }
+
+    /// The co-op's accent (web `--terracotta`). Dynamic, so it is read when drawn and follows a change of palette.
+    static let terracotta = UIColor { _ in hex(coopAccent.accent) }
+    /// Accent on a navy band (web `--terracotta-on-navy`), the same in both themes.
+    static let accentOnInk = UIColor { _ in hex(coopAccent.accentOnInk) }
 
     // MARK: Roles that follow Light / Dark
     // The web's role tokens (app/globals.css, app/theme.css) as dynamic colours: UIKit picks the light or the dark value from
@@ -70,8 +125,8 @@ enum Brand {
     /// A raised row or card (web `--surface`).
     static let surface = dynamic(light: .white, dark: hex(0x0E3045))
     /// The selected tab, switches and primary buttons (web `--action`, with terracotta-on-navy for a selection on the dark canvas).
-    static let action = dynamic(light: navy, dark: hex(0xA85539))
-    static let selection = dynamic(light: navy, dark: hex(0xD7A590))
+    static let action = UIColor { $0.userInterfaceStyle == .dark ? hex(coopAccent.nightFill) : navy }
+    static let selection = UIColor { $0.userInterfaceStyle == .dark ? hex(coopAccent.accentOnInk) : navy }
 
     // MARK: The person's choice (Light / Dark / System)
     // The page tells the frame which one is in force (`theme` message, lib/theme.ts). The frame keeps it so the next launch

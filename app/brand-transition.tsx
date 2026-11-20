@@ -2,9 +2,11 @@
 
 import BrandLockup from "./brand-lockup";
 import { useEffect, useState } from "react";
+import { useCoopName } from "../lib/coop-settings";
 
 export default function BrandTransition() {
   const [compact, setCompact] = useState(false);
+  const coopName = useCoopName();
 
   useEffect(() => {
     const updateFromScroll = () => {
@@ -23,7 +25,7 @@ export default function BrandTransition() {
     <a
       href="#top"
       className={`brand-transition${compact ? " is-compact" : ""}`}
-      aria-label="Veritas Village"
+      aria-label={coopName}
     >
       <BrandLockup priority sizes="(max-width: 520px) 54vw, 360px" />
     </a>
