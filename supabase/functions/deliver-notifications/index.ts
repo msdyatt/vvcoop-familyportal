@@ -4,6 +4,7 @@ import { logEdgeError } from "../_shared/error-log.ts";
 import { getFromAddress, readVaultSecret, sendViaResend } from "../_shared/resend.ts";
 import { safeEqual } from "../_shared/crypto.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
+import { loadEmailBrand } from "../_shared/coop-brand.ts";
 import { parseAllowList, processDeliveries, type ClaimedDelivery, type Deps, type Outcome } from "../_shared/notification-delivery.ts";
 import { resolveSmsProvider } from "../_shared/sms.ts";
 
@@ -59,6 +60,7 @@ async function handle(req: Request): Promise<Response> {
   const deps: Deps = {
     sms,
     allowList: parseAllowList(Deno.env.get("DELIVERY_ALLOWLIST")),
+    brand: await loadEmailBrand(admin),
     sendEmail: async (row, message): Promise<Outcome> => {
       // The delivery id is the idempotency key: a retry of the same row can never send twice.
       const result = await sendViaResend(resendKey!, from!, row.destination, message.subject, message.html, { idempotencyKey: row.delivery_id });

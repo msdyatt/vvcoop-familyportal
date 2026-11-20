@@ -15,6 +15,15 @@ async function worker() {
   return (await import(workerUrl.href)).default;
 }
 
+// The co-op's logo is drawn from custom properties (app/coop-logo.tsx, app/theme.css) so a co-op's own file can
+// replace it before the first paint; the page carries the element, the stylesheet carries the bundled file.
+const LOGO = /class="coop-logo lockup auto[^"]*" role="img" aria-label="Veritas Village"/;
+test("the stylesheet's default logo is the existing site lockup", async () => {
+  const css = await readFile(new URL("../app/theme.css", import.meta.url), "utf8");
+  assert.match(css, /--coop-lockup-light:url\("\/brand\/lockup-horizontal-navy\.png"\)/);
+  assert.match(css, /--coop-lockup-dark:url\("\/brand\/lockup-horizontal-cream\.png"\)/);
+});
+
 async function request(path, init = {}) {
   return (await worker()).fetch(new Request(`http://localhost${path}`, init), env, ctx);
 }
@@ -25,7 +34,7 @@ test("serves the public homepage without the shared password", async () => {
   const html = await response.text();
   assert.match(html, /Learning in truth/);
   assert.match(html, /42-2025384/);
-  assert.match(html, /lockup-horizontal-navy/);
+  assert.match(html, LOGO);
   assert.doesNotMatch(html, /This site is password protected/);
   assert.doesNotMatch(html, /Friday Co-op/i);
 });
@@ -47,7 +56,7 @@ test("server-renders the branded public home", async () => {
   const html = await response.text();
   assert.match(html, /Learning in truth/);
   assert.match(html, /Lately at the co-op/);
-  assert.match(html, /lockup-horizontal-navy/);
+  assert.match(html, LOGO);
   assert.doesNotMatch(html, /Friday Co-op/i);
 });
 
@@ -83,7 +92,7 @@ test("serves distinct, navigable nonprofit verification pages publicly", async (
     const html = await response.text();
     assert.match(html, heading);
     assert.match(html, /class="public-header-logo"/, `${path} shows the header brand link`);
-    assert.match(html, /lockup-horizontal-navy/, `${path} uses the existing site logo`);
+    assert.match(html, LOGO, `${path} uses the existing site logo`);
     assert.match(html, /href="\/about"/);
     assert.match(html, /href="\/programs"/);
     assert.match(html, /href="\/contact"/);

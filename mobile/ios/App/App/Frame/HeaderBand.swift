@@ -14,7 +14,7 @@ struct HeaderTheme {
     static let family = HeaderTheme(background: Brand.canvas, foreground: Brand.ink, rule: Brand.terracotta, logo: "LockupNavy")  // LockupNavy has a cream variant for dark
     static let admin = HeaderTheme(
         background: Brand.band, foreground: Brand.cream,
-        rule: UIColor(red: 0xD7 / 255, green: 0xA5 / 255, blue: 0x90 / 255, alpha: 1), logo: "LockupCream")
+        rule: Brand.accentOnInk, logo: "LockupCream")
 
     /// `name` is what the page's header says it belongs to ("home", "teacher", "admin"); without it, the path decides.
     static func resolve(name: String?, path: String) -> HeaderTheme {
@@ -50,7 +50,7 @@ final class HeaderBandView: UIView {
 
         logo.contentMode = .scaleAspectFit
         logo.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        logo.accessibilityLabel = "Veritas Village"
+        logo.accessibilityLabel = Brand.coopName
         logo.isAccessibilityElement = true
 
         back.setImage(UIImage(systemName: "chevron.backward", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)), for: .normal)

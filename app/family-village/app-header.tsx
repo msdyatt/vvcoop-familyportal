@@ -1,7 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import BrandLockup from "../brand-lockup";
+import CoopLogo from "../coop-logo";
+import { useCoopName } from "../../lib/coop-settings";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { useOutsideClick } from "../../lib/use-outside-click";
@@ -36,6 +37,7 @@ export default function AppHeader({ current, roles: held, title, subtitle }: { c
   const [tourOpen, setTourOpen] = useState(false);
   const [returning, setReturning] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const coopName = useCoopName();
 
   async function loadProfile() {
     const supabase = getSupabaseBrowserClient();
@@ -82,15 +84,15 @@ export default function AppHeader({ current, roles: held, title, subtitle }: { c
   return <>
     <UrgentBanner />
     <header className={`app-header${current === "admin" ? " app-header-admin" : ""}`}>
-      <a href="/family-village/home" className="app-header-brand" aria-label="Veritas Village home">
+      <a href="/family-village/home" className="app-header-brand" aria-label={`${coopName} home`}>
         {/* The guide's own navigation-bar example uses the primary horizontal
             lockup, and pairs the cream variant with dark fields -- which is
             Admin's navy band. Rendered at 150px wide, above its 120px minimum. */}
         {current === "admin"
-          ? <Image className="app-header-lockup on-dark" src="/brand/lockup-horizontal-cream.png" alt="Veritas Village" width={900} height={310} priority />
+          ? <CoopLogo className="app-header-lockup" tone="on-dark" />
           : <BrandLockup className="app-header-lockup" priority />}
         {/* In the apps the header takes the colour of the screen, so Admin needs the navy lockup there too. */}
-        {current === "admin" && <Image className="app-header-lockup on-light" src="/brand/lockup-horizontal-navy.png" alt="" aria-hidden="true" width={900} height={310} />}
+        {current === "admin" && <CoopLogo className="app-header-lockup on-light" tone="on-light" decorative />}
       </a>
       <div className="app-header-title">{current === "admin" && <span className="admin-chip app-header-admin-chip">Admin</span>}<h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
       <div className="app-header-actions">

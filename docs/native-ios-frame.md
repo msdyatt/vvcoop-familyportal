@@ -400,5 +400,14 @@ failure screen by itself. The status-bar style over a canvas-coloured header is 
 launch screen (navy), the Face ID lock screen (navy), the Safari view controller's navy bar, and the admin header band (a dark band
 in both themes). Capability `theme` is advertised so the page can tell a build that knows the message.
 
+## Co-op palette (issue #140)
+
+The page also sends `post("coopTheme", { name, accent, accentText, accentOnInk, nightFill })` on every load (lib/coop-settings.ts),
+with the co-op's accent colours as `#rrggbb`. `Brand.setCoopTheme` keeps them in UserDefaults (`vv.coop.accent`, `vv.coop.name`)
+and `Brand.terracotta`, `accentOnInk`, `action` (Dark), `selection` (Dark) and the Messages accent roles read them when drawn, so the
+next launch starts in the co-op's colours; the header band redraws at once, other views on their next redraw. A malformed palette is
+ignored whole. `Brand.danger` (payment sheet errors) stays fixed. The header's logo artwork and the splash are still the bundled
+Veritas Village assets: a co-op's uploaded logo is not downloaded by the frame yet. Older frame builds ignore the message.
+
 Not verified on a device: this was written and syntax-checked, not run on a phone. Check on a phone: toggle Dark in Account
 settings and look at the navigation bar, tab bar, Menu sheet and a sheet page; then switch back to System with the phone in Dark.

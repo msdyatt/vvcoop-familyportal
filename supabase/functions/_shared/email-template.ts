@@ -17,6 +17,28 @@
 const LOGO_URL = "https://family.veritasvillage.org/brand/lockup-horizontal-navy.png";
 
 /**
+ * The co-op's name, logo and accent as the email shows them (public.coop_settings, read by
+ * _shared/coop-brand.ts). The default is the Veritas Village look, so a caller that cannot read the
+ * settings still sends a sound email. Ink, paper and the frame stay navy and cream whatever the co-op.
+ */
+export type EmailBrand = {
+  name: string;
+  logoUrl: string;
+  /** Drawn 160 px wide; the height follows the logo's own shape. */
+  logoHeight: number;
+  /** Rules and the note's edge (the co-op's accent). */
+  accent: string;
+  /** The button behind white text: the accent's text-safe shade (4.5:1 with white, checked on save). */
+  accentText: string;
+  /** Where people are told to ask for help; null when the co-op has not set one. */
+  supportEmail: string | null;
+};
+
+export const DEFAULT_EMAIL_BRAND: EmailBrand = {
+  name: "Veritas Village", logoUrl: LOGO_URL, logoHeight: 55, accent: "#bb6141", accentText: "#a85539", supportEmail: null,
+};
+
+/**
  * Escapes a plain-text value (an admin-typed name, a free-text note) before
  * it's spliced into an *Html field below. `bodyHtml`/`noteHtml` are named for
  * what they hold -- real markup a caller composed on purpose (`<p>...</p>`) --
@@ -38,8 +60,10 @@ export function renderEmail(opts: {
   ctaUrl?: string;
   footerHtml?: string;
   preheader?: string;
+  brand?: EmailBrand;
 }): string {
   const { eyebrow, heading, bodyHtml, noteHtml, ctaLabel, ctaUrl, footerHtml, preheader } = opts;
+  const brand = opts.brand ?? DEFAULT_EMAIL_BRAND;
   return `<!doctype html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
@@ -56,13 +80,13 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;"
 <tr><td>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf7f1;">
 <tr><td style="padding:38px;background:#faf7f1;">
-<img src="${LOGO_URL}" width="160" height="55" alt="Veritas Village" style="display:block;border:0;margin:0 0 18px;">
-<span style="display:block;width:42px;height:2px;margin:0 0 28px;background:#bb6141;font-size:0;line-height:0;">&nbsp;</span>
+<img src="${escapeHtml(brand.logoUrl)}" width="160" height="${brand.logoHeight}" alt="${escapeHtml(brand.name)}" style="display:block;border:0;margin:0 0 18px;">
+<span style="display:block;width:42px;height:2px;margin:0 0 28px;background:${brand.accent};font-size:0;line-height:0;">&nbsp;</span>
 <p style="margin:0 0 4px;color:#5f6b61;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;">${eyebrow}</p>
 <h1 style="margin:5px 0 22px;color:#0b2a3d;font-family:Georgia,'Times New Roman',serif;font-size:31px;line-height:1.05;font-weight:700;">${heading}</h1>
 <div style="color:#5f6b61;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;">${bodyHtml}</div>
-${noteHtml ? `<div style="margin:18px 0;padding:12px 16px;color:#0b2a3d;font-family:Arial,Helvetica,sans-serif;font-style:italic;font-size:14px;border-left:3px solid #bb6141;">${noteHtml}</div>` : ""}
-${ctaLabel && ctaUrl ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 13px;"><tr><td style="background:#bb6141;"><a href="${ctaUrl}" style="display:inline-block;padding:12px 17px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;text-decoration:none;">${ctaLabel}</a></td></tr></table>` : ""}
+${noteHtml ? `<div style="margin:18px 0;padding:12px 16px;color:#0b2a3d;font-family:Arial,Helvetica,sans-serif;font-style:italic;font-size:14px;border-left:3px solid ${brand.accent};">${noteHtml}</div>` : ""}
+${ctaLabel && ctaUrl ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 13px;"><tr><td style="background:${brand.accentText};"><a href="${ctaUrl}" style="display:inline-block;padding:12px 17px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;text-decoration:none;">${ctaLabel}</a></td></tr></table>` : ""}
 ${footerHtml ? `<p style="display:block;margin:0;color:#5f6b61;font-family:Arial,Helvetica,sans-serif;font-size:12px;">${footerHtml}</p>` : ""}
 </td></tr>
 </table>

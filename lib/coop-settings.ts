@@ -1,0 +1,101 @@
+/**
+ * The co-op's settings on the page (docs/theming.md, "Co-op theme").
+ *
+ * One row, public.coop_settings, readable by anyone (the sign-in page shows the name and logo before anyone is
+ * signed in). The page keeps the last copy on the device (localStorage COOP_THEME_KEY) so COOP_SCRIPT can dress the
+ * next page before it paints; CoopThemeSync (app/coop-theme-sync.tsx) fetches the row once per page load and
+ * refreshes that copy. Components read the name and contact through useCoopTheme(); before anything is known they
+ * get the defaults, which are the Veritas Village look.
+ */
+import { useSyncExternalStore } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { COOP_THEME_KEY, DEFAULT_THEME, LOGO_BUCKET, THEME_VAR_NAMES, parseTheme, themeFromRow, themeVars, type CoopTheme } from "./coop-theme";
+import { nativeFrame } from "./native-frame";
+
+export const COOP_SETTINGS_COLUMNS =
+  "name,palette_id,accent,heading_font,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,support_email,support_phone,updated_at";
+
+let current: CoopTheme | null = null;
+const listeners = new Set<() => void>();
+
+function storage(): Storage | null {
+  try { return typeof window === "undefined" ? null : window.localStorage; } catch { return null; }
+}
+
+/** The copy kept on this device, or null (first visit, private mode, storage blocked, or junk). */
+export function readCachedTheme(): CoopTheme | null {
+  try {
+    const raw = storage()?.getItem(COOP_THEME_KEY);
+    return raw ? parseTheme(JSON.parse(raw)) : null;
+  } catch { return null; }
+}
+
+function writeCachedTheme(theme: CoopTheme) {
+  try { storage()?.setItem(COOP_THEME_KEY, JSON.stringify(theme)); } catch { /* the page still shows it */ }
+}
+
+/** The theme in force on this page. */
+export function coopTheme(): CoopTheme {
+  if (!current) current = readCachedTheme() ?? DEFAULT_THEME;
+  return current;
+}
+
+/** Dresses the document in a theme: the custom properties, and the iPhone frame's bars through the bridge. */
+export function applyCoopTheme(theme: CoopTheme, element?: HTMLElement) {
+  if (typeof document === "undefined") return;
+  const target = element ?? document.documentElement;
+  const vars = themeVars(theme);
+  for (const name of THEME_VAR_NAMES) {
+    if (name in vars) target.style.setProperty(name, vars[name]);
+    else target.style.removeProperty(name);
+  }
+  if (!element) {
+    // The frame colours its own header rule, selected tab and buttons; it keeps them for the next launch.
+    nativeFrame()?.post("coopTheme", {
+      name: theme.name,
+      accent: theme.accent.accent, accentText: theme.accent.accent_text,
+      accentOnInk: theme.accent.accent_on_ink, nightFill: theme.accent.night_fill,
+    });
+  }
+}
+
+/** Makes a theme the one in force: applies it, keeps it on the device, and tells components that read it. */
+export function setCoopTheme(theme: CoopTheme) {
+  const changed = JSON.stringify(theme) !== JSON.stringify(current);
+  current = theme;
+  applyCoopTheme(theme);
+  writeCachedTheme(theme);
+  if (changed) for (const listener of listeners) listener();
+}
+
+/** The public URL of a file in the brand bucket. */
+export function brandFileUrl(supabase: SupabaseClient, path: string): string {
+  return supabase.storage.from(LOGO_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/** The settings row as a theme; null when it could not be read (offline, not set up), so the cached one stays. */
+export async function fetchCoopTheme(supabase: SupabaseClient): Promise<CoopTheme | null> {
+  try {
+    const { data, error } = await supabase.from("coop_settings").select(COOP_SETTINGS_COLUMNS).eq("id", "coop").maybeSingle();
+    if (error || !data) return null;
+    return themeFromRow(data as Record<string, unknown>, (path) => brandFileUrl(supabase, path));
+  } catch { return null; }
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
+/**
+ * The co-op's theme for a component. The server and the first client render use the defaults (so hydration
+ * matches); the device's copy and then the fetched one follow straight after.
+ */
+export function useCoopTheme(): CoopTheme {
+  return useSyncExternalStore(subscribe, coopTheme, () => DEFAULT_THEME);
+}
+
+/** Just the name, for labels and sentences. */
+export function useCoopName(): string {
+  return useCoopTheme().name;
+}

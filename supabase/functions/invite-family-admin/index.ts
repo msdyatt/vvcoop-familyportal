@@ -2,7 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { sendAndLog } from "../_shared/resend.ts";
-import { buildInviteEmail, INVITE_SUBJECT } from "../_shared/invite-email.ts";
+import { buildInviteEmail, inviteSubject } from "../_shared/invite-email.ts";
+import { loadEmailBrand } from "../_shared/coop-brand.ts";
 import { manageInvitation } from "../_shared/invitations.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
@@ -93,9 +94,10 @@ async function handle(req: Request): Promise<Response> {
     ]);
     if (setupResults.some(result => result.error)) return json({ error: "Part of the household setup needs administrator attention. No email was sent yet." }, 500);
 
-    const html = buildInviteEmail({ adminName, familyName: familyName!, existingHousehold: Boolean(familyId), note: body?.note?.trim(), actionLink });
+    const brand = await loadEmailBrand(adminClient);
+    const html = buildInviteEmail({ adminName, familyName: familyName!, existingHousehold: Boolean(familyId), note: body?.note?.trim(), actionLink }, brand);
     const emailResult = await sendAndLog(adminClient, {
-      to: email, subject: INVITE_SUBJECT,
+      to: email, subject: inviteSubject(brand),
       html, kind: "invite", subjectType: "family", subjectId: familyRecordId,
     });
     if (!emailResult.ok) return json({ ok: true, email, familyName, expiresAt, warning: `The account was created, but the invite email could not be sent: ${emailResult.error}` });

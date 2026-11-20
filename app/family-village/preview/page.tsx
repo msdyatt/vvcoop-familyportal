@@ -1,4 +1,4 @@
-import Image from "next/image";
+import CoopLogo from "../../coop-logo";
 import Link from "next/link";
 import FacebookGroupLink from "../../facebook-group-link";
 
@@ -11,7 +11,7 @@ export const metadata = {
 
 export default function FamilyVillagePreview() {
   return <div className="portal-shell">
-    <aside className="portal-sidebar"><Link className="portal-wordmark" href="/" aria-label="Veritas Village"><Image src="/brand/lockup-horizontal-cream.png" alt="Veritas Village" width={900} height={310}/></Link><p>Family Village</p><nav aria-label="Family portal preview">{sections.map((section, index) => <a className={index === 0 ? "active" : ""} href={`#${section.toLowerCase().replaceAll(" ", "-")}`} key={section}>{section}</a>)}</nav><div className="account-chip"><span>Preview</span><small>No family data</small></div></aside>
+    <aside className="portal-sidebar"><Link className="portal-wordmark" href="/" aria-label="Veritas Village"><CoopLogo tone="on-dark" decorative /></Link><p>Family Village</p><nav aria-label="Family portal preview">{sections.map((section, index) => <a className={index === 0 ? "active" : ""} href={`#${section.toLowerCase().replaceAll(" ", "-")}`} key={section}>{section}</a>)}</nav><div className="account-chip"><span>Preview</span><small>No family data</small></div></aside>
     <main className="portal-dashboard">
       <header><div><p className="eyebrow">Family portal preview</p><h1>Your village, gathered.</h1></div><div className="preview-switch"><a href="/family-village/teacher">Teacher view</a><a href="/family-village/admin">Admin view</a><a href="/family-village">Finish preview</a></div></header>
       <div className="preview-banner"><b>This is a privacy-safe preview.</b> Real names, notes, photographs, and paperwork will appear only after secure sign-in and administrative approval.</div>

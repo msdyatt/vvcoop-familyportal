@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
+import CoopLogo from "../../coop-logo";
 import { FilterXSS, getDefaultWhiteList } from "xss";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { formatCoopDateTime } from "../../../lib/coop-time";
@@ -265,8 +265,7 @@ export default function InboxTab() {
 function EmptyList({ filtered }: { filtered: boolean }) {
   if (filtered) return <p className="inbox-muted inbox-empty-small">Nothing matches.</p>;
   return <div className="inbox-empty">
-    <Image className="inbox-empty-mark logo-on-light" src="/brand/mark-compact-navy.png" alt="" width={72} height={72} />
-    <Image className="inbox-empty-mark logo-on-dark" src="/brand/mark-compact-cream.png" alt="" width={72} height={72} />
+    <CoopLogo kind="mark" className="inbox-empty-mark" decorative />
     <p className="inbox-empty-title">The inbox is clear.</p>
     <p className="inbox-muted">Nothing is waiting. Put the kettle on.</p>
   </div>;

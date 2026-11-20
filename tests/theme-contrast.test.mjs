@@ -10,6 +10,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import ts from "typescript";
+
+// The co-op palettes (lib/coop-theme.ts), transpiled so the generator the admin screen uses is the one tested here.
+const coopDir = await mkdtemp(path.join(tmpdir(), "coop-theme-"));
+{
+  const source = readFileSync(new URL("../lib/coop-theme.ts", import.meta.url), "utf8");
+  const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
+  await writeFile(path.join(coopDir, "coop-theme.mjs"), outputText);
+}
+const coop = await import(pathToFileURL(path.join(coopDir, "coop-theme.mjs")).href);
 
 const strip = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "");
 const css = strip(readFileSync(new URL("../app/globals.css", import.meta.url), "utf8"));   // the roles, for the light theme
@@ -36,10 +50,10 @@ function props(body) {
 }
 
 const light = props(blockBody(css, ":root"));
-const darkAttr = blockBody(themeCss, 'html[data-theme="dark"]');
+const darkAttr = blockBody(themeCss, 'html[data-theme="dark"],\n.theme-preview-dark');
 const mediaAt = themeCss.indexOf("@media (prefers-color-scheme: dark)");
 const darkMedia = mediaAt >= 0 ? blockBody(themeCss, "html:not([data-theme])", mediaAt) : null;
-const PAPER = [".pdf-page", ".email-paper", ".report-sheet", ".printable-report", ".roster-print-sheet", ".sign-pad", ".sign-preview"];
+const PAPER = [".pdf-page", ".email-paper", ".report-sheet", ".printable-report", ".roster-print-sheet", ".sign-pad", ".sign-preview", ".theme-preview-light"];
 const paperBody = blockBody(themeCss, PAPER.join(",\n"));
 
 function resolve(name, vars, depth = 0) {
@@ -111,6 +125,8 @@ const PAIRS = [
   ["cream", "cal-class", 4.5, "class event pill"],
   ["fg-rgb@.66", "canvas", 4.5, "inactive tab label (iOS style)"],
   ["fg-rgb@.72", "canvas", 4.5, "inactive tab label (Android style)"],
+  ["m3-on-secondary-container", "m3-secondary-container", 4.5, "selected tab label (Android style)"],
+  ["accent-ink", "surface", 3, "accent emphasis on a card"],
   ["status-new", "surface", 3, "office inbox: New status mark"],
   ["status-open", "surface", 3, "office inbox: Open status mark"],
   ["status-waiting", "surface", 3, "office inbox: Waiting on family status mark"],
@@ -125,6 +141,25 @@ const PAIRS = [
 
 const themes = [["light", light]];
 if (darkAttr) themes.push(["dark", { ...light, ...props(darkAttr) }]);
+
+/** The pairs that fail for one set of token values: [{fg, bg, got, min}]. */
+function failures(theme, vars) {
+  const out = [];
+  for (const [fg, bg, wanted, what, override] of PAIRS) {
+    const min = override?.[theme] ?? wanted;
+    const back = colour(bg, vars, [0, 0, 0]);
+    const got = ratio(colour(fg, vars, back), back);
+    if (got < min) out.push(`${what} (${fg} on ${bg}) ${got.toFixed(2)}:1 < ${min}:1`);
+  }
+  return out;
+}
+
+/** The stylesheet's tokens with a co-op palette in place: the ten brand-level properties it sets (ACCENT_VARS). */
+function withAccent(vars, tokens) {
+  const next = { ...vars };
+  for (const key of coop.ACCENT_KEYS) next[coop.ACCENT_VARS[key]] = tokens[key];
+  return next;
+}
 
 for (const [theme, vars] of themes) {
   for (const [fg, bg, wanted, what, override] of PAIRS) {
@@ -159,4 +194,100 @@ test("paper keeps the light roles: every role the dark theme changes is put back
     assert.ok(name in paper, `${name} changes in the dark theme but paper does not put it back`);
     assert.equal(resolve(name, { ...light, ...paper }), lightValue, `paper's ${name} is not the light value`);
   }
+});
+
+// ---- Co-op palettes (lib/coop-theme.ts) ---------------------------------------------------------------------------
+
+test("the Veritas palette in lib/coop-theme.ts is exactly the stylesheet's accent colours", () => {
+  for (const key of coop.ACCENT_KEYS) assert.equal(coop.VERITAS_ACCENT[key], light[coop.ACCENT_VARS[key]], `${key} (${coop.ACCENT_VARS[key]})`);
+});
+
+test("the database's default palette is the Veritas palette too", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/20261120090000_coop_settings.sql", import.meta.url), "utf8");
+  const literal = sql.match(/function private\.default_coop_accent\(\)[\s\S]*?select '(\{[\s\S]*?\})'::jsonb/)[1];
+  assert.deepEqual(JSON.parse(literal), coop.VERITAS_ACCENT);
+});
+
+test("the backgrounds the palette checks use are the stylesheet's own", () => {
+  const dark = themes.find(([t]) => t === "dark")[1];
+  const B = coop.ROLE_BACKGROUNDS;
+  const hex = (v) => "#" + rgbOf(v).map((c) => c.toString(16).padStart(2, "0")).join("");
+  assert.equal(B.canvas, hex(resolve("--canvas", light)));
+  assert.equal(B.surface, hex(resolve("--surface", light)));
+  assert.equal(B.cream, hex(resolve("--cream", light)));
+  assert.equal(B.navy, hex(resolve("--ink-surface", light)));
+  assert.equal(B.navy, hex(resolve("--action", light)));
+  assert.equal(B["night canvas"], hex(resolve("--canvas", dark)));
+  assert.equal(B["night surface"], hex(resolve("--surface", dark)));
+  assert.equal(B["night band"], hex(resolve("--ink-surface", dark)));
+});
+
+test("a palette sets only the accent family: no alert, error, ink or background token reads an accent property", () => {
+  const accentVars = new Set(coop.ACCENT_KEYS.map((k) => coop.ACCENT_VARS[k]));
+  const readsAccent = (name, vars, seen = new Set()) => {
+    if (accentVars.has(name)) return true;
+    if (seen.has(name)) return false;
+    seen.add(name);
+    const m = String(vars[name] ?? "").match(/^var\((--[a-z0-9-]+)\)$/);
+    return m ? readsAccent(m[1], vars, seen) : false;
+  };
+  for (const [theme, vars] of themes) {
+    for (const name of ["--danger-text", "--danger-fill", "--danger-line", "--terracotta-deep", "--warm-tint", "--text", "--canvas", "--surface", "--ink-surface", "--gold", "--line-strong"]) {
+      assert.ok(name in vars, `${name} is defined`);
+      assert.ok(!readsAccent(name, vars), `${theme}: ${name} must not follow the co-op's palette`);
+    }
+  }
+});
+
+for (const palette of coop.PALETTES) {
+  test(`palette "${palette.label}" passes its own checks and every token pair in both themes`, () => {
+    assert.deepEqual(coop.checkAccent(palette.tokens).map((p) => p.message), []);
+    for (const [theme, vars] of themes) assert.deepEqual(failures(theme, withAccent(vars, palette.tokens)), [], theme);
+  });
+}
+
+test("a custom colour of any hue, made usable, generates a palette that passes every token pair in both themes", () => {
+  const bad = [];
+  let tried = 0;
+  for (let hue = 0; hue < 360; hue += 15) {
+    for (const [l, c] of [[0.45, 0.05], [0.55, 0.12], [0.62, 0.18], [0.7, 0.1], [0.35, 0.15]]) {
+      const base = coop.nearestUsableAccent(coop.oklchToHex(l, c, (hue * Math.PI) / 180));
+      if (!base) continue;
+      tried++;
+      const tokens = coop.generateAccent(base);
+      const own = coop.checkAccent(tokens).map((p) => p.message);
+      if (own.length) bad.push(`${base}: ${own.join(" / ")}`);
+      for (const [theme, vars] of themes) for (const f of failures(theme, withAccent(vars, tokens))) bad.push(`${base} ${theme}: ${f}`);
+    }
+  }
+  assert.ok(tried >= 100, `only ${tried} colours were tried`);
+  assert.deepEqual(bad, []);
+});
+
+test("the palette check refuses what the token pairs would fail, and says why in plain words", () => {
+  const pale = coop.checkAccent(coop.generateAccent("#f5d76e"));
+  assert.ok(pale.length > 0, "a pale yellow accent is refused");
+  assert.match(pale[0].message, /^Too close to its background for lines and large headings on the page \(1\.\d\d:1, needs 3:1\)\. Choose a darker shade\.$/);
+  const navyish = coop.checkAccent(coop.generateAccent("#1a3a6a"));
+  assert.ok(navyish.some((p) => /dark theme.*Choose a lighter shade/.test(p.message)), "a navy-like accent is refused for the dark theme");
+  // Whatever checkAccent lets through, the full pair list agrees with (the other direction is the loop above).
+  for (const base of ["#f5d76e", "#1a3a6a", "#000000", "#ffffff", "#00ff00", "#0000ff"]) {
+    const tokens = coop.generateAccent(base);
+    const pairsFail = themes.some(([theme, vars]) => failures(theme, withAccent(vars, tokens)).length > 0);
+    if (pairsFail) assert.ok(coop.checkAccent(tokens).length > 0, `${base} fails a token pair but passed checkAccent`);
+  }
+  assert.ok(coop.checkAccent({ ...coop.VERITAS_ACCENT, accent_text: "red" }).length > 0, "a colour that is not #rrggbb is refused");
+});
+
+test("a cached theme is taken whole or not at all", () => {
+  const good = { v: 1, name: "Riverbend", accent: coop.PALETTES[1].tokens, font: "georgia", logos: { logo_light: "https://x.supabase.co/storage/v1/object/public/coop-brand/logo_light/a.png" }, ratio: 3 };
+  const parsed = coop.parseTheme(good);
+  assert.equal(parsed.name, "Riverbend");
+  assert.deepEqual(parsed.accent, coop.PALETTES[1].tokens);
+  assert.equal(parsed.logos.logo_light, good.logos.logo_light);
+  assert.deepEqual(coop.parseTheme({ ...good, accent: { ...good.accent, accent: "#f5d76e" } }).accent, coop.VERITAS_ACCENT, "a failing accent falls back");
+  assert.equal(coop.parseTheme({ ...good, logos: { logo_light: "https://evil.example/x.png" } }).logos.logo_light, undefined, "a logo from elsewhere is ignored");
+  assert.equal(coop.parseTheme({ ...good, logos: { logo_light: 'https://x.supabase.co/storage/v1/object/public/coop-brand/a.png");background:url("x' } }).logos.logo_light, undefined, "and cannot break out of url()");
+  assert.equal(coop.parseTheme({ ...good, font: "comic" }).font, "playfair");
+  assert.deepEqual(coop.parseTheme("junk"), coop.DEFAULT_THEME);
 });

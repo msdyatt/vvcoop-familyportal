@@ -7,6 +7,7 @@ import { deleteAccount } from "../_shared/account-deletion.ts";
 import { scrubBillingForErasure } from "../_shared/billing-erasure.ts";
 import { getFromAddress, readVaultSecret, sendViaResend } from "../_shared/resend.ts";
 import { escapeHtml, renderEmail } from "../_shared/email-template.ts";
+import { loadEmailBrand } from "../_shared/coop-brand.ts";
 
 /**
  * Permanently deletes an account.
@@ -63,9 +64,11 @@ async function handle(req: Request): Promise<Response> {
     try {
       const [from, apiKey] = await Promise.all([getFromAddress(admin), readVaultSecret(admin, "RESEND_API_KEY")]);
       if (from && apiKey) {
+        const brand = await loadEmailBrand(admin);
         const html = renderEmail({
+          brand,
           eyebrow: "Account deleted", heading: "Your Family Village account has been deleted.", preheader: "Your account was deleted.",
-          bodyHtml: `<p>Your Family Village account for ${escapeHtml(result.outcome.email)} has been permanently deleted, along with your messages and personal details.</p><p>If you didn&rsquo;t do this, contact <a href="mailto:admin@veritasvillage.org">admin@veritasvillage.org</a> right away.</p>`,
+          bodyHtml: `<p>Your Family Village account for ${escapeHtml(result.outcome.email)} has been permanently deleted, along with your messages and personal details.</p><p>If you didn&rsquo;t do this, contact <a href="mailto:${escapeHtml(brand.supportEmail ?? "admin@veritasvillage.org")}">${escapeHtml(brand.supportEmail ?? "admin@veritasvillage.org")}</a> right away.</p>`,
         });
         await sendViaResend(apiKey, from, result.outcome.email, "Your Family Village account was deleted", html);
       }

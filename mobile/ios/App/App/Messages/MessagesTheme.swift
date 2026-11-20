@@ -19,14 +19,15 @@ enum MT {
     static let canvasUI = dynamic(0xFAF7F1, 0x08202F)
     static let textUI = dynamic(0x0B2A3D, 0xFAF7F1)
     static let mutedUI = dynamic(0x5F6B61, 0xBBC0B8)
-    static let accentTextUI = dynamic(0xA85539, 0xD7A590)
+    /// The co-op's accent text (web --text-accent): its text shade on light grounds, its on-navy shade in Dark (Brand.coopAccent).
+    static let accentTextUI = UIColor { $0.userInterfaceStyle == .dark ? Brand.color(Brand.coopAccent.accentOnInk) : Brand.color(Brand.coopAccent.accentText) }
     static let warmTintUI = dynamic(0xF4E4DC, 0x3A2730)
     static let dangerTextUI = dynamic(0x6B3826, 0xF3C6B3)
     /// Fill of your own bubbles and primary buttons: navy, and the deeper terracotta in Dark.
-    static let actionUI = dynamic(0x0B2A3D, 0xA85539)
-    static let accentOnActionUI = dynamic(0xD7A590, 0xFAF7F1)
+    static let actionUI = Brand.action
+    static let accentOnActionUI = UIColor { $0.userInterfaceStyle == .dark ? hex(0xFAF7F1) : Brand.color(Brand.coopAccent.accentOnInk) }
     static let goldUI = dynamic(0xAA7D38, 0xE0B56A)
-    static let terracottaUI = hex(0xBB6141)
+    static let terracottaUI = Brand.terracotta
     static let cream = hex(0xFAF7F1)
     /// A hairline: the text colour at about 12% (web: rgba(var(--fg-rgb), .12)).
     static let lineUI = UIColor { $0.userInterfaceStyle == .dark ? hex(0xFAF7F1).withAlphaComponent(0.14) : hex(0x0B2A3D).withAlphaComponent(0.12) }

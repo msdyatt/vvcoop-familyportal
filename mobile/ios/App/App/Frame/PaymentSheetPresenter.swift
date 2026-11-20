@@ -61,7 +61,7 @@ final class PaymentSheetPresenter {
         a.colors.componentPlaceholderText = ink.withAlphaComponent(0.45)
         a.colors.icon = ink.withAlphaComponent(0.7)
         a.colors.primary = Brand.action
-        a.colors.danger = Brand.terracotta
+        a.colors.danger = Brand.danger
         a.cornerRadius = 10
         a.borderWidth = 1
         a.shadow = .disabled

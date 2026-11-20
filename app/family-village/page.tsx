@@ -1,5 +1,6 @@
 import BrandLockup from "../brand-lockup";
 import SignInPanel from "./sign-in-panel";
+import CoopSupportLine from "../coop-support-line";
 
 export const metadata = {
   title: "Family Village | Veritas Village",
@@ -17,6 +18,7 @@ export default function FamilyVillageSignIn() {
       <p className="portal-entry-copy">Family Village brings classes, messages with teachers, announcements, calendars, photographs, and signed documents together in one private place.</p>
       <SignInPanel />
       <a className="preview-link" href="/family-village/preview">Preview the family experience →</a>
+      <CoopSupportLine />
       <p className="portal-legal-links"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></p>
     </section>
   </main>;
