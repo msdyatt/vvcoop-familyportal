@@ -9,8 +9,11 @@
  */
 import { useSyncExternalStore } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { COOP_THEME_KEY, DEFAULT_THEME, LOGO_BUCKET, PERSONAL_ACCENT_KEY, THEME_VAR_NAMES, effectiveAccent, parseTheme, themeFromRow, themeVars, type CoopTheme } from "./coop-theme";
+import { COOP_THEME_KEY, DEFAULT_THEME, LOGO_BUCKET, PERSONAL_ACCENT_KEY, THEME_VAR_NAMES, activeVariant, coopToday, effectiveAccent, parseTheme, themeFromRow, themeVars, type CoopTheme } from "./coop-theme";
 import { nativeFrame } from "./native-frame";
+
+export const LOGO_VARIANT_COLUMNS =
+  "id,name,starts_on,ends_on,yearly,override,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,updated_at";
 
 export const COOP_SETTINGS_COLUMNS =
   "name,palette_id,accent,heading_font,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,support_email,support_phone,personal_palettes,updated_at";
@@ -58,12 +61,26 @@ export function applyCoopTheme(theme: CoopTheme, element?: HTMLElement) {
     else target.style.removeProperty(name);
   }
   if (!element) {
+    paintFavicon(theme);
     // The frame colours its own header rule, selected tab and buttons; it keeps them for the next launch.
     nativeFrame()?.post("coopTheme", {
       name: theme.name,
       accent: theme.accent.accent, accentText: theme.accent.accent_text,
       accentOnInk: theme.accent.accent_on_ink, nightFill: theme.accent.night_fill,
     });
+  }
+}
+
+/**
+ * The browser tab's icon: a seasonal variant's compact mark (light) while it is in force, else the bundled icons. Only
+ * browsers can change it; a home-screen icon (installed web app, iPhone and Android apps) is fixed when installed.
+ */
+function paintFavicon(theme: CoopTheme) {
+  const mark = activeVariant(theme.seasonal, coopToday(theme.timeZone))?.logos.mark_light ?? null;
+  for (const link of Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'))) {
+    if (!link.dataset.defaultHref) link.dataset.defaultHref = link.getAttribute("href") ?? "";
+    const want = mark ?? link.dataset.defaultHref;
+    if (link.getAttribute("href") !== want) link.setAttribute("href", want);
   }
 }
 
@@ -84,9 +101,13 @@ export function brandFileUrl(supabase: SupabaseClient, path: string): string {
 /** The settings row as a theme; null when it could not be read (offline, not set up), so the cached one stays. */
 export async function fetchCoopTheme(supabase: SupabaseClient): Promise<CoopTheme | null> {
   try {
-    const { data, error } = await supabase.from("coop_settings").select(COOP_SETTINGS_COLUMNS).eq("id", "coop").maybeSingle();
+    const [{ data, error }, variants] = await Promise.all([
+      supabase.from("coop_settings").select(COOP_SETTINGS_COLUMNS).eq("id", "coop").maybeSingle(),
+      // Seasonal logos (part 3). If they cannot be read, the co-op's own logos show.
+      supabase.from("coop_logo_variants").select(LOGO_VARIANT_COLUMNS).order("updated_at", { ascending: false }),
+    ]);
     if (error || !data) return null;
-    return themeFromRow(data as Record<string, unknown>, (path) => brandFileUrl(supabase, path));
+    return themeFromRow(data as Record<string, unknown>, (path) => brandFileUrl(supabase, path), (variants.data ?? []) as Record<string, unknown>[]);
   } catch { return null; }
 }
 

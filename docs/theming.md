@@ -158,3 +158,36 @@ paint (larger text even before the co-op settings are cached).
 Tests: `tests/coop-theme.test.mjs` (the head script with personal choices, the database's palette list),
 `tests/text-scale.test.mjs` (the build step, and no fixed pixel font size left in the built CSS),
 `supabase/tests/database/033_personal_palettes.test.sql`.
+
+## Seasonal logos (issue #140 part 3, issue #110)
+
+Plumbing only: no artwork is made here. Admin, Appearance, "Seasonal logos" lists variants of the logo and adds,
+edits or removes them. Each has a name, a start and end day, "every year" (the year is ignored and the range may run
+over New Year), "when it shows" (between the dates, now whatever the date, or not at all) and any of the four logo
+files (lockup and compact mark, for light and dark grounds), stored in `coop-brand` under `seasonal/`.
+Table `public.coop_logo_variants`, written only through `admin_save_logo_variant` and `admin_delete_logo_variant`
+(same admin checks as the settings), readable by everyone. At most 24.
+
+**Which one shows.** `activeVariant` (lib/coop-theme.ts): a variant turned on wins (the most recently changed of
+them); otherwise the dated variant whose range holds today, the shortest range first, then the most recently
+changed. "Today" is the co-op's date (`coopToday`, America/Chicago for now; it belongs in the settings when the
+portal serves other co-ops, #139). The variant's files replace the matching slots; empty slots, and every slot when
+no variant is in force, show the co-op's own logo (and, without that, the bundled Veritas Village files). The head
+script carries `activeVariant`'s own source, so the page before and after first paint pick the same one; the change
+at midnight shows on the next page load.
+
+**Where it shows.** Everywhere `CoopLogo` draws the logo: the header (light, dark and the Admin band), the sign-in
+page, the public pages' header, the Office inbox empty state. The browser tab's icon becomes the variant's light
+compact mark while it is in force. Emails keep the co-op's own logo.
+
+**What does not change, and why.**
+- Installed web app (home-screen icon, splash): the manifest's icons are read when the app is installed and are not
+  re-read on a schedule, so a season cannot reach them.
+- Android app: the launcher icon comes from the app's resources. Activity aliases could switch between bundled icons,
+  but that needs the art in the build.
+- iPhone app: iOS can switch to an alternate app icon (`UIApplication.setAlternateIconName`), but only to icons
+  bundled in the app (declared under `CFBundleIcons` > `CFBundleAlternateIcons` in Info.plist, with the image sets in
+  the asset catalog), and the system shows the person an alert each time it changes. So each seasonal icon has to be
+  designed, added to the asset catalog, shipped in an App Store update, and switched by the frame from a bridge message
+  (the page knows which variant is in force). Not built here. The native header's logo and the splash also still use
+  the bundled art; downloading the uploaded file in the frame is the step that would bring seasonal lockups there.

@@ -23,7 +23,7 @@ const manifest = await load("worker/manifest.ts", "manifest");
 const LOGO = "https://abc.supabase.co/storage/v1/object/public/coop-brand/logo_light/abc.png";
 
 /** Runs the head script with this in storage and returns the custom properties it set (and the page's dataset). */
-function runScript(stored, { throws = false, personal = null, textSize = null, dataset = {} } = {}) {
+function runScript(stored, { throws = false, personal = null, textSize = null, dataset = {}, now = null } = {}) {
   const set = {};
   const values = {
     [coop.COOP_THEME_KEY]: stored === undefined ? null : typeof stored === "string" ? stored : JSON.stringify(stored),
@@ -34,6 +34,8 @@ function runScript(stored, { throws = false, personal = null, textSize = null, d
     document: { documentElement: { dataset, style: { setProperty: (k, v) => { set[k] = v; } } } },
     localStorage: throws ? { getItem() { throw new Error("blocked"); } } : { getItem: (k) => values[k] ?? null },
   };
+  // A fixed "now" for the seasonal logos: `new Date()` with no argument gives it.
+  if (now) sandbox.Date = class extends Date { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return Date.parse(now); } };
   vm.runInNewContext(coop.COOP_SCRIPT, sandbox);
   return set;
 }
@@ -129,4 +131,63 @@ test("the database offers exactly the ready-made palettes", async () => {
   const ids = coop.PALETTES.map((p) => p.id);
   assert.ok(sql.includes(`default '{${ids.join(",")}}'`), "the column default");
   assert.equal(sql.split(`array['${ids.join("', '")}']`).length - 1, 2, "the column check and the function's list");
+});
+
+// ---- Seasonal logos (part 3) -----------------------------------------------------------------------------------------
+
+const base = "https://abc.supabase.co/storage/v1/object/public/coop-brand/";
+const variant = (name, startsOn, endsOn, extra = {}) => ({
+  name, startsOn, endsOn, yearly: false, override: "auto", ratio: null, updatedAt: "2026-01-01T00:00:00Z",
+  logos: { logo_light: `${base}seasonal/${name}.png` }, ...extra,
+});
+
+test("the variant in force: turned on first, then the shortest dated range that holds today, then the newest", () => {
+  const harvest = variant("harvest", "2026-10-01", "2026-10-31");
+  const founders = variant("founders", "2026-10-12", "2026-10-12");
+  const winter = variant("winter", "2026-12-15", "2027-01-06", { yearly: true });
+  const off = variant("off", "2026-01-01", "2026-12-31", { override: "off" });
+  const all = [harvest, founders, winter, off];
+  assert.equal(coop.activeVariant(all, "2026-10-05")?.name, "harvest");
+  assert.equal(coop.activeVariant(all, "2026-10-12")?.name, "founders", "a one-day range beats a month");
+  assert.equal(coop.activeVariant(all, "2026-11-01"), null, "nothing in November: the co-op's own logo");
+  assert.equal(coop.activeVariant(all, "2027-12-20")?.name, "winter", "yearly ranges ignore the year");
+  assert.equal(coop.activeVariant(all, "2028-01-03")?.name, "winter", "and may run over New Year");
+  assert.equal(coop.activeVariant(all, "2028-01-07"), null);
+  assert.equal(coop.activeVariant([off], "2026-06-01"), null, "'off' never shows");
+  const onOld = variant("on-old", "2020-01-01", "2020-01-02", { override: "on", updatedAt: "2026-01-01T00:00:00Z" });
+  const onNew = variant("on-new", "2020-01-01", "2020-01-02", { override: "on", updatedAt: "2026-02-01T00:00:00Z" });
+  assert.equal(coop.activeVariant([...all, onOld, onNew], "2026-10-12")?.name, "on-new", "turned on wins, the newest of them");
+  const twin = variant("twin", "2026-10-01", "2026-10-31", { updatedAt: "2026-03-01T00:00:00Z" });
+  assert.equal(coop.activeVariant([harvest, twin], "2026-10-05")?.name, "twin", "same length: the newest");
+});
+
+test("today is the co-op's date, not the computer's", () => {
+  assert.equal(coop.coopToday("America/Chicago", new Date("2026-11-20T04:00:00Z")), "2026-11-19");
+  assert.equal(coop.coopToday("UTC", new Date("2026-11-20T04:00:00Z")), "2026-11-20");
+  assert.equal(coop.coopToday("Not/AZone", new Date("2026-11-20T04:00:00Z")), "2026-11-20");
+});
+
+test("a variant replaces only the slots it has, with its own shape; the head script does the same on every day", () => {
+  const theme = coop.parseTheme({
+    v: 1, name: "Riverbend", timeZone: "UTC", ratio: 2.9,
+    logos: { logo_light: `${base}logo_light/a.png`, mark_light: `${base}mark_light/m.png` },
+    seasonal: [
+      variant("harvest", "2026-10-01", "2026-10-31", { ratio: 4, logos: { logo_light: `${base}seasonal/h.png`, mark_dark: `${base}seasonal/hm.png` } }),
+      variant("winter", "2026-12-15", "2027-01-06", { yearly: true, logos: { logo_dark: `${base}seasonal/w.png` } }),
+      { junk: true },
+    ],
+  });
+  assert.equal(theme.seasonal.length, 2, "a malformed variant is dropped");
+  const oct = coop.themeVars(theme, "2026-10-10");
+  assert.equal(oct["--coop-lockup-light"], `url("${base}seasonal/h.png")`);
+  assert.equal(oct["--coop-mark-light"], `url("${base}mark_light/m.png")`, "the co-op's own mark stays");
+  assert.equal(oct["--coop-mark-dark"], `url("${base}seasonal/hm.png")`);
+  assert.equal(oct["--coop-lockup-ratio"], "4");
+  const jan = coop.themeVars(theme, "2027-01-02");
+  assert.equal(jan["--coop-lockup-light"], `url("${base}logo_light/a.png")`);
+  assert.equal(jan["--coop-lockup-dark"], `url("${base}seasonal/w.png")`);
+  assert.equal(jan["--coop-lockup-ratio"], "2.9", "a variant without a light lockup keeps the co-op's shape");
+  for (const day of ["2026-09-30", "2026-10-01", "2026-10-31", "2026-11-01", "2026-12-15", "2027-01-06", "2027-01-07"]) {
+    assert.deepEqual(runScript(theme, { now: `${day}T12:00:00Z` }), coop.themeVars(theme, day), day);
+  }
 });

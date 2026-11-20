@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import {
-  CUSTOM_PALETTE_ID, DEFAULT_THEME, HEADING_FONTS, LOGO_BUCKET, LOGO_MAX_BYTES, LOGO_SLOTS, LOGO_TYPES, LOGO_VARS, PALETTES,
+  CUSTOM_PALETTE_ID, DEFAULT_THEME, HEADING_FONTS, LOGO_BUCKET, LOGO_SLOTS, LOGO_TYPES, LOGO_VARS, PALETTES,
   checkAccent, generateAccent, isHeadingFont, nearestUsableAccent, normalizeHex, paletteById, themeVars,
   type AccentTokens, type CoopTheme, type HeadingFontId, type LogoSlot,
 } from "../../../lib/coop-theme";
 import { COOP_SETTINGS_COLUMNS, brandFileUrl, fetchCoopTheme, setCoopTheme } from "../../../lib/coop-settings";
+import { logoProblem } from "../../../lib/logo-files";
+import SeasonalLogosCard from "./seasonal-logos-card";
 
 /**
  * Admin, Appearance: the co-op's name, support contact, accent palette, heading font and logos (issue #140,
@@ -31,32 +33,6 @@ const SLOT_LABELS: Record<LogoSlot, { title: string; hint: string }> = {
   mark_light: { title: "Compact mark, light backgrounds", hint: "A small square version without the name." },
   mark_dark: { title: "Compact mark, dark backgrounds", hint: "The square mark in a light ink." },
 };
-
-function readImageShape(file: File): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new window.Image();
-    img.onload = () => { resolve({ width: img.naturalWidth, height: img.naturalHeight }); URL.revokeObjectURL(url); };
-    img.onerror = () => { reject(new Error("That file could not be read as an image.")); URL.revokeObjectURL(url); };
-    img.src = url;
-  });
-}
-
-/** Why a file cannot be a logo for this slot, or null. */
-async function logoProblem(slot: LogoSlot, file: File): Promise<string | null | { ratio: number }> {
-  if (!(LOGO_TYPES as readonly string[]).includes(file.type)) return "Use a PNG, JPEG or WebP file. PNG with a transparent background works best.";
-  if (file.size > LOGO_MAX_BYTES) return `That file is ${(file.size / 1048576).toFixed(1)} MB. Logos can be up to 1 MB.`;
-  const { width, height } = await readImageShape(file);
-  const ratio = width / height;
-  if (slot.startsWith("logo")) {
-    if (ratio < 1 || ratio > 6) return "A logo here should be wider than it is tall (up to six times as wide). Use the compact mark slots for a square mark.";
-    if (width < 300) return `That image is ${width} pixels wide. Use one at least 300 pixels wide so it stays sharp.`;
-  } else {
-    if (ratio < 0.75 || ratio > 1.33) return "A compact mark should be about square.";
-    if (width < 96) return `That image is ${width} pixels wide. Use one at least 96 pixels wide.`;
-  }
-  return { ratio };
-}
 
 export default function AppearanceTab() {
   const [row, setRow] = useState<Row | null>(null);
@@ -287,6 +263,8 @@ export default function AppearanceTab() {
           </div>;
         })}
       </section>
+
+      <SeasonalLogosCard />
     </div>
 
     <aside className="appearance-preview-column" aria-label="Preview">

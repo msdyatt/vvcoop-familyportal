@@ -338,13 +338,19 @@ export type CoopTheme = {
   supportPhone: string | null;
   /** The ready-made palettes each person may pick for themselves (Account settings, Appearance). */
   personalPalettes: string[];
+  /** Seasonal logo variants (Admin, Appearance; public.coop_logo_variants). */
+  seasonal: LogoVariant[];
+  /** The co-op's time zone, for which day it is. Fixed for now (lib/coop-time.ts COOP_TZ); a setting later (#139). */
+  timeZone: string;
 };
 
 export const DEFAULT_PERSONAL_PALETTES = PALETTES.map((p) => p.id);
+export const DEFAULT_TIME_ZONE = "America/Chicago";
 
 export const DEFAULT_THEME: CoopTheme = {
   v: 1, name: DEFAULT_COOP_NAME, paletteId: DEFAULT_PALETTE_ID, accent: VERITAS_ACCENT, font: DEFAULT_HEADING_FONT,
   logos: {}, ratio: null, supportEmail: null, supportPhone: null, personalPalettes: DEFAULT_PERSONAL_PALETTES,
+  seasonal: [], timeZone: DEFAULT_TIME_ZONE,
 };
 
 // ---- Personal appearance ----------------------------------------------------------------------------------------
@@ -369,16 +375,71 @@ export function effectiveAccent(theme: CoopTheme, personal: unknown): AccentToke
 
 export const COOP_THEME_KEY = "vv-coop";
 
-/** The CSS custom properties a theme sets on the document. Nothing is set for a logo the co-op has not uploaded. */
-export function themeVars(theme: CoopTheme): Record<string, string> {
+// ---- Seasonal logos (part 3, issue #110) ---------------------------------------------------------------------------
+
+export type LogoVariant = {
+  name: string;
+  /** "YYYY-MM-DD". With `yearly` only the month and day count, and the range may run over New Year. */
+  startsOn: string;
+  endsOn: string;
+  yearly: boolean;
+  /** "auto": between the dates; "on": now, whatever the date; "off": never. */
+  override: "auto" | "on" | "off";
+  logos: Partial<Record<LogoSlot, string>>;
+  ratio: number | null;
+  updatedAt: string;
+};
+
+/**
+ * The variant in force on `today` ("YYYY-MM-DD" in the co-op's time zone), or null. One turned on wins (the most
+ * recently changed, if several); otherwise the dated one whose range holds today, the shortest range first (a
+ * one-day "Founders' Day" beats a month-long "Autumn"), then the most recently changed.
+ *
+ * Self-contained on purpose: COOP_SCRIPT carries its source (activeVariant.toString()) so the page before its first
+ * paint and the page after it can never disagree.
+ */
+export function activeVariant(variants: LogoVariant[], today: string): LogoVariant | null {
+  const day = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000;
+  const md = (iso: string) => iso.slice(5, 10);
+  const span = (v: LogoVariant) => {
+    if (!v.yearly) return day(v.endsOn) - day(v.startsOn);
+    const d = day("2001-" + md(v.endsOn)) - day("2001-" + md(v.startsOn));
+    return d >= 0 ? d : d + 365;
+  };
+  const holds = (v: LogoVariant) => {
+    if (!v.yearly) return v.startsOn <= today && today <= v.endsOn;
+    const s = md(v.startsOn), e = md(v.endsOn), t = md(today);
+    return s <= e ? s <= t && t <= e : t >= s || t <= e;
+  };
+  const newer = (a: LogoVariant, b: LogoVariant) => (a.updatedAt > b.updatedAt ? -1 : a.updatedAt < b.updatedAt ? 1 : 0);
+  const on = variants.filter((v) => v.override === "on").sort(newer);
+  if (on.length) return on[0];
+  const dated = variants.filter((v) => v.override === "auto" && holds(v)).sort((a, b) => span(a) - span(b) || newer(a, b));
+  return dated.length ? dated[0] : null;
+}
+
+/** Today's date in the co-op's time zone, as "YYYY-MM-DD". */
+export function coopToday(timeZone: string, now: Date = new Date()): string {
+  try { return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now); }
+  catch { return now.toISOString().slice(0, 10); }
+}
+
+/**
+ * The CSS custom properties a theme sets on the document. Nothing is set for a logo the co-op has not uploaded. A
+ * seasonal variant in force on `today` replaces the slots it has; the others keep the co-op's own logo.
+ */
+export function themeVars(theme: CoopTheme, today: string = coopToday(theme.timeZone)): Record<string, string> {
   const vars: Record<string, string> = {};
   for (const key of ACCENT_KEYS) vars[ACCENT_VARS[key]] = theme.accent[key];
   vars["--serif"] = HEADING_FONTS.find((f) => f.id === theme.font)?.stack ?? HEADING_FONTS[0].stack;
+  const season = activeVariant(theme.seasonal, today);
+  const logos = { ...theme.logos, ...(season?.logos ?? {}) };
   for (const slot of LOGO_SLOTS) {
-    const url = theme.logos[slot];
+    const url = logos[slot];
     if (url && LOGO_URL_RE.test(url)) vars[LOGO_VARS[slot]] = `url("${url}")`;
   }
-  if (theme.ratio && theme.ratio >= 1 && theme.ratio <= 6) vars["--coop-lockup-ratio"] = String(Math.round(theme.ratio * 1000) / 1000);
+  const ratio = season?.logos.logo_light ? season.ratio : theme.ratio;
+  if (ratio && ratio >= 1 && ratio <= 6) vars["--coop-lockup-ratio"] = String(Math.round(ratio * 1000) / 1000);
   return vars;
 }
 
@@ -414,12 +475,38 @@ export function parseTheme(value: unknown): CoopTheme {
     personalPalettes: Array.isArray(t.personalPalettes)
       ? t.personalPalettes.filter((id): id is string => typeof id === "string" && Boolean(paletteById(id)))
       : DEFAULT_PERSONAL_PALETTES,
+    seasonal: Array.isArray(t.seasonal) ? t.seasonal.map(parseVariant).filter((v): v is LogoVariant => v !== null).slice(0, 24) : [],
+    timeZone: typeof t.timeZone === "string" && /^[A-Za-z_]+(\/[A-Za-z_+-]+)*$/.test(t.timeZone) ? t.timeZone : DEFAULT_TIME_ZONE,
+  };
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+function parseVariant(value: unknown): LogoVariant | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.startsOn !== "string" || !ISO_DAY.test(v.startsOn) || typeof v.endsOn !== "string" || !ISO_DAY.test(v.endsOn)) return null;
+  if (v.override !== "auto" && v.override !== "on" && v.override !== "off") return null;
+  const logosIn = (v.logos ?? {}) as Record<string, unknown>;
+  const logos: Partial<Record<LogoSlot, string>> = {};
+  for (const slot of LOGO_SLOTS) { const u = logosIn[slot]; if (typeof u === "string" && LOGO_URL_RE.test(u)) logos[slot] = u; }
+  if (!Object.keys(logos).length) return null;
+  return {
+    name: typeof v.name === "string" ? v.name.slice(0, 60) : "",
+    startsOn: v.startsOn, endsOn: v.endsOn, yearly: v.yearly === true, override: v.override, logos,
+    ratio: typeof v.ratio === "number" && v.ratio >= 1 && v.ratio <= 6 ? v.ratio : null,
+    updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : "",
   };
 }
 
 /** The settings row (public.coop_settings) as a theme. `publicUrl` turns a bucket path into its public URL. */
-export function themeFromRow(row: Record<string, unknown> | null | undefined, publicUrl: (path: string) => string): CoopTheme {
+export function themeFromRow(row: Record<string, unknown> | null | undefined, publicUrl: (path: string) => string, variantRows: Record<string, unknown>[] = []): CoopTheme {
   if (!row) return DEFAULT_THEME;
+  const seasonal = variantRows.map((r) => {
+    const vlogos: Record<string, string> = {};
+    for (const slot of LOGO_SLOTS) { const p = r[`${slot}_path`]; if (typeof p === "string" && p) vlogos[slot] = publicUrl(p); }
+    return { name: r.name, startsOn: r.starts_on, endsOn: r.ends_on, yearly: r.yearly, override: r.override, logos: vlogos,
+      ratio: r.logo_ratio == null ? null : Number(r.logo_ratio), updatedAt: r.updated_at };
+  });
   const logos: Record<string, string> = {};
   for (const slot of LOGO_SLOTS) {
     const path = row[`${slot}_path`];
@@ -430,6 +517,7 @@ export function themeFromRow(row: Record<string, unknown> | null | undefined, pu
     ratio: typeof row.logo_ratio === "number" ? row.logo_ratio : row.logo_ratio == null ? null : Number(row.logo_ratio),
     supportEmail: row.support_email, supportPhone: row.support_phone,
     personalPalettes: Array.isArray(row.personal_palettes) ? row.personal_palettes : undefined,
+    seasonal,
   });
 }
 
@@ -452,7 +540,13 @@ for(i=0;i<keys.length;i++){if(typeof a[keys[i]]!=='string'||!hex.test(a[keys[i]]
 if(ok){for(i=0;i<keys.length;i++)s.setProperty(vars[i],a[keys[i]])}
 var fonts=${JSON.stringify(Object.fromEntries(HEADING_FONTS.map((f) => [f.id, f.stack])))};
 if(typeof t.font==='string'&&fonts.hasOwnProperty(t.font))s.setProperty('--serif',fonts[t.font]);
-var re=${LOGO_URL_RE.toString()},slots=${JSON.stringify(LOGO_VARS)},L=t.logos||{};
-for(var k in slots){if(slots.hasOwnProperty(k)&&typeof L[k]==='string'&&re.test(L[k]))s.setProperty(slots[k],'url("'+L[k]+'")')}
-if(typeof t.ratio==='number'&&t.ratio>=1&&t.ratio<=6)s.setProperty('--coop-lockup-ratio',String(Math.round(t.ratio*1000)/1000));
+var re=${LOGO_URL_RE.toString()},slots=${JSON.stringify(LOGO_VARS)},L={},B=t.logos||{},ratio=t.ratio,season=null,k;
+for(k in B)if(B.hasOwnProperty(k))L[k]=B[k];
+if(Object.prototype.toString.call(t.seasonal)==='[object Array]'){
+var today;try{today=new Intl.DateTimeFormat('en-CA',{timeZone:t.timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}catch(e){today=new Date().toISOString().slice(0,10)}
+var ok2=[];for(i=0;i<t.seasonal.length;i++){var v=t.seasonal[i];if(v&&typeof v.startsOn==='string'&&typeof v.endsOn==='string'&&v.logos)ok2.push(v)}
+season=(${activeVariant.toString()})(ok2,today);
+if(season){for(k in season.logos)if(season.logos.hasOwnProperty(k))L[k]=season.logos[k];if(season.logos.logo_light)ratio=season.ratio}}
+for(k in slots){if(slots.hasOwnProperty(k)&&typeof L[k]==='string'&&re.test(L[k]))s.setProperty(slots[k],'url("'+L[k]+'")')}
+if(typeof ratio==='number'&&ratio>=1&&ratio<=6)s.setProperty('--coop-lockup-ratio',String(Math.round(ratio*1000)/1000));
 }catch(e){}})();`;
