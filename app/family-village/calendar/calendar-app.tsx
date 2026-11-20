@@ -5,10 +5,11 @@ import PageSkeleton from "../page-skeleton";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import AppHeader from "../app-header";
 import CalendarView from "../calendar-view";
+import { PersonalSubscribeLink } from "../subscribe-link";
 import MfaChallengeScreen from "../mfa-challenge";
 
 export default function CalendarApp() {
-  const { state: access, roles, recheck } = usePortalAccess("member");
+  const { state: access, userId, roles, recheck } = usePortalAccess("member");
 
   async function signOutToEntry() {
     await getSupabaseBrowserClient()?.auth.signOut();
@@ -23,5 +24,7 @@ export default function CalendarApp() {
   return <main className="workspace-preview calendar-page">
     <AppHeader current="home" roles={roles} title="Calendar" subtitle="Co-op dates and class dates." />
     <CalendarView />
+    {/* Moved here from Today, which now shows only the next few dates. */}
+    {userId && <div className="calendar-subscribe-row"><PersonalSubscribeLink userId={userId} /></div>}
   </main>;
 }

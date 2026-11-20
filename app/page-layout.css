@@ -1,0 +1,209 @@
+/* ==========================================================================
+   Page layout for the family pages built by home/portal-gate.tsx (Today,
+   Children, Documents, News). Issue #108: Today led with a whole month
+   calendar, sections sat in heavy navy blocks under a second heading that
+   repeated the page title, and lines ran the full width of a wide screen.
+   Now: lighter cards with one heading size, a reading width, and Today in two
+   columns. Roles only (docs/theming.md). Loaded after globals.css, so these
+   win over its two copies of the old rules without !important.
+   ========================================================================== */
+
+/* A comfortable reading width on wide screens; Messages, Calendar, Photos and Admin keep the full width. */
+.live-portal > .portal-grid,
+.live-portal > .today-grid,
+.live-portal > .compliance-banner,
+.live-portal > .area-tabs,
+.live-portal > .portal-footer {
+  max-width:1120px;
+}
+
+/* ---------- Section cards ---------- */
+
+.live-portal .portal-module {
+  min-height:0;
+  padding:22px 26px 24px;
+  border:1px solid rgba(var(--fg-rgb),.1);
+  border-radius:16px;
+  background:var(--surface);
+  box-shadow:0 1px 2px rgba(var(--shadow-rgb),.05), 0 8px 24px rgba(var(--shadow-rgb),.05);
+}
+
+/* The small label over each heading repeated the heading (or the page title); one heading is enough. */
+.live-portal .portal-module > .eyebrow { display:none; }
+
+.live-portal .portal-module h2,
+.live-portal .portal-module .module-head h2 {
+  margin:0 0 14px;
+  color:var(--text);
+  font:700 22px/1.2 var(--serif);
+}
+
+.module-head {
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.module-head a,
+.module-more {
+  display:inline-flex;
+  align-items:center;
+  min-height:44px;
+  color:var(--text-accent);
+  font:600 14px var(--sans);
+  text-decoration:none;
+}
+.module-head a:hover,
+.module-more:hover { text-decoration:underline; }
+.module-head a { margin:-12px 0 0; }
+.module-more { margin-top:6px; }
+
+/* The children's block was a navy band; now it is a card like the others. */
+.live-portal .portal-module-wide {
+  background:var(--surface);
+  color:var(--text);
+}
+.live-portal .portal-module-wide h2 { color:var(--text); }
+.live-portal .portal-module-wide .portal-empty { color:var(--text-muted); }
+
+.live-portal .portal-people { gap:10px; }
+
+.live-portal .portal-people div.person-card {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+  padding:10px 16px 10px 10px;
+  border:1px solid rgba(var(--fg-rgb),.14);
+  border-radius:14px;
+  background:var(--canvas);
+  transition:border-color .15s ease, transform .2s cubic-bezier(.34,1.5,.64,1);
+}
+.live-portal .portal-people div.person-card:hover {
+  border-color:var(--text-accent);
+  background:var(--canvas);
+  transform:translateY(-2px);
+}
+.live-portal .portal-people div.person-card:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+.live-portal .portal-people h3 { margin:0; color:var(--text); font:700 18px var(--serif); }
+.live-portal .portal-people .enroll-dot { position:static; margin-left:4px; }
+
+.live-portal .add-child-trigger {
+  border-color:rgba(var(--fg-rgb),.28);
+  border-radius:10px;
+  color:var(--text-muted);
+}
+.live-portal .add-child-trigger:hover { color:var(--text); border-color:rgba(var(--fg-rgb),.5); }
+
+/* Lists inside cards: tighter rows. */
+.live-portal .portal-module .portal-list li { padding:12px 0; }
+.live-portal .portal-module .portal-list li:first-child { border-top:0; padding-top:2px; }
+
+/* ---------- Today ---------- */
+
+.today-grid {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:18px;
+  align-items:start;
+}
+
+.today-main,
+.today-side {
+  display:grid;
+  gap:18px;
+  min-width:0;
+}
+
+@media (min-width:1100px) {
+  .today-grid { grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); }
+}
+
+/* Coming up: a short list with a date chip, not a whole month. */
+.today-dates {
+  display:grid;
+  gap:4px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+
+.today-date {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  width:100%;
+  min-height:56px;
+  padding:6px 10px 6px 6px;
+  border:0;
+  border-radius:12px;
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+  transition:background .15s ease;
+}
+.today-date:hover { background:rgba(var(--fg-rgb),.05); }
+.today-date:focus-visible { outline:2px solid var(--gold); outline-offset:1px; }
+
+.today-date-chip {
+  flex:none;
+  display:grid;
+  place-items:center;
+  width:50px;
+  height:50px;
+  border:1px solid rgba(var(--fg-rgb),.14);
+  border-radius:12px;
+  background:var(--canvas);
+  line-height:1;
+  transition:transform .25s cubic-bezier(.34,1.6,.64,1);
+}
+.today-date:hover .today-date-chip { transform:rotate(-4deg); }
+.today-date-chip small { color:var(--text-accent); font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.today-date-chip b { margin-top:-6px; font:700 21px var(--serif); }
+
+/* The first date is the next thing to happen: it gets the accent. */
+.today-dates li:first-child .today-date-chip {
+  border-color:var(--action);
+  background:var(--action);
+  color:var(--cream);
+}
+.today-dates li:first-child .today-date-chip small { color:var(--accent-on-action); }
+
+.today-date-text { display:grid; gap:2px; min-width:0; }
+.today-date-text b { font:600 15px var(--sans); }
+.today-date-text small { color:var(--text-muted); font-size:13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-portal .portal-people div.person-card,
+  .today-date-chip { transition:none; }
+  .live-portal .portal-people div.person-card:hover,
+  .today-date:hover .today-date-chip { transform:none; }
+}
+
+/* "Ready" checks on class dates: small pills a thumb can hit, not grey boxes. */
+.live-portal .event-completion-group { gap:8px; }
+.live-portal .event-completion-group label,
+.live-portal .event-completion-group button {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-height:36px;
+  padding:0 14px 0 10px;
+  border:1px solid rgba(var(--fg-rgb),.18);
+  border-radius:18px;
+  background:var(--canvas);
+  color:var(--text);
+  font:600 13px var(--sans);
+  cursor:pointer;
+}
+.live-portal .event-completion-group button { padding:0 14px; }
+.live-portal .event-completion-group label:hover,
+.live-portal .event-completion-group button:hover { border-color:var(--text-accent); }
+.live-portal .event-completion-group label.done {
+  border-color:transparent;
+  background:var(--panel);
+  color:var(--text-muted);
+}

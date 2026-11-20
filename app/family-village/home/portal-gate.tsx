@@ -8,14 +8,12 @@ import DocumentViewer from "../document-viewer";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
-import CalendarView from "../calendar-view";
 import AppHeader from "../app-header";
 import RichText, { stripRichText } from "../../../lib/rich-text";
 import MfaChallengeScreen from "../mfa-challenge";
 import { ComplianceBanner, CompliancePanel, ComplianceItem, SigningInfo } from "../compliance-panel";
 import PostAttachments, { PostThumbnail, usePostAttachments } from "../post-attachments";
 import { FamilyRequirement, Requirement, SchoolYear } from "../../../lib/compliance";
-import { PersonalSubscribeLink } from "../subscribe-link";
 
 type PortalState = "loading" | "signed-out" | "mfa-challenge" | "pending" | "active" | "error";
 type Profile = { display_name: string | null; email: string; status: "pending" | "active" | "suspended" };
@@ -52,7 +50,7 @@ function toComplianceItems(rows: unknown): ComplianceItem[] {
 export type PortalView = "home" | "children" | "news" | "classes" | "documents";
 
 const VIEW_HEADERS: Record<PortalView, { title: string; subtitle: string }> = {
-  home: { title: "Family Village", subtitle: "Your household\u2019s week, gathered in one place." },
+  home: { title: "Today", subtitle: "Your household\u2019s week, gathered in one place." },
   children: { title: "Your children", subtitle: "Profiles, classes and enrollment." },
   news: { title: "News & notices", subtitle: "From the co-op." },
   classes: { title: "Classes", subtitle: "Dates and prep for your children\u2019s classes." },
@@ -60,7 +58,9 @@ const VIEW_HEADERS: Record<PortalView, { title: string; subtitle: string }> = {
 };
 
 export default function PortalGate({ view = "home" }: { view?: PortalView }) {
-  const show = (section: string) => view === "home" || view === section;
+  // Today and the section pages share these blocks; these say which page is showing them.
+  const onToday = view === "home";
+  const onChildrenPage = view === "children";
   const [state, setState] = useState<PortalState>(() => isSupabaseConfigured() ? "loading" : "error");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [portal, setPortal] = useState<PortalData | null>(null);
@@ -70,7 +70,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const [openDocumentId, setOpenDocumentId] = useState<string | null>(null);
   const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
-  const [userId, setUserId] = useState<string | null>(null);
+  const [, setUserId] = useState<string | null>(null);
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
@@ -181,6 +181,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
   // of the Village calendar stops a shoebox reminder for one elective sitting
   // between two co-op-wide dates every family needs to read.
   const classDates = (portal?.events ?? []).filter((event) => event.audience === "class");
+  const upcoming = (portal?.events ?? []).filter((event) => event.audience !== "class").slice(0, 5);
 
   const complianceDocumentIds = new Set(
     (portal?.compliance ?? []).flatMap((item) => [item.requirement.document_id, item.row.signed_document_id].filter(Boolean) as string[]),
@@ -198,19 +199,53 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
       </div>
       <a href="/family-village/children">Choose classes →</a>
     </aside>}
-    <div className={`portal-grid${view === "home" ? "" : " portal-single"}`}>
-      {show("children") && <section id="my-children" className="portal-module portal-module-wide"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
-        {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
+    {/* Today: what is coming, what the children need, then the family and the news beside it. The full month
+        calendar lives on the Calendar page (issue #108: Today was too calendar-heavy). */}
+    {view === "home" ? <div className="today-grid">
+      <div className="today-main">
+        <section className="portal-module today-upcoming" id="calendar">
+          <div className="module-head"><h2>Coming up</h2><a href="/family-village/calendar">Open the calendar →</a></div>
+          {upcoming.length ? <ol className="today-dates">{upcoming.map((event) => {
+            const zone = event.all_day ? { timeZone: "UTC" } : {};
+            const when = new Date(event.starts_at);
+            const detail = [
+              when.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", ...zone }),
+              event.all_day ? "All day" : when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+              event.location,
+            ].filter(Boolean).join(" · ");
+            return <li key={event.id}><button type="button" className="today-date" onClick={() => setOpenEventId(event.id)}>
+              <span className="today-date-chip" aria-hidden="true"><small>{when.toLocaleDateString("en-US", { month: "short", ...zone })}</small><b>{when.toLocaleDateString("en-US", { day: "numeric", ...zone })}</b></span>
+              <span className="today-date-text"><b>{event.title}</b><small>{detail}</small></span>
+            </button></li>;
+          })}</ol> : empty("Nothing on the co-op calendar yet. Dates will appear here as they are added.")}
+        </section>
+        <section className="portal-module today-classes"><p className="eyebrow">Learning</p><h2>In your children&rsquo;s classes</h2>{classDates.length
+        ? <ol className="portal-list class-event-list">{classDates.map(event => {
+            const childIds = (portal?.enrollments ?? []).filter((entry) => entry.class_id === event.class_id).map((entry) => entry.child_id);
+            const completedIds = new Set((portal?.completions ?? []).filter((entry) => entry.event_id === event.id).map((entry) => entry.child_id));
+            const allDone = childIds.length > 0 && childIds.every((id) => completedIds.has(id));
+            return <li key={event.id}>
+              <button className="class-event-open" onClick={() => setOpenEventId(event.id)}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</time><span><b>{event.title}</b><small>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</small></span></button>
+              {event.requires_prework && <div className="event-completion-group">
+                {childIds.map((childId) => { const child = portal?.children.find((row) => row.id === childId); const done = completedIds.has(childId); return <label key={childId} className={done ? "done" : ""}><input type="checkbox" checked={done} onChange={() => setEventCompletion(event.id, [childId], !done)} />{child?.first_name ?? "Student"} {done ? "ready" : "assignment"}</label>; })}
+                {childIds.length > 1 && <button onClick={() => setEventCompletion(event.id, childIds, !allDone)}>{allDone ? "Clear all" : "Mark all ready"}</button>}
+              </div>}
+            </li>;
+          })}</ol>
+        : empty(portal?.classes.length ? "Nothing scheduled in your children's classes yet." : "Classes will appear after enrollment is entered.")}</section>
+      </div>
+      <div className="today-side">
+        <section id="my-children" className="portal-module portal-module-wide today-children"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
+        {onChildrenPage ? portal && <AddChildForm familyId={portal.familyId} onAdded={load} /> : <a className="module-more" href="/family-village/children">Profiles and enrollment →</a>}
+      </section>
+        <section className="portal-module today-news" id="news"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{(onToday ? portal.posts.slice(0, 3) : portal.posts).map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}{onToday && (portal?.posts.length ?? 0) > 0 && <a className="module-more" href="/family-village/news">All news →</a>}</section>
+      </div>
+    </div> : <div className="portal-grid portal-single">
+      {view === "children" && <section id="my-children" className="portal-module portal-module-wide today-children"><p className="eyebrow">Your children</p><h2>The family table</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
+        {onChildrenPage ? portal && <AddChildForm familyId={portal.familyId} onAdded={load} /> : <a className="module-more" href="/family-village/children">Profiles and enrollment →</a>}
       </section>}
-      {show("home") && <section className="portal-module portal-module-full" id="calendar"><p className="eyebrow">Coming up</p><h2>Village calendar</h2>
-        <CalendarView />
-        {userId && <div className="calendar-subscribe-row"><PersonalSubscribeLink userId={userId} /></div>}
-      </section>}
-      {show("news") && <section className="portal-module" id="news"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{portal.posts.map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}</section>}
-      {/* Class dates, per class, with anything needing prep called out. This
-          replaces the old assignments list -- homework is now a flag on a date
-          rather than a separate row, so a parent reads one list instead of two. */}
-      {show("classes") && <section className="portal-module"><p className="eyebrow">Learning</p><h2>In your children&rsquo;s classes</h2>{classDates.length
+      {view === "news" && <section className="portal-module today-news" id="news"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{(onToday ? portal.posts.slice(0, 3) : portal.posts).map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}{onToday && (portal?.posts.length ?? 0) > 0 && <a className="module-more" href="/family-village/news">All news →</a>}</section>}
+      {view === "classes" && <section className="portal-module today-classes"><p className="eyebrow">Learning</p><h2>In your children&rsquo;s classes</h2>{classDates.length
         ? <ol className="portal-list class-event-list">{classDates.map(event => {
             const childIds = (portal?.enrollments ?? []).filter((entry) => entry.class_id === event.class_id).map((entry) => entry.child_id);
             const completedIds = new Set((portal?.completions ?? []).filter((entry) => entry.event_id === event.id).map((entry) => entry.child_id));
@@ -224,14 +259,13 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
             </li>;
           })}</ol>
         : empty(portal?.classes.length ? "Nothing scheduled in your children's classes yet." : "Classes will appear after enrollment is entered.")}</section>}
-      {show("documents") && <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">To do &amp; signed</p><h2>Forms &amp; dues</h2>
+      {view === "documents" && <>
+        <section className="portal-module portal-module-wide" id="paperwork"><p className="eyebrow">To do &amp; signed</p><h2>Forms &amp; dues</h2>
         {portal && <FamilyCompliance familyId={portal.familyId} />}
-      </section>}
-      {/* Documents that aren't a requirement -- class handouts and anything an
-          administrator has shared with this household. Signed copies are
-          excluded because they already appear above, against their requirement. */}
-      {show("documents") && <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other files</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>}
-    </div>
+      </section>
+        <section className="portal-module"><p className="eyebrow">Shared files</p><h2>Handouts &amp; other files</h2>{otherDocuments.length ? <ol className="portal-list portal-docs clickable-list">{otherDocuments.map(document => <li key={document.id}><div role="button" tabIndex={0} onClick={() => openDocument(document.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDocument(document.id); } }} style={{ display: "contents" }}><div><b>{document.title}</b><span>{document.kind}</span></div></div></li>)}</ol> : empty("Handouts shared with your family or your children's classes will appear here.")}</section>
+      </>}
+    </div>}
 
     <footer className="portal-footer">
       <a href="mailto:veritasvillagecoop@gmail.com?subject=Feedback%20on%20Family%20Village">Feedback</a>
