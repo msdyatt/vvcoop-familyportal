@@ -1,20 +1,54 @@
 /**
  * The installed web app's manifest, with the co-op's name (issue #140; public.coop_settings).
  *
- * Served at /app.webmanifest (app/layout.tsx links it). public/manifest.webmanifest is the template: icons, colours and paths stay as they are there. This route
+ * Served at /app.webmanifest (app/layout.tsx links it). MANIFEST_TEMPLATE below is the template: icons, colours and paths stay as they are there. This route
  * reads the co-op's name from the settings row (readable without signing in) and puts it in the name, the
  * short name and the description. If the settings cannot be read quickly, the template is served unchanged, so
  * installing the app never depends on the database. Icons are not themed: a home-screen icon needs fixed sizes
  * and a maskable version, which a logo upload does not provide.
  */
 export const MANIFEST_PATH = "/app.webmanifest";
-/** The static template. Static files are served before the Worker runs, so the branded copy needs its own path. */
-export const MANIFEST_TEMPLATE_PATH = "/manifest.webmanifest";
+
+/**
+ * The template: the same as public/manifest.webmanifest (tests/coop-theme.test.mjs checks they match). Kept here
+ * because the Worker has no binding to read static files with, and static files are served before the Worker runs,
+ * so the branded copy needs its own path.
+ */
+export const MANIFEST_TEMPLATE: Record<string, unknown> = {
+  "name": "Veritas Village Family Portal",
+  "short_name": "Veritas Village",
+  "description": "Classes, news, and reminders for Veritas Village families and teachers.",
+  "id": "/family-village",
+  "start_url": "/family-village/home",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b2a3d",
+  "theme_color": "#0b2a3d",
+  "icons": [
+    {
+      "src": "/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+};
 
 const UPSTREAM_TIMEOUT_MS = 2_000;
 const TEMPLATE_NAME = "Veritas Village";
-
-type Fetcher = { fetch(request: Request | string, init?: RequestInit): Promise<Response> };
 
 /** The template with the co-op's name in place of the bundled one. Pure, for the tests. */
 export function brandManifest(template: Record<string, unknown>, name: string | null): Record<string, unknown> {
@@ -41,12 +75,8 @@ async function coopName(supabase: { url: string; key: string }, fetchImpl: typeo
   }
 }
 
-export async function handleManifest(request: Request, assets: Fetcher, supabase: { url: string; key: string }, fetchImpl: typeof fetch = fetch): Promise<Response> {
-  const asset = await assets.fetch(new Request(new URL(MANIFEST_TEMPLATE_PATH, request.url)));
-  if (!asset.ok) return asset;
-  let template: Record<string, unknown>;
-  try { template = await asset.clone().json(); } catch { return asset; }
-  const body = brandManifest(template, await coopName(supabase, fetchImpl));
+export async function handleManifest(supabase: { url: string; key: string }, fetchImpl: typeof fetch = (input, init) => fetch(input, init)): Promise<Response> {
+  const body = brandManifest(MANIFEST_TEMPLATE, await coopName(supabase, fetchImpl));
   return new Response(JSON.stringify(body), {
     headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=300" },
   });

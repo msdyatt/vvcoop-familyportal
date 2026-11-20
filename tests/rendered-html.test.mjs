@@ -111,3 +111,18 @@ test("displays nonprofit identity and administrative contact details", async () 
     assert.match(html, /family\.veritasvillage\.org\/family-village/);
   }
 });
+
+test("the installed app's manifest is answered by the Worker itself, with no static-file binding and the database out of reach", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error("offline in the test"); };
+  try {
+    const response = await (await worker()).fetch(new Request("http://localhost/app.webmanifest"), { SITE_PASSWORD: "x", SITE_AUTH_SECRET: "y" }, ctx);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "application/manifest+json");
+    const body = await response.json();
+    assert.equal(body.short_name, "Veritas Village");
+    assert.equal(body.start_url, "/family-village/home");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
