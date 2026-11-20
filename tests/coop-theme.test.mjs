@@ -74,18 +74,21 @@ test("the manifest takes the co-op's name, and keeps the template otherwise", ()
   });
 });
 
-test("the manifest route serves the template when the settings cannot be read, and the branded copy when they can", async () => {
-  const template = JSON.parse(await readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"));
-  const assets = { fetch: async (req) => { assert.equal(new URL(req.url).pathname, "/manifest.webmanifest"); return new Response(JSON.stringify(template)); } };
-  const supabase = { url: "https://abc.supabase.co", key: "pk" };
-  const request = new Request("https://family.example.org/app.webmanifest");
+test("the manifest route's template is public/manifest.webmanifest", async () => {
+  const file = JSON.parse(await readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"));
+  assert.deepEqual(manifest.MANIFEST_TEMPLATE, file);
+});
 
-  const down = await manifest.handleManifest(request, assets, supabase, async () => { throw new Error("offline"); });
+test("the manifest route serves the template when the settings cannot be read, and the branded copy when they can", async () => {
+  const template = manifest.MANIFEST_TEMPLATE;
+  const supabase = { url: "https://abc.supabase.co", key: "pk" };
+
+  const down = await manifest.handleManifest(supabase, async () => { throw new Error("offline"); });
   assert.deepEqual(await down.json(), template);
   assert.equal(down.headers.get("content-type"), "application/manifest+json");
 
   let asked = "";
-  const up = await manifest.handleManifest(request, assets, supabase, async (url, init) => {
+  const up = await manifest.handleManifest(supabase, async (url, init) => {
     asked = String(url);
     assert.equal(init.headers.apikey, "pk");
     return new Response(JSON.stringify([{ name: "Riverbend Co-op" }]));

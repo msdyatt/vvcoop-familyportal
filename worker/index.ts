@@ -70,7 +70,7 @@ const worker = {
     // The installed app's manifest, with the co-op's name from its settings (worker/manifest.ts). Ahead of the
     // gate: browsers fetch a manifest without cookies, and it says nothing the sign-in page does not.
     if (url.pathname === MANIFEST_PATH && request.method === "GET") {
-      return withSecurityHeaders(await handleManifest(request, env.ASSETS, supabaseConnection()));
+      return withSecurityHeaders(await handleManifest(supabaseConnection()));
     }
 
     const gated = await guardRequest(request, env);
