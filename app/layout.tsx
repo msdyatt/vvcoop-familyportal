@@ -5,9 +5,11 @@ import "./public-site.css";
 import "./theme.css";
 import "./appearance.css";
 import "./class-pages.css";
+import "./desktop-nav.css";
 import { PLATFORM_SCRIPT } from "../lib/platform";
 import { THEME_COLORS, THEME_SCRIPT } from "../lib/theme";
 import { COOP_SCRIPT } from "../lib/coop-theme";
+import { SIDENAV_SCRIPT } from "../lib/desktop-nav";
 import ThemeSync from "./theme-sync";
 import CoopThemeSync from "./coop-theme-sync";
 import ErrorReporter from "./error-reporter";
@@ -73,6 +75,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       {/* The co-op's accent, heading font and logos, from the copy kept on this device (lib/coop-theme.ts), also before the first paint. */}
       <script dangerouslySetInnerHTML={{ __html: COOP_SCRIPT }} />
+      {/* A desktop sidebar that was tucked away stays tucked away from the first paint (lib/desktop-nav.ts). */}
+      <script dangerouslySetInnerHTML={{ __html: SIDENAV_SCRIPT }} />
       {/* Playfair Display carries the high-contrast display serif the brand
           guide specifies for headings. Inter is the body face; the CSS stack
           falls through to the platform UI sans, which the guide allows. Both

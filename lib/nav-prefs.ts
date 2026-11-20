@@ -52,16 +52,16 @@ export const DESTINATIONS: Destination[] = [
   { id: "teacher-news", label: "Team news", href: `${TEACHER}/news`, icon: "news", role: "teacher", area: "portal" },
   { id: "teacher-classes", label: "My classes", href: `${TEACHER}/classes`, icon: "classes", role: "teacher", area: "portal" },
   { id: "teacher-lounge", label: "Print queue", href: `${TEACHER}/print`, icon: "paperwork", role: "teacher", area: "portal" },
-  { id: "admin-dashboard", label: "Dashboard", href: ADMIN, icon: "dashboard", role: "admin", area: "admin" },
+  { id: "admin-dashboard", label: "Overview", href: ADMIN, icon: "dashboard", role: "admin", area: "admin" },
   { id: "admin-families", label: "Families", href: `${ADMIN}?tab=families`, icon: "families", role: "admin", area: "admin" },
   { id: "admin-classes", label: "Classes", href: `${ADMIN}?tab=classes`, icon: "classes", role: "admin", area: "admin" },
-  { id: "admin-invitations", label: "Invites", href: `${ADMIN}?tab=invitations`, icon: "invitations", role: "admin", area: "admin" },
+  { id: "admin-invitations", label: "Invitations", href: `${ADMIN}?tab=invitations`, icon: "invitations", role: "admin", area: "admin" },
   { id: "admin-documents", label: "Documents", href: `${ADMIN}?tab=documents`, icon: "compliance", role: "admin", area: "admin" },
   { id: "admin-news", label: "News", href: `${ADMIN}?tab=news`, icon: "news", role: "admin", area: "admin" },
   { id: "admin-reports", label: "Reports", href: `${ADMIN}?tab=reports`, icon: "reports", role: "admin", area: "admin" },
   { id: "admin-activity", label: "Activity", href: `${ADMIN}?tab=activity`, icon: "activity", role: "admin", area: "admin" },
-  { id: "admin-flagged", label: "Messaging", href: `${ADMIN}?tab=message-reports`, icon: "flag", role: "admin", area: "admin" },
-  { id: "admin-integrations", label: "Services", href: `${ADMIN}?tab=integrations`, icon: "integrations", role: "admin", area: "admin" },
+  { id: "admin-flagged", label: "Reported messages", href: `${ADMIN}?tab=message-reports`, icon: "flag", role: "admin", area: "admin" },
+  { id: "admin-integrations", label: "Integrations", href: `${ADMIN}?tab=integrations`, icon: "integrations", role: "admin", area: "admin" },
 ];
 
 export const SECTION_LABELS: Record<Section, string> = { home: "Main bar", admin: "Admin bar" };
