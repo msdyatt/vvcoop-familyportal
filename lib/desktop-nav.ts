@@ -107,6 +107,9 @@ export function adminHref(tab: string): string {
   return tab === "dashboard" ? ADMIN_PATH : `${ADMIN_PATH}?tab=${tab}`;
 }
 
+/** Opens the sidebar as a drawer on a narrow screen (the header's Menu button sends it). */
+export const DRAWER_EVENT = "vv-drawer-open";
+
 /** Asks the Admin workspace to switch tab in place, without reloading the page. */
 export const ADMIN_TAB_EVENT = "vv-admin-tab";
 

@@ -127,13 +127,14 @@ test("a tucked-away sidebar is marked before the first paint, and a broken stora
   assert.equal(run(null, true), undefined);
 });
 
-test("the sidebar, tab strip and Jump button only show in a desktop browser, never in the installed apps", async () => {
+test("the sidebar, its drawer, the tab strips and the header buttons only show in a browser, never in the installed apps", async () => {
   const css = (await readFile(new URL("../app/desktop-nav.css", import.meta.url), "utf8")).replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(css, /^\.side-nav,\s*\.area-tabs,\s*\.jump-to-trigger\s*\{\s*display:none;\s*\}/m);
   const showing = [...css.matchAll(/([^{}]*)\{([^{}]*)\}/g)]
-    .filter(([, selector, body]) => /(^|[\s,])\.(side-nav|area-tabs|jump-to-trigger)(\s*[,{]|$)/m.test(selector.trim() + "{") && /display\s*:\s*(flex|inline-flex|grid|block)/.test(body))
+    .filter(([, selector, body]) => /(^|[\s,])\.(side-nav|side-nav-scrim|side-nav-close|area-tabs|jump-to-trigger|mobile-nav-trigger)(\s*[,{]|$)/m.test(selector.trim() + "{") && /display\s*:\s*(flex|inline-flex|grid|block)/.test(body))
     .map(([, selector]) => selector.trim());
-  assert.ok(showing.length >= 3);
+  assert.ok(showing.length >= 6, showing.join("\n"));
+  assert.match(css, /^\.mobile-nav-trigger,\s*\.side-nav-close,\s*\.side-nav-scrim\s*\{\s*display:none;\s*\}/m);
   for (const selector of showing) assert.match(selector, /html:not\(\[data-app\]\):not\(\[data-frame\]\)/, selector);
   assert.match(css, /@media \(min-width:1024px\)/);
   assert.match(css, /prefers-reduced-motion: reduce/);

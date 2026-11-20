@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CoopLogo from "../coop-logo";
 import { useUnreadCount } from "./messages/messages-link";
 import {
   ADMIN_GROUPS, ADMIN_PATH, ADMIN_TAB_EVENT, PORTAL_PRIMARY, PORTAL_SECONDARY,
-  SIDENAV_KEY, activePortalItem, adminGroupOf, adminHref, adminTabFrom, dayPartOf, greeting, seasonOf,
+  DRAWER_EVENT, SIDENAV_KEY, activePortalItem, adminGroupOf, adminHref, adminTabFrom, dayPartOf, greeting, seasonOf,
   type DayPart, type NavIcon, type Season, type SideItem,
 } from "../../lib/desktop-nav";
 import type { PortalKey } from "../../lib/nav-prefs";
@@ -100,6 +100,40 @@ export default function SideNav({ current, roles, name }: { current: PortalKey; 
   const [choice, setChoice] = useState<boolean | null>(null);
   const collapsed = choice ?? boot?.collapsed ?? false;
   const now = boot?.now ?? null;
+  // On a narrow screen in a browser the sidebar is a drawer, opened from the header's Menu button.
+  const [drawer, setDrawer] = useState(false);
+  const shell = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const open = () => { opener.current = document.activeElement as HTMLElement | null; setDrawer(true); };
+    window.addEventListener(DRAWER_EVENT, open);
+    return () => window.removeEventListener(DRAWER_EVENT, open);
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!drawer) { delete root.dataset.drawer; return; }
+    root.dataset.drawer = "open";
+    const frame = window.requestAnimationFrame(() => shell.current?.querySelector<HTMLElement>(".side-nav-close")?.focus());
+    // Closes on Escape, and keeps Tab inside the drawer while it is open.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setDrawer(false); opener.current?.focus(); return; }
+      if (event.key !== "Tab" || !shell.current) return;
+      const stops = [...shell.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled])")].filter((el) => el.offsetParent !== null);
+      if (!stops.length) return;
+      const first = stops[0], last = stops[stops.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => { window.cancelAnimationFrame(frame); document.removeEventListener("keydown", onKey); delete root.dataset.drawer; };
+  }, [drawer]);
+
+  function close() {
+    setDrawer(false);
+    opener.current?.focus();
+  }
 
   useEffect(() => {
     const sync = () => setWhere(readLocation());
@@ -145,6 +179,7 @@ export default function SideNav({ current, roles, name }: { current: PortalKey; 
     // Already in the Admin workspace: switch in place, no reload.
     if (!window.location.pathname.startsWith(ADMIN_PATH)) return;
     event.preventDefault();
+    setDrawer(false);
     window.dispatchEvent(new CustomEvent(ADMIN_TAB_EVENT, { detail: adminGroupOf(adminTab).tabs.some((row) => row.id === tab) ? adminTab : tab }));
   }
 
@@ -152,13 +187,18 @@ export default function SideNav({ current, roles, name }: { current: PortalKey; 
   const season = now ? seasonOf(now) : null;
   const firstName = name.split(/\s+/)[0] ?? "";
 
-  return <nav className={`side-nav${admin ? " side-nav-admin" : ""}`} aria-label={admin ? "Admin" : "Main"}>
+  return <div ref={shell} className="side-nav-shell" {...(drawer ? { role: "dialog", "aria-modal": true, "aria-label": "Menu" } : {})}>
+    {drawer && <button type="button" className="side-nav-scrim" tabIndex={-1} aria-label="Close the menu" onClick={close} />}
+    <nav className={`side-nav${admin ? " side-nav-admin" : ""}`} aria-label={admin ? "Admin" : "Main"}>
     <div className="side-nav-top">
       <a className="side-nav-brand" href={admin ? ADMIN_PATH : "/family-village/home"} aria-label={admin ? "Admin overview" : "Today"}>
         <CoopLogo className="side-nav-lockup" tone={admin ? "on-dark" : "auto"} />
         <CoopLogo kind="mark" className="side-nav-mark" tone={admin ? "on-dark" : "auto"} decorative />
       </a>
       {admin && <span className="side-nav-admin-chip">Admin</span>}
+      <button type="button" className="side-nav-close" onClick={close} aria-label="Close the menu">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
     </div>
 
     <p className="side-nav-hello" aria-live="off">
@@ -211,5 +251,6 @@ export default function SideNav({ current, roles, name }: { current: PortalKey; 
         <span>{collapsed ? "" : "Tuck away"}</span>
       </button>
     </div>
-  </nav>;
+  </nav>
+  </div>;
 }
