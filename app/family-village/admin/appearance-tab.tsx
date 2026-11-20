@@ -19,6 +19,7 @@ type Row = {
   name: string; palette_id: string; accent: AccentTokens; heading_font: string;
   logo_light_path: string | null; logo_dark_path: string | null; mark_light_path: string | null; mark_dark_path: string | null;
   logo_ratio: number | null; support_email: string | null; support_phone: string | null;
+  personal_palettes: string[] | null;
 };
 
 /** A logo slot's draft: unchanged, a new file (with its preview URL and shape), or cleared back to the bundled logo. */
@@ -71,6 +72,7 @@ export default function AppearanceTab() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
+  const [personal, setPersonal] = useState<string[]>([]);
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
@@ -87,6 +89,7 @@ export default function AppearanceTab() {
     setFont(isHeadingFont(r.heading_font) ? r.heading_font : "playfair");
     setLogos({ logo_light: { kind: "keep" }, logo_dark: { kind: "keep" }, mark_light: { kind: "keep" }, mark_dark: { kind: "keep" } });
     setLogoErrors({});
+    setPersonal(r.personal_palettes ?? PALETTES.map((p) => p.id));
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
@@ -159,6 +162,11 @@ export default function AppearanceTab() {
         p_support_email: supportEmail, p_support_phone: supportPhone,
       });
       if (error) throw new Error(error.message);
+      const personalNow = PALETTES.map((p) => p.id).filter((id) => personal.includes(id));
+      if (JSON.stringify(personalNow) !== JSON.stringify(row.personal_palettes ?? PALETTES.map((p) => p.id))) {
+        const { error: personalError } = await supabase.rpc("admin_set_personal_palettes", { p_ids: personalNow });
+        if (personalError) throw new Error(personalError.message);
+      }
       // The old files are no longer used. Removing them is tidy-up; a failure here changes nothing people see.
       if (replaced.length) await supabase.storage.from(LOGO_BUCKET).remove(replaced).catch(() => {});
       const theme = await fetchCoopTheme(supabase);
@@ -230,6 +238,19 @@ export default function AppearanceTab() {
           <ul>{problems.map((p) => <li key={p.message}>{p.message}</li>)}</ul>
           {nearest && <button type="button" className="ghost" onClick={() => setCustomHex(nearest)}>Use the nearest shade that works ({nearest})</button>}
         </div>}
+      </section>
+
+      <section className="appearance-card">
+        <p className="card-kicker">Colours members may choose</p>
+        <p className="field-note">Each person can switch to one of these for themselves under Account settings, Appearance. The co-op&rsquo;s own colours are always offered. Untick them all to keep one palette for everyone.</p>
+        <div className="appearance-personal">
+          {PALETTES.map((p) => <label key={p.id}>
+            <input type="checkbox" checked={personal.includes(p.id)} disabled={busy}
+              onChange={(e) => setPersonal((list) => e.target.checked ? [...list, p.id] : list.filter((id) => id !== p.id))} />
+            <span className="appearance-swatches" aria-hidden="true"><span style={{ background: p.tokens.accent }} /></span>
+            {p.label}
+          </label>)}
+        </div>
       </section>
 
       <section className="appearance-card">

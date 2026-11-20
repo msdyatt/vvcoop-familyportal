@@ -133,3 +133,28 @@ fully shows on the next launch (the header redraws at once). Its logo artwork is
 generated ones, checks the Veritas palette matches the stylesheet and the database default, and that no alert, ink
 or background role follows the palette. `tests/coop-theme.test.mjs` runs the head script and the manifest route.
 `supabase/tests/database/032_coop_settings.test.sql` covers who may read and write, the refusals and the bucket.
+
+## Personal appearance (issue #140, part 2)
+
+Account settings, Appearance has three choices, each person's own:
+
+- **Light, Dark or System** (as before, `lib/theme.ts`).
+- **Accent colour**: the co-op's own, or one of the ready-made palettes the co-op offers (Admin, Appearance,
+  "Colours members may choose"; `coop_settings.personal_palettes`, set by `admin_set_personal_palettes`). Only
+  ready-made palettes can be offered, because each has passed every contrast check. The section is hidden when the
+  co-op offers none. A palette the co-op stops offering falls back to the co-op's own, on every device, at once.
+- **Text size**: Standard or Larger. Larger multiplies every font size and line height by 1.15 (`--text-scale` in
+  `app/appearance.css`). The stylesheets write sizes in pixels, so a build step (`scripts/postcss-text-scale.mjs`,
+  in `postcss.config.mjs`) rewrites each pixel value in `font`, `font-size` and `line-height` to
+  `calc(<px> * var(--text-scale, 1))`. Spacing, borders and icons do not change. Inline `fontSize` in TSX is not
+  scaled; prefer CSS. In the iPhone app the web pages scale the same way and the native Messages screens take at least
+  one step larger Dynamic Type (`appearance` bridge message).
+
+Storage follows the Light/Dark rule: the device keeps the choice (`localStorage` `vv-accent`, `vv-text-size`) and the
+account keeps it too (`user_nav_prefs.prefs.accent`, `.textSize`). A choice made on this device wins; a device never
+set adopts the account's when the tab bar loads the person's record. `COOP_SCRIPT` applies both before the first
+paint (larger text even before the co-op settings are cached).
+
+Tests: `tests/coop-theme.test.mjs` (the head script with personal choices, the database's palette list),
+`tests/text-scale.test.mjs` (the build step, and no fixed pixel font size left in the built CSS),
+`supabase/tests/database/033_personal_palettes.test.sql`.

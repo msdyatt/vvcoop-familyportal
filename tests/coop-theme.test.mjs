@@ -22,12 +22,17 @@ const manifest = await load("worker/manifest.ts", "manifest");
 
 const LOGO = "https://abc.supabase.co/storage/v1/object/public/coop-brand/logo_light/abc.png";
 
-/** Runs the head script with this in storage and returns the custom properties it set. */
-function runScript(stored, { throws = false } = {}) {
+/** Runs the head script with this in storage and returns the custom properties it set (and the page's dataset). */
+function runScript(stored, { throws = false, personal = null, textSize = null, dataset = {} } = {}) {
   const set = {};
+  const values = {
+    [coop.COOP_THEME_KEY]: stored === undefined ? null : typeof stored === "string" ? stored : JSON.stringify(stored),
+    [coop.PERSONAL_ACCENT_KEY]: personal,
+    [coop.TEXT_SIZE_KEY]: textSize,
+  };
   const sandbox = {
-    document: { documentElement: { style: { setProperty: (k, v) => { set[k] = v; } } } },
-    localStorage: throws ? { getItem() { throw new Error("blocked"); } } : { getItem: () => (stored === undefined ? null : typeof stored === "string" ? stored : JSON.stringify(stored)) },
+    document: { documentElement: { dataset, style: { setProperty: (k, v) => { set[k] = v; } } } },
+    localStorage: throws ? { getItem() { throw new Error("blocked"); } } : { getItem: (k) => values[k] ?? null },
   };
   vm.runInNewContext(coop.COOP_SCRIPT, sandbox);
   return set;
@@ -88,4 +93,40 @@ test("the manifest route serves the template when the settings cannot be read, a
   assert.equal(body.short_name, "Riverbend Co-op");
   assert.deepEqual(body.icons, template.icons);
   assert.equal(body.start_url, template.start_url);
+});
+
+// ---- Personal appearance (part 2) ----------------------------------------------------------------------------------
+
+test("the head script wears the person's palette only when the co-op allows it", () => {
+  const theme = coop.parseTheme({ v: 1, name: "Riverbend", accent: coop.PALETTES[0].tokens, personalPalettes: ["teal", "plum"] });
+  const teal = coop.PALETTES.find((p) => p.id === "teal").tokens;
+  assert.deepEqual(runScript(theme, { personal: "teal" }), coop.themeVars({ ...theme, accent: coop.effectiveAccent(theme, "teal") }));
+  assert.equal(runScript(theme, { personal: "teal" })["--terracotta"], teal.accent);
+  assert.equal(runScript(theme, { personal: "ochre" })["--terracotta"], theme.accent.accent, "a palette the co-op does not offer is ignored");
+  assert.equal(runScript(theme, { personal: "coop" })["--terracotta"], theme.accent.accent);
+  assert.equal(runScript({ ...theme, personalPalettes: "teal" }, { personal: "teal" })["--terracotta"], theme.accent.accent, "a malformed list offers nothing");
+  assert.deepEqual(coop.effectiveAccent(theme, "teal"), teal);
+  assert.deepEqual(coop.effectiveAccent(theme, "ochre"), theme.accent);
+  assert.deepEqual(coop.effectiveAccent({ ...theme, personalPalettes: [] }, "teal"), theme.accent);
+});
+
+test("the head script turns on larger text from the device, even before the co-op settings are cached", () => {
+  const dataset = {};
+  runScript(undefined, { textSize: "large", dataset });
+  assert.equal(dataset.textSize, "large");
+  const plain = {};
+  runScript(undefined, { textSize: "huge", dataset: plain });
+  assert.equal(plain.textSize, undefined);
+});
+
+test("a cached theme keeps the co-op's list of personal palettes, without unknown ones", () => {
+  assert.deepEqual(coop.parseTheme({ v: 1, personalPalettes: ["teal", "neon", 3] }).personalPalettes, ["teal"]);
+  assert.deepEqual(coop.parseTheme({ v: 1 }).personalPalettes, coop.PALETTES.map((p) => p.id));
+});
+
+test("the database offers exactly the ready-made palettes", async () => {
+  const sql = await readFile(new URL("../supabase/migrations/20261120100000_personal_palettes.sql", import.meta.url), "utf8");
+  const ids = coop.PALETTES.map((p) => p.id);
+  assert.ok(sql.includes(`default '{${ids.join(",")}}'`), "the column default");
+  assert.equal(sql.split(`array['${ids.join("', '")}']`).length - 1, 2, "the column check and the function's list");
 });

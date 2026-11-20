@@ -1,4 +1,5 @@
 import os
+import SwiftUI
 import UIKit
 
 /// Where the website lives and how the frame identifies itself to it.
@@ -100,6 +101,19 @@ enum Brand {
         return changed
     }
     static func color(_ rgb: UInt32) -> UIColor { hex(rgb) }
+
+    // MARK: Larger text
+    // The person's "Larger text" choice (Account settings; lib/personal-appearance.ts, `appearance` message). The web pages
+    // scale their own text; the native screens (Messages) take at least one step larger Dynamic Type, and still follow the
+    // phone's own text size above that. Kept for the next launch; a screen opened after the change picks it up.
+    private static let textSizeKey = "vv.textSize"
+    static var largerText: Bool { UserDefaults.standard.string(forKey: textSizeKey) == "large" }
+    static func setTextSize(_ size: String) {
+        guard size == "large" || size == "normal" else { return }
+        UserDefaults.standard.set(size, forKey: textSizeKey)
+    }
+    /// The Dynamic Type range for native screens.
+    static var dynamicTypeRange: ClosedRange<DynamicTypeSize> { largerText ? .xLarge ... .accessibility5 : .xSmall ... .accessibility5 }
 
     /// The co-op's accent (web `--terracotta`). Dynamic, so it is read when drawn and follows a change of palette.
     static let terracotta = UIColor { _ in hex(coopAccent.accent) }

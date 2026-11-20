@@ -409,5 +409,9 @@ next launch starts in the co-op's colours; the header band redraws at once, othe
 ignored whole. `Brand.danger` (payment sheet errors) stays fixed. The header's logo artwork and the splash are still the bundled
 Veritas Village assets: a co-op's uploaded logo is not downloaded by the frame yet. Older frame builds ignore the message.
 
+`post("appearance", { textSize })` carries the person's Larger text choice (lib/personal-appearance.ts). The frame keeps it
+(`vv.textSize`) and native screens (NativeScreenController) get a Dynamic Type range starting at `.xLarge` instead of `.xSmall`, so
+they are at least one step larger and still follow the phone's own setting above that. A screen opened after the change picks it up.
+
 Not verified on a device: this was written and syntax-checked, not run on a phone. Check on a phone: toggle Dark in Account
 settings and look at the navigation bar, tab bar, Menu sheet and a sheet page; then switch back to System with the phone in Dark.

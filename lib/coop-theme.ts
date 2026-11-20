@@ -336,12 +336,36 @@ export type CoopTheme = {
   ratio: number | null;
   supportEmail: string | null;
   supportPhone: string | null;
+  /** The ready-made palettes each person may pick for themselves (Account settings, Appearance). */
+  personalPalettes: string[];
 };
+
+export const DEFAULT_PERSONAL_PALETTES = PALETTES.map((p) => p.id);
 
 export const DEFAULT_THEME: CoopTheme = {
   v: 1, name: DEFAULT_COOP_NAME, paletteId: DEFAULT_PALETTE_ID, accent: VERITAS_ACCENT, font: DEFAULT_HEADING_FONT,
-  logos: {}, ratio: null, supportEmail: null, supportPhone: null,
+  logos: {}, ratio: null, supportEmail: null, supportPhone: null, personalPalettes: DEFAULT_PERSONAL_PALETTES,
 };
+
+// ---- Personal appearance ----------------------------------------------------------------------------------------
+// Each person may choose one of the co-op's allowed ready-made palettes instead of the co-op's own, and larger text
+// (lib/personal-appearance.ts keeps the choices). Only ready-made palettes: they all pass every check.
+
+export const PERSONAL_ACCENT_KEY = "vv-accent";
+export const TEXT_SIZE_KEY = "vv-text-size";
+export const TEXT_SIZES = ["normal", "large"] as const;
+export type TextSize = (typeof TEXT_SIZES)[number];
+/** How much "Larger text" scales every font size and line height (app/appearance.css, --text-scale). */
+export const LARGE_TEXT_SCALE = 1.15;
+
+/** The accent in force: the person's palette when the co-op allows it, else the co-op's own. */
+export function effectiveAccent(theme: CoopTheme, personal: unknown): AccentTokens {
+  if (typeof personal === "string" && theme.personalPalettes.includes(personal)) {
+    const palette = paletteById(personal);
+    if (palette) return palette.tokens;
+  }
+  return theme.accent;
+}
 
 export const COOP_THEME_KEY = "vv-coop";
 
@@ -387,6 +411,9 @@ export function parseTheme(value: unknown): CoopTheme {
     ratio,
     supportEmail: text(t.supportEmail, 200),
     supportPhone: text(t.supportPhone, 40),
+    personalPalettes: Array.isArray(t.personalPalettes)
+      ? t.personalPalettes.filter((id): id is string => typeof id === "string" && Boolean(paletteById(id)))
+      : DEFAULT_PERSONAL_PALETTES,
   };
 }
 
@@ -402,6 +429,7 @@ export function themeFromRow(row: Record<string, unknown> | null | undefined, pu
     name: row.name, paletteId: row.palette_id, accent: row.accent, font: row.heading_font, logos,
     ratio: typeof row.logo_ratio === "number" ? row.logo_ratio : row.logo_ratio == null ? null : Number(row.logo_ratio),
     supportEmail: row.support_email, supportPhone: row.support_phone,
+    personalPalettes: Array.isArray(row.personal_palettes) ? row.personal_palettes : undefined,
   });
 }
 
@@ -411,10 +439,15 @@ export function themeFromRow(row: Record<string, unknown> | null | undefined, pu
  * purpose. The cache only ever holds what parseTheme accepted; the script still applies an accent whole or not at
  * all, and a logo only from the brand bucket.
  * With nothing cached (a first visit) the stylesheet's own defaults show until lib/coop-settings.ts has fetched.
+ * It also applies the person's own choices kept on this device: larger text (always), and their palette when the
+ * cached co-op settings allow it (effectiveAccent).
  */
-export const COOP_SCRIPT = `(function(){try{var raw=null;try{raw=localStorage.getItem('${COOP_THEME_KEY}')}catch(e){}
+export const COOP_SCRIPT = `(function(){try{var raw=null,pa=null,ts=null;try{raw=localStorage.getItem('${COOP_THEME_KEY}');pa=localStorage.getItem('${PERSONAL_ACCENT_KEY}');ts=localStorage.getItem('${TEXT_SIZE_KEY}')}catch(e){}
+if(ts==='large')document.documentElement.dataset.textSize='large';
 if(!raw)return;var t=JSON.parse(raw);if(!t||t.v!==1)return;
 var s=document.documentElement.style,hex=${HEX_RE.toString()},keys=${JSON.stringify(ACCENT_KEYS)},vars=${JSON.stringify(ACCENT_KEYS.map((k) => ACCENT_VARS[k]))},a=t.accent||{},ok=true,i;
+var P=${JSON.stringify(Object.fromEntries(PALETTES.map((p) => [p.id, p.tokens])))};
+if(typeof pa==='string'&&P.hasOwnProperty(pa)&&Object.prototype.toString.call(t.personalPalettes)==='[object Array]'&&t.personalPalettes.indexOf(pa)>=0)a=P[pa];
 for(i=0;i<keys.length;i++){if(typeof a[keys[i]]!=='string'||!hex.test(a[keys[i]]))ok=false}
 if(ok){for(i=0;i<keys.length;i++)s.setProperty(vars[i],a[keys[i]])}
 var fonts=${JSON.stringify(Object.fromEntries(HEADING_FONTS.map((f) => [f.id, f.stack])))};

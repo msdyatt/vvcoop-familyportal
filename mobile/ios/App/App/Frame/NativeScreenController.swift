@@ -29,7 +29,8 @@ final class NativeScreenController: UIViewController, ChromeRefreshing, UIGestur
     init<Content: View>(chrome: Chrome, navigator: Navigator?, @ViewBuilder content: () -> Content) {
         self.chrome = chrome
         self.navigator = navigator
-        let hosting = UIHostingController(rootView: content())
+        // Larger text (Brand.dynamicTypeRange): at least one step up when the person chose it.
+        let hosting = UIHostingController(rootView: AnyView(content().dynamicTypeSize(Brand.dynamicTypeRange)))
         // The hosted view fills the space it is given; it does not ask for a size of its own.
         hosting.sizingOptions = []
         self.content = hosting
