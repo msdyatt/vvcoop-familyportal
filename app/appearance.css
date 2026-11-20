@@ -199,3 +199,23 @@ html[data-text-size="large"] { --text-scale:1.15; }
   cursor:pointer;
 }
 .appearance-personal input { width:18px; height:18px; accent-color:var(--action); }
+
+/* ---- Admin, Appearance: seasonal logos (app/family-village/admin/seasonal-logos-card.tsx) ------------------------- */
+.seasonal-list { display:grid; gap:0; margin:0; padding:0; list-style:none; }
+.seasonal-list li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid rgba(var(--fg-rgb),.1); }
+@media (max-width:600px) { .seasonal-list li { grid-template-columns:minmax(0,1fr); } }
+.seasonal-thumbs { display:flex; gap:4px; }
+.seasonal-thumb { width:40px; height:40px; background:no-repeat center / contain; border:1px solid rgba(var(--fg-rgb),.14); border-radius:2px; }
+.seasonal-thumb.on-light { background-color:var(--cream); }
+.seasonal-thumb.on-dark { background-color:var(--navy); }
+.seasonal-text p { margin:0; }
+.seasonal-status { margin-left:6px; padding:2px 8px; color:var(--text-muted); font:700 11px var(--sans); border:1px solid rgba(var(--fg-rgb),.25); border-radius:999px; }
+.seasonal-status.live { color:var(--text-accent); border-color:currentColor; }
+.seasonal-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.seasonal-form { display:grid; gap:10px; padding:12px 0 0; border-top:1px solid rgba(var(--fg-rgb),.1); }
+.seasonal-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.seasonal-form select, .seasonal-form input[type="date"] { min-height:44px; padding:8px 10px; color:var(--text); background:var(--surface-sunken); font:400 15px var(--sans); text-transform:none; letter-spacing:0; border:1px solid rgba(var(--fg-rgb),.2); border-radius:2px; }
+.seasonal-check { display:flex !important; gap:8px; align-items:center; color:var(--text) !important; font:400 14px var(--sans) !important; letter-spacing:0 !important; text-transform:none !important; }
+.seasonal-check input { width:18px; height:18px; accent-color:var(--action); }
+.seasonal-empty { color:var(--sage-text); font:400 12px var(--sans); }
+.appearance-logo-thumb.on-dark .seasonal-empty { color:var(--sage-on-navy); }
