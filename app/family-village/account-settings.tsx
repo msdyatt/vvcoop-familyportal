@@ -11,6 +11,7 @@ import NotificationPrefsSection from "./notification-prefs-section";
 import { ConfirmDeleteModal } from "./admin/admin-ui";
 import { disablePush } from "../../lib/push";
 import ThemeChoiceControl from "./theme-choice";
+import { PersonalAccentControl, TextSizeControl } from "./personal-appearance";
 
 export default function AccountSettings({ email, onProfileUpdated }: { email: string; onSignOut?: () => void; onProfileUpdated?: () => void }) {
   return <div className="account-settings">
@@ -32,6 +33,9 @@ function AppearanceSection() {
     <p className="card-kicker">Appearance</p>
     <p className="portal-empty">Light, dark, or follow this device’s setting. Dark is easier on the eyes in the evening.</p>
     <ThemeChoiceControl />
+    <PersonalAccentControl />
+    <TextSizeControl />
+    <p className="portal-empty personal-note">These apply to you only. A device keeps its own choice; a new device starts from your account’s.</p>
   </div>;
 }
 

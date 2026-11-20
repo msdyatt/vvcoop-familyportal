@@ -10,6 +10,7 @@ import PortalMenuItems from "./portal-menu-items";
 import { useUnreadCount } from "./messages/messages-link";
 import { buildFrameState, nativeFrame } from "../../lib/native-frame";
 import { applyTheme, readStoredChoice } from "../../lib/theme";
+import { applyPersonalAccent, applyTextSize, isAccentChoice, readStoredAccent, readStoredTextSize } from "../../lib/personal-appearance";
 import BarCustomizer from "./bar-customizer";
 import ThemeChoiceControl from "./theme-choice";
 import DetailModal from "./detail-modal";
@@ -83,6 +84,9 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
       writeCachedPrefs(fresh);
       // A device that has never had a theme chosen takes the one on the account (lib/theme.ts).
       if (fresh.theme && readStoredChoice() === null) applyTheme(fresh.theme, { persist: true });
+      // The same for the person's accent and text size (lib/personal-appearance.ts).
+      if (fresh.accent && isAccentChoice(fresh.accent) && readStoredAccent() === null) applyPersonalAccent(fresh.accent, { persist: true });
+      if (fresh.textSize && readStoredTextSize() === null) applyTextSize(fresh.textSize, { persist: true });
     }
   }
 
@@ -133,6 +137,10 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
     // Saving the bar rewrites the whole record; keep the theme that is in force on this device in it.
     const device = readStoredChoice();
     if (device) next.theme = device;
+    const accent = readStoredAccent();
+    if (accent) next.accent = accent;
+    const textSize = readStoredTextSize();
+    if (textSize) next.textSize = textSize;
     setPrefs(next);
     writeCachedPrefs(next);
     const supabase = getSupabaseBrowserClient();

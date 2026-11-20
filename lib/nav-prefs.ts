@@ -52,16 +52,16 @@ export const DESTINATIONS: Destination[] = [
   { id: "teacher-news", label: "Team news", href: `${TEACHER}/news`, icon: "news", role: "teacher", area: "portal" },
   { id: "teacher-classes", label: "My classes", href: `${TEACHER}/classes`, icon: "classes", role: "teacher", area: "portal" },
   { id: "teacher-lounge", label: "Print queue", href: `${TEACHER}/print`, icon: "paperwork", role: "teacher", area: "portal" },
-  { id: "admin-dashboard", label: "Dashboard", href: ADMIN, icon: "dashboard", role: "admin", area: "admin" },
+  { id: "admin-dashboard", label: "Overview", href: ADMIN, icon: "dashboard", role: "admin", area: "admin" },
   { id: "admin-families", label: "Families", href: `${ADMIN}?tab=families`, icon: "families", role: "admin", area: "admin" },
   { id: "admin-classes", label: "Classes", href: `${ADMIN}?tab=classes`, icon: "classes", role: "admin", area: "admin" },
-  { id: "admin-invitations", label: "Invites", href: `${ADMIN}?tab=invitations`, icon: "invitations", role: "admin", area: "admin" },
+  { id: "admin-invitations", label: "Invitations", href: `${ADMIN}?tab=invitations`, icon: "invitations", role: "admin", area: "admin" },
   { id: "admin-documents", label: "Documents", href: `${ADMIN}?tab=documents`, icon: "compliance", role: "admin", area: "admin" },
   { id: "admin-news", label: "News", href: `${ADMIN}?tab=news`, icon: "news", role: "admin", area: "admin" },
   { id: "admin-reports", label: "Reports", href: `${ADMIN}?tab=reports`, icon: "reports", role: "admin", area: "admin" },
   { id: "admin-activity", label: "Activity", href: `${ADMIN}?tab=activity`, icon: "activity", role: "admin", area: "admin" },
-  { id: "admin-flagged", label: "Messaging", href: `${ADMIN}?tab=message-reports`, icon: "flag", role: "admin", area: "admin" },
-  { id: "admin-integrations", label: "Services", href: `${ADMIN}?tab=integrations`, icon: "integrations", role: "admin", area: "admin" },
+  { id: "admin-flagged", label: "Reported messages", href: `${ADMIN}?tab=message-reports`, icon: "flag", role: "admin", area: "admin" },
+  { id: "admin-integrations", label: "Integrations", href: `${ADMIN}?tab=integrations`, icon: "integrations", role: "admin", area: "admin" },
 ];
 
 export const SECTION_LABELS: Record<Section, string> = { home: "Main bar", admin: "Admin bar" };
@@ -85,6 +85,10 @@ export type NavPrefs = {
   legacy?: { home?: string[]; teacher?: string[] };
   /** Light, Dark or System (lib/theme.ts). Not a bar setting, but it lives in the same small per-person record. */
   theme?: "system" | "light" | "dark";
+  /** The person's accent: "coop" or a ready-made palette id (lib/personal-appearance.ts). */
+  accent?: string;
+  /** Larger text (lib/personal-appearance.ts). */
+  textSize?: "normal" | "large";
 };
 
 const byId = new Map(DESTINATIONS.map((d) => [d.id, d]));
@@ -164,6 +168,9 @@ export function cleanPrefs(value: unknown): NavPrefs {
   }
   if (Array.isArray(raw.admin)) out.admin = known(raw.admin).slice(0, MAX_SLOTS);
   if (raw.theme === "system" || raw.theme === "light" || raw.theme === "dark") out.theme = raw.theme;
+  // Checked against the palettes where it is used; here only kept short and plain.
+  if (typeof raw.accent === "string" && /^[a-z][a-z0-9-]{1,30}$/.test(raw.accent)) out.accent = raw.accent;
+  if (raw.textSize === "normal" || raw.textSize === "large") out.textSize = raw.textSize;
 
   // Carry the earlier lists along, untouched by later saves.
   const legacy = raw.legacy;

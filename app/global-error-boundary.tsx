@@ -2,6 +2,7 @@
 
 import { Component, ReactNode } from "react";
 import { getSupabaseBrowserClient } from "../lib/supabase";
+import { coopTheme } from "../lib/coop-settings";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean };
@@ -41,10 +42,13 @@ export default class GlobalErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      // The co-op's name and support address from the copy on this device (lib/coop-settings.ts); this only renders in the browser.
+      const { name, supportEmail } = coopTheme();
+      const contact = supportEmail ?? "veritasvillagecoop@gmail.com";
       return <div className="global-error-fallback">
-        <p className="eyebrow">Veritas Village</p>
+        <p className="eyebrow">{name}</p>
         <h1>Something went wrong.</h1>
-        <p>Please refresh the page. If this keeps happening, let us know at <a href="mailto:veritasvillagecoop@gmail.com">veritasvillagecoop@gmail.com</a>.</p>
+        <p>Please refresh the page. If this keeps happening, let us know at <a href={`mailto:${contact}`}>{contact}</a>.</p>
         <button type="button" onClick={() => window.location.reload()}>Refresh</button>
       </div>;
     }

@@ -4,13 +4,15 @@
    dark, in two places that must stay identical (tests/theme-contrast.test.mjs checks that they are):
 
      html[data-theme="dark"]                      the choice in force, set before first paint by lib/theme.ts
+       (and .theme-preview-dark, Admin, Appearance's dark preview pane)
      @media (prefers-color-scheme: dark)          System, for the moment before that script runs and for
        html:not([data-theme])                     browsers with JavaScript off
 
    Loaded after the other stylesheets (app/layout.tsx). Palette: Ink Navy ground, Parchment Cream text,
    Terracotta for accents and the primary fill, Antique Gold (lifted) as the lantern's warmth. */
 
-html[data-theme="dark"] {
+html[data-theme="dark"],
+.theme-preview-dark {
   /* Ground: Ink Navy, deepened toward night, never neutral grey */
   --canvas:#08202f;
   --canvas-rgb:8,32,47;
@@ -28,19 +30,23 @@ html[data-theme="dark"] {
   --text-muted:var(--sage-on-navy);
   --text-soft:#9aa99e;
   --text-accent:var(--terracotta-on-navy);
-  --accent-ink:#e8a98d;
+  --accent-ink:var(--accent-night);
   --danger-text:#f3c6b3;
 
-  /* Fills: a deeper terracotta that still carries cream text at 4.5:1, a hotter one for alerts */
-  --action:#a85539;
-  --accent-fill:#a85539;
+  /* Fills: the accent's night fill (cream text at 4.5:1; the co-op's palette, lib/coop-theme.ts), a hotter one for alerts */
+  --action:var(--accent-night-fill);
+  --accent-fill:var(--accent-night-fill);
   --danger-fill:#c4472d;
   --cal-coop:#2b6a8f;
-  --cal-class:#a85539;
+  --cal-class:var(--accent-night-fill);
   --accent-on-action:var(--cream);
   --wash-on-action:rgba(2,10,16,.3);
   --chip-on-action:rgba(2,10,16,.2);
   --gold:#e0b56a;                        /* Antique Gold, lifted for night: focus rings and the lantern glow */
+  --status-new:var(--accent-night);
+  --status-open:#8fbfe0;
+  --status-waiting:#e0b56a;
+  --status-done:#9aa99e;
 
   /* Lines, washes and shadows */
   --line-strong:#d9d3c4;
@@ -56,8 +62,8 @@ html[data-theme="dark"] {
   --glass-lens-ring:rgba(255,255,255,.2);
 
   --m3-surface-container:#12384d;
-  --m3-secondary-container:#5b3324;
-  --m3-on-secondary-container:#f6d9cb;
+  --m3-secondary-container:var(--accent-night-tint);
+  --m3-on-secondary-container:var(--accent-night-tint-ink);
 
   color-scheme:dark;
 }
@@ -81,19 +87,23 @@ html[data-theme="dark"] {
     --text-muted:var(--sage-on-navy);
     --text-soft:#9aa99e;
     --text-accent:var(--terracotta-on-navy);
-    --accent-ink:#e8a98d;
+    --accent-ink:var(--accent-night);
     --danger-text:#f3c6b3;
 
-    /* Fills: a deeper terracotta that still carries cream text at 4.5:1, a hotter one for alerts */
-    --action:#a85539;
-    --accent-fill:#a85539;
+    /* Fills: the accent's night fill (cream text at 4.5:1; the co-op's palette, lib/coop-theme.ts), a hotter one for alerts */
+    --action:var(--accent-night-fill);
+    --accent-fill:var(--accent-night-fill);
     --danger-fill:#c4472d;
     --cal-coop:#2b6a8f;
-    --cal-class:#a85539;
+    --cal-class:var(--accent-night-fill);
     --accent-on-action:var(--cream);
     --wash-on-action:rgba(2,10,16,.3);
     --chip-on-action:rgba(2,10,16,.2);
     --gold:#e0b56a;                        /* Antique Gold, lifted for night: focus rings and the lantern glow */
+    --status-new:var(--accent-night);
+    --status-open:#8fbfe0;
+    --status-waiting:#e0b56a;
+    --status-done:#9aa99e;
 
     /* Lines, washes and shadows */
     --line-strong:#d9d3c4;
@@ -109,8 +119,8 @@ html[data-theme="dark"] {
     --glass-lens-ring:rgba(255,255,255,.2);
 
     --m3-surface-container:#12384d;
-    --m3-secondary-container:#5b3324;
-    --m3-on-secondary-container:#f6d9cb;
+    --m3-secondary-container:var(--accent-night-tint);
+    --m3-on-secondary-container:var(--accent-night-tint-ink);
 
     color-scheme:dark;
   }
@@ -127,7 +137,8 @@ html[data-theme="dark"] {
 .printable-report,
 .roster-print-sheet,
 .sign-pad,
-.sign-preview {
+.sign-preview,
+.theme-preview-light {
   --canvas:var(--cream);
   --canvas-rgb:var(--cream-rgb);
   --surface:#fffdf9;
@@ -143,7 +154,7 @@ html[data-theme="dark"] {
   --accent-ink:var(--terracotta);
   --danger-text:var(--terracotta-deep);
   --action:var(--navy);
-  --accent-fill:var(--terracotta-deep);
+  --accent-fill:var(--accent-deep);
   --danger-fill:var(--terracotta-deep);
   --gold:var(--antique-gold);
   --line-strong:var(--navy);
@@ -151,6 +162,14 @@ html[data-theme="dark"] {
   --shadow-rgb:var(--navy-rgb);
   --scrim-rgb:var(--navy-rgb);
   color-scheme:light;
+}
+
+/* Admin, Appearance's light preview pane (app/appearance.css) shows a few band and accent roles paper never needs. */
+.theme-preview-light {
+  --ink-surface:var(--navy);
+  --ink-surface-rgb:var(--navy-rgb);
+  --accent-on-action:var(--terracotta-on-navy);
+  --portal-accent:var(--terracotta);
 }
 
 /* The paper's own text colour: inherited text colour is already computed by the time a role is re-declared. */
@@ -199,6 +218,37 @@ html[data-theme="dark"] .logo-on-dark { display:block; }
   html:not([data-theme]) .logo-on-light { display:none; }
   html:not([data-theme]) .logo-on-dark { display:block; }
 }
+
+/* ---- The co-op's logos (app/coop-logo.tsx) ------------------------------------------------------------------
+   Drawn as backgrounds so the co-op's own files replace these bundled defaults before the first paint (COOP_SCRIPT,
+   lib/coop-theme.ts, sets the four properties and the lockup's shape on <html>). "auto" follows the theme; "on-dark"
+   is for a band that is dark in both themes; "on-light" for paper. */
+:root {
+  --coop-lockup-light:url("/brand/lockup-horizontal-navy.png");
+  --coop-lockup-dark:url("/brand/lockup-horizontal-cream.png");
+  --coop-mark-light:url("/brand/mark-compact-navy.png");
+  --coop-mark-dark:url("/brand/mark-compact-cream.png");
+  --coop-lockup-ratio:900/310;
+}
+.coop-logo {
+  display:block;
+  max-width:100%;
+  background:no-repeat left center / contain;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+.coop-logo.lockup { aspect-ratio:var(--coop-lockup-ratio); background-image:var(--coop-lockup-light); }
+.coop-logo.mark { aspect-ratio:1; background-position:center; background-image:var(--coop-mark-light); }
+.coop-logo.lockup.on-dark { background-image:var(--coop-lockup-dark); }
+.coop-logo.mark.on-dark { background-image:var(--coop-mark-dark); }
+html[data-theme="dark"] .coop-logo.lockup.auto { background-image:var(--coop-lockup-dark); }
+html[data-theme="dark"] .coop-logo.mark.auto { background-image:var(--coop-mark-dark); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .coop-logo.lockup.auto { background-image:var(--coop-lockup-dark); }
+  html:not([data-theme]) .coop-logo.mark.auto { background-image:var(--coop-mark-dark); }
+}
+.brand-transition .coop-logo { width:100%; background-position:center; }
+.mini-brand .coop-logo { width:150px; }
 
 /* ---- The Light / Dark / System control (app/family-village/theme-choice.tsx) --------------------------------- */
 .theme-choice {

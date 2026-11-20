@@ -1,4 +1,4 @@
-import { escapeHtml, renderEmail } from "./email-template.ts";
+import { DEFAULT_EMAIL_BRAND, escapeHtml, renderEmail, type EmailBrand } from "./email-template.ts";
 import { safePath } from "./paths.ts";
 import { buildSmsBody, type SmsProvider } from "./sms.ts";
 
@@ -33,21 +33,21 @@ export type Outcome =
 const EYEBROWS: Record<string, string> = {
   broadcast_urgent: "Urgent alert",
   broadcast_important: "Important notice",
-  broadcast_notice: "A note from Veritas Village",
 };
 
-export function buildEmail(row: Pick<ClaimedDelivery, "kind" | "title" | "body" | "link_path" | "urgent">): { subject: string; html: string } {
+export function buildEmail(row: Pick<ClaimedDelivery, "kind" | "title" | "body" | "link_path" | "urgent">, brand: EmailBrand = DEFAULT_EMAIL_BRAND): { subject: string; html: string } {
   const paragraphs = (row.body ?? "").split(/\n{2,}/).map((part) => part.trim()).filter(Boolean)
     .map((part) => `<p style="margin:0 0 12px;">${escapeHtml(part).replace(/\n/g, "<br>")}</p>`).join("");
   const preheader = escapeHtml((row.body ?? row.title).replace(/\s+/g, " ").slice(0, 110));
   const html = renderEmail({
-    eyebrow: EYEBROWS[row.kind] ?? "Notification",
+    eyebrow: EYEBROWS[row.kind] ?? (row.kind === "broadcast_notice" ? `A note from ${escapeHtml(brand.name)}` : "Notification"),
     heading: escapeHtml(row.title),
     bodyHtml: paragraphs || `<p style="margin:0;">Open Family Village to read it.</p>`,
     ctaLabel: "Open Family Village",
     ctaUrl: `${SITE}${safePath(row.link_path)}`,
-    footerHtml: `You are getting this because you are part of Veritas Village. You can change how we reach you under Account settings in <a href="${SITE}/family-village/home" style="color:#5f6b61;">Family Village</a>.`,
+    footerHtml: `You are getting this because you are part of ${escapeHtml(brand.name)}. You can change how we reach you under Account settings in <a href="${SITE}/family-village/home" style="color:#5f6b61;">Family Village</a>.`,
     preheader,
+    brand,
   });
   return { subject: row.urgent ? `URGENT: ${row.title}` : row.title, html };
 }
@@ -64,6 +64,8 @@ export type Deps = {
    */
   allowList?: Set<string> | null;
   concurrency?: number;
+  /** The co-op's name, logo and accent for the emails (_shared/coop-brand.ts); the Veritas look without it. */
+  brand?: EmailBrand;
 };
 
 export function parseAllowList(raw: string | null | undefined): Set<string> | null {
@@ -75,7 +77,7 @@ async function deliverOne(row: ClaimedDelivery, deps: Deps): Promise<Outcome> {
   if (deps.allowList && !deps.allowList.has(row.destination.toLowerCase())) {
     return { status: "skipped", provider: null, reason: "not_on_allowlist" };
   }
-  if (row.channel === "email") return await deps.sendEmail(row, buildEmail(row));
+  if (row.channel === "email") return await deps.sendEmail(row, buildEmail(row, deps.brand));
 
   if (!deps.sms.live) return { status: "skipped", provider: deps.sms.name, reason: "provider_not_set_up" };
   const result = await deps.sms.send({

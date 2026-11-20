@@ -9,7 +9,7 @@
   display: block;
   line-height: 0;
 }
-.public-header-logo img { display: block; width: 100%; height: auto; }
+.public-header-logo img, .public-header-logo .coop-logo { display: block; width: 100%; height: auto; }
 .public-header-logo:focus-visible { outline: 2px solid var(--terracotta-text); outline-offset: 5px; }
 @media (max-width: 850px) {
   .public-header-logo { top: 10px; left: 6vw; width: 116px; }

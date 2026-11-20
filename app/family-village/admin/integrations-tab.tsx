@@ -6,6 +6,7 @@ import DemoAccountsCard from "./demo-accounts-card";
 import PhotoOptimizerCard from "./photo-optimizer-card";
 import NotificationSettingsCard from "./notification-settings-card";
 import EventReminderSettingsCard from "./event-reminder-settings-card";
+import OfficeInboxCard from "./office-inbox-card";
 
 type Integration = { id: string; display_name: string; status: string; public_note: string | null; external_url: string | null; api_base_url: string | null; from_address: string | null; last_checked_at: string | null };
 
@@ -104,6 +105,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
       <p>The &ldquo;Double-sided&rdquo; checkbox on every printable report already queues a job with the right <code>sides</code> value worked out — landscape reports bind on the short edge so the back of the page lands right-side-up. Recent jobs show up below once any are queued.</p>
     </aside>
     <div className="integrations-list">
+      <OfficeInboxCard />
       {integrations.map((row) => <IntegrationCard
         key={row.id} row={row} onSave={save}
         live={row.id === "resend"}

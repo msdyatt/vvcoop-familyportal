@@ -33,6 +33,7 @@
     "lib/broadcast.test.ts",
     "lib/schedule.test.ts",
     "lib/coop-time.test.ts",
+    "lib/office-inbox.test.ts",
     "mobile"
   ]
 }

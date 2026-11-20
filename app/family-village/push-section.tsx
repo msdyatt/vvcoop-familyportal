@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCoopName } from "../../lib/coop-settings";
 import { disablePush, enablePush, getPushState, isIosDevice, sendTestPush, type PushState } from "../../lib/push";
 
 type InstallPrompt = Event & { prompt: () => Promise<void> };
@@ -11,6 +12,7 @@ type InstallPrompt = Event & { prompt: () => Promise<void> };
  */
 export default function PushSection() {
   const [state, setState] = useState<PushState | null>(null);
+  const coopName = useCoopName();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
@@ -55,12 +57,12 @@ export default function PushSection() {
     <p className="card-kicker">Phone &amp; notifications</p>
     <p className="portal-empty">Get a notification on this device for news, class notes, and reminders, and open the portal like an app.</p>
 
-    {installPrompt && <button type="button" className="ghost" onClick={install}>Add Veritas Village to this device</button>}
+    {installPrompt && <button type="button" className="ghost" onClick={install}>Add {coopName} to this device</button>}
 
     {state === "needs-install" && <ol className="field-note">
       <li>Open this page in <b>Safari</b>.</li>
       <li>Tap the <b>Share</b> button, then <b>Add to Home Screen</b>.</li>
-      <li>Open <b>Veritas Village</b> from your Home Screen and come back here to turn notifications on.</li>
+      <li>Open <b>{coopName}</b> from your Home Screen and come back here to turn notifications on.</li>
     </ol>}
     {state === "unsupported" && <p className="field-note">This browser can&rsquo;t show notifications{isIosDevice() ? "" : ". Try Chrome, Edge, Firefox, or Safari"}.</p>}
     {state === "denied" && <p className="field-note">Notifications are blocked for this site. Allow them in your browser or phone settings, then come back and turn them on.</p>}
