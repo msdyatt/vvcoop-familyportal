@@ -8,6 +8,7 @@ import "./appearance.css";
 import "./class-pages.css";
 import "./desktop-nav.css";
 import "./page-layout.css";
+import "./records-vault.css";
 import { PLATFORM_SCRIPT } from "../lib/platform";
 import { THEME_COLORS, THEME_SCRIPT } from "../lib/theme";
 import { COOP_SCRIPT } from "../lib/coop-theme";
