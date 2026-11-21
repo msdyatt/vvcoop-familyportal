@@ -3,22 +3,23 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import {
-  CUSTOM_PALETTE_ID, DEFAULT_THEME, HEADING_FONTS, LOGO_BUCKET, LOGO_SLOTS, LOGO_TYPES, LOGO_VARS, PALETTES,
-  checkAccent, generateAccent, isHeadingFont, nearestUsableAccent, normalizeHex, paletteById, themeVars,
-  type AccentTokens, type CoopTheme, type HeadingFontId, type LogoSlot,
+  BAND_STYLES, BODY_FONTS, CUSTOM_PALETTE_ID, DEFAULT_THEME, DEFAULT_WHIMSY, HEADING_FONTS, LOGO_BUCKET, LOGO_SLOTS, LOGO_TYPES, LOGO_VARS, PALETTES,
+  WHIMSY_MARKERS, checkAccent, generateAccent, isBandStyle, isBodyFont, isHeadingFont, nearestUsableAccent, normalizeHex, paletteById, parseWhimsy, themeVars,
+  type AccentTokens, type BandStyle, type BodyFontId, type CoopTheme, type HeadingFontId, type LogoSlot, type Whimsy, type WhimsyMarker, type WhimsySeason,
 } from "../../../lib/coop-theme";
 import { COOP_SETTINGS_COLUMNS, brandFileUrl, fetchCoopTheme, setCoopTheme } from "../../../lib/coop-settings";
 import { logoProblem } from "../../../lib/logo-files";
 import SeasonalLogosCard from "./seasonal-logos-card";
 
 /**
- * Admin, Appearance: the co-op's name, support contact, accent palette, heading font and logos (issue #140,
+ * Admin, Appearance: the co-op's name, support contact, accent palette, fonts, header and sidebar, small touches and logos (issue #140,
  * docs/theming.md "Co-op theme"). Everything is a draft until Save: the preview shows it in the light and the dark
  * theme side by side, and a palette that fails a contrast check cannot be saved (the database checks again).
  */
 
 type Row = {
   name: string; palette_id: string; accent: AccentTokens; heading_font: string;
+  body_font: string | null; header_style: string | null; sidebar_style: string | null; whimsy: unknown;
   logo_light_path: string | null; logo_dark_path: string | null; mark_light_path: string | null; mark_dark_path: string | null;
   logo_ratio: number | null; support_email: string | null; support_phone: string | null;
   personal_palettes: string[] | null;
@@ -43,6 +44,10 @@ export default function AppearanceTab() {
   const [paletteId, setPaletteId] = useState("veritas");
   const [customHex, setCustomHex] = useState("#bb6141");
   const [font, setFont] = useState<HeadingFontId>("playfair");
+  const [bodyFont, setBodyFont] = useState<BodyFontId>("inter");
+  const [header, setHeader] = useState<BandStyle>("plain");
+  const [sidebar, setSidebar] = useState<BandStyle>("plain");
+  const [whimsy, setWhimsy] = useState<Whimsy>(DEFAULT_WHIMSY);
   const [logos, setLogos] = useState<Record<LogoSlot, LogoDraft>>({ logo_light: { kind: "keep" }, logo_dark: { kind: "keep" }, mark_light: { kind: "keep" }, mark_dark: { kind: "keep" } });
   const [logoErrors, setLogoErrors] = useState<Partial<Record<LogoSlot, string>>>({});
   const [busy, setBusy] = useState(false);
@@ -63,6 +68,10 @@ export default function AppearanceTab() {
     setPaletteId(r.palette_id);
     setCustomHex(r.accent?.accent ?? "#bb6141");
     setFont(isHeadingFont(r.heading_font) ? r.heading_font : "playfair");
+    setBodyFont(isBodyFont(r.body_font) ? r.body_font : "inter");
+    setHeader(isBandStyle(r.header_style) ? r.header_style : "plain");
+    setSidebar(isBandStyle(r.sidebar_style) ? r.sidebar_style : "plain");
+    setWhimsy(parseWhimsy(r.whimsy));
     setLogos({ logo_light: { kind: "keep" }, logo_dark: { kind: "keep" }, mark_light: { kind: "keep" }, mark_dark: { kind: "keep" } });
     setLogoErrors({});
     setPersonal(r.personal_palettes ?? PALETTES.map((p) => p.id));
@@ -93,8 +102,8 @@ export default function AppearanceTab() {
     }
     const lightLogo = logos.logo_light;
     const ratio = lightLogo.kind === "new" ? lightLogo.ratio : lightLogo.kind === "clear" ? null : row.logo_ratio;
-    return { ...DEFAULT_THEME, name: name.trim() || row.name, paletteId, accent, font, logos: current, ratio };
-  }, [row, accent, logos, name, paletteId, font]);
+    return { ...DEFAULT_THEME, name: name.trim() || row.name, paletteId, accent, font, bodyFont, header, sidebar, whimsy, logos: current, ratio };
+  }, [row, accent, logos, name, paletteId, font, bodyFont, header, sidebar, whimsy]);
 
   async function pickLogo(slot: LogoSlot, file: File | undefined) {
     if (!file) return;
@@ -138,6 +147,10 @@ export default function AppearanceTab() {
         p_support_email: supportEmail, p_support_phone: supportPhone,
       });
       if (error) throw new Error(error.message);
+      const { error: styleError } = await supabase.rpc("admin_save_coop_style", {
+        p_body_font: bodyFont, p_header_style: header, p_sidebar_style: sidebar, p_whimsy: whimsy,
+      });
+      if (styleError) throw new Error(styleError.message);
       const personalNow = PALETTES.map((p) => p.id).filter((id) => personal.includes(id));
       if (JSON.stringify(personalNow) !== JSON.stringify(row.personal_palettes ?? PALETTES.map((p) => p.id))) {
         const { error: personalError } = await supabase.rpc("admin_set_personal_palettes", { p_ids: personalNow });
@@ -170,7 +183,7 @@ export default function AppearanceTab() {
     if (theme) setCoopTheme(theme);
     await load();
     setBusy(false);
-    setStatus("Back to the Veritas Village palette, Playfair Display and the bundled logos. The name and contact are unchanged.");
+    setStatus("Back to the Veritas Village palette, fonts, plain header and sidebar, every small touch, and the bundled logos. The name and contact are unchanged.");
   }
 
   if (loadError) return <section className="appearance"><p className="admin-form-status" role="alert">{loadError}</p></section>;
@@ -230,13 +243,49 @@ export default function AppearanceTab() {
       </section>
 
       <section className="appearance-card">
-        <p className="card-kicker">Heading font</p>
-        <div className="appearance-fonts" role="radiogroup" aria-label="Heading font">
-          {HEADING_FONTS.map((f) => <button type="button" key={f.id} role="radio" aria-checked={font === f.id} disabled={busy}
-            className="appearance-font" onClick={() => setFont(f.id)}>
-            <span className="appearance-font-sample" style={{ fontFamily: f.stack }}>{name.trim() || row.name}</span>
-            <small>{f.label}: {f.hint}</small>
-          </button>)}
+        <p className="card-kicker">Fonts</p>
+        <p className="field-note">Every font here is kept with the portal, so nothing is loaded from anyone else. A device only downloads the ones in use.</p>
+        <FontPicker id="appearance-heading-font" label="Headings" fonts={HEADING_FONTS} value={font} disabled={busy}
+          onChange={(id) => { if (isHeadingFont(id)) setFont(id); }} sample={name.trim() || row.name} large />
+        <FontPicker id="appearance-body-font" label="Text" fonts={BODY_FONTS} value={bodyFont} disabled={busy}
+          onChange={(id) => { if (isBodyFont(id)) setBodyFont(id); }} sample="Friday is co-op day. Doors open at 9:45, so pack lunches the night before." />
+      </section>
+
+      <section className="appearance-card">
+        <p className="card-kicker">Header and sidebar</p>
+        <p className="field-note">Each style only uses colour pairs that are already checked for contrast, so the text stays easy to read in Light and Dark. Admin keeps its navy band.</p>
+        <BandPicker label="Header" value={header} onChange={setHeader} disabled={busy} swatchStyle={draft ? themeVarsStyle(draft) : undefined} />
+        <BandPicker label="Sidebar" value={sidebar} onChange={setSidebar} disabled={busy} swatchStyle={draft ? themeVarsStyle(draft) : undefined} />
+      </section>
+
+      <section className="appearance-card">
+        <p className="card-kicker">Small touches</p>
+        <p className="field-note">The little things in the sidebar. Anyone who has asked their device for less motion never sees the animations.</p>
+        <label className="appearance-select">What blows through the village
+          <select value={whimsy.season} disabled={busy} onChange={(e) => setWhimsy((w) => ({ ...w, season: e.target.value as WhimsySeason }))}>
+            <option value="auto">The season, by the calendar</option>
+            <option value="autumn">Autumn leaves, all year</option>
+            <option value="winter">Winter snow, all year</option>
+            <option value="spring">Spring petals, all year</option>
+            <option value="summer">Summer fireflies, all year</option>
+            <option value="none">Nothing</option>
+          </select>
+        </label>
+        <fieldset className="appearance-markers">
+          <legend>The mark beside the current page</legend>
+          <div role="radiogroup" aria-label="Mark shape">
+            {WHIMSY_MARKERS.map((m) => <button type="button" key={m} role="radio" aria-checked={whimsy.marker === m} disabled={busy}
+              className="appearance-marker" onClick={() => setWhimsy((w) => ({ ...w, marker: m }))}>
+              <span className="appearance-marker-glyph" data-marker={m} aria-hidden="true" />{MARKER_LABELS[m]}
+            </button>)}
+          </div>
+        </fieldset>
+        <div className="appearance-toggles">
+          {TOUCHES.map((t) => <label key={t.key}>
+            <input type="checkbox" checked={whimsy[t.key]} disabled={busy} onChange={(e) => setWhimsy((w) => ({ ...w, [t.key]: e.target.checked }))} />
+            <b>{t.label}</b>
+            <small>{t.hint}</small>
+          </label>)}
         </div>
       </section>
 
@@ -277,13 +326,56 @@ export default function AppearanceTab() {
         <button type="button" onClick={save} disabled={busy || !accent || problems.length > 0}>{busy ? "Working…" : "Save appearance"}</button>
         {!confirmReset
           ? <button type="button" className="ghost" disabled={busy} onClick={() => setConfirmReset(true)}>Reset to default</button>
-          : <span className="appearance-confirm">Go back to the Veritas palette, font and logos?
+          : <span className="appearance-confirm">Go back to the Veritas palette, fonts, styles, small touches and logos?
             <button type="button" className="ghost" onClick={reset}>Reset</button>
             <button type="button" className="ghost" onClick={() => setConfirmReset(false)}>Keep</button></span>}
       </div>
       <p className="admin-form-status" role="status">{status || "Nothing changes for anyone until you save."}</p>
     </aside>
   </section>;
+}
+
+const MARKER_LABELS: Record<WhimsyMarker, string> = { diamond: "Diamond", star: "Star", heart: "Heart", leaf: "Leaf", dot: "Dot" };
+
+const TOUCHES: { key: "greeting" | "village" | "quill" | "motion"; label: string; hint: string }[] = [
+  { key: "greeting", label: "Greeting", hint: "\u201cGood morning\u201d with a little sun, lantern or moon at the top of the sidebar." },
+  { key: "village", label: "The village", hint: "The engraved village at the foot of the sidebar." },
+  { key: "quill", label: "Quill underline", hint: "A hand-drawn line under the current page\u2019s name." },
+  { key: "motion", label: "Little animations", hint: "The mark springing between pages, wiggling icons, falling leaves." },
+];
+
+/** A font list as a drop-down, grouped, with a live sample in the chosen face. */
+function FontPicker({ id, label, fonts, value, onChange, sample, disabled, large = false }: {
+  id: string; label: string; fonts: readonly { id: string; label: string; group: string; hint: string; stack: string }[];
+  value: string; onChange: (id: string) => void; sample: string; disabled: boolean; large?: boolean;
+}) {
+  const groups = [...new Set(fonts.map((f) => f.group))];
+  const current = fonts.find((f) => f.id === value) ?? fonts[0];
+  return <div className="appearance-font-picker">
+    <label htmlFor={id}>{label}</label>
+    <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+      {groups.map((g) => <optgroup key={g} label={g}>
+        {fonts.filter((f) => f.group === g).map((f) => <option key={f.id} value={f.id} style={{ fontFamily: f.stack }}>{f.label}</option>)}
+      </optgroup>)}
+    </select>
+    <p className={`appearance-font-sample${large ? " large" : ""}`} style={{ fontFamily: current.stack }}>{sample}</p>
+    <small>{current.hint}</small>
+  </div>;
+}
+
+/** The four band styles as small swatches, for the header or the sidebar. */
+function BandPicker({ label, value, onChange, disabled, swatchStyle }: { label: string; value: BandStyle; onChange: (b: BandStyle) => void; disabled: boolean; swatchStyle?: CSSProperties }) {
+  return <fieldset className="appearance-bands">
+    <legend>{label}</legend>
+    <div role="radiogroup" aria-label={`${label} style`}>
+      {BAND_STYLES.map((b) => <button type="button" key={b.id} role="radio" aria-checked={value === b.id} disabled={disabled}
+        className="appearance-band" onClick={() => onChange(b.id)}>
+        {/* The swatch wears the draft palette in the light roles, so it shows what Save would give. */}
+        <span className="appearance-band-swatch theme-preview-light" data-band={b.id} style={swatchStyle} aria-hidden="true"><span>Aa</span></span>
+        <span><b>{b.label}</b><small>{b.hint}</small></span>
+      </button>)}
+    </div>
+  </fieldset>;
 }
 
 /** The theme's custom properties as an inline style, so a preview can wear a palette the page is not wearing. */
@@ -300,10 +392,19 @@ function themeVarsStyle(theme: CoopTheme): CSSProperties {
 
 /** A small, representative screen in one theme: the header, a card with accent text, a button and a band. */
 function Preview({ theme, mode }: { theme: CoopTheme; mode: "light" | "dark" }) {
+  const darkBand = (b: BandStyle) => mode === "dark" || b === "ink" || b === "accent";
   return <figure className={`appearance-preview theme-preview-${mode}`} style={themeVarsStyle(theme)}>
     <figcaption>{mode === "light" ? "Light" : "Dark"}</figcaption>
-    <div className="appearance-preview-header">
-      <span className={`coop-logo lockup ${mode === "light" ? "on-light" : "on-dark"}`} aria-hidden="true" />
+    <div className="appearance-preview-shell">
+    <div className="appearance-preview-side" data-band={theme.sidebar} aria-hidden="true">
+      <span className={`coop-logo mark ${darkBand(theme.sidebar) ? "on-dark" : "on-light"}`} />
+      <span className="appearance-preview-nav on"><span className="appearance-preview-marker" data-marker={theme.whimsy.marker} />Today</span>
+      <span className="appearance-preview-nav">Messages</span>
+      <span className="appearance-preview-nav">Classes</span>
+    </div>
+    <div className="appearance-preview-main">
+    <div className="appearance-preview-header" data-band={theme.header}>
+      <span className={`coop-logo lockup ${darkBand(theme.header) ? "on-dark" : "on-light"}`} aria-hidden="true" />
       <span className="appearance-preview-rule" aria-hidden="true" />
     </div>
     <div className="appearance-preview-body">
@@ -316,6 +417,8 @@ function Preview({ theme, mode }: { theme: CoopTheme; mode: "light" | "dark" }) 
         <span className="appearance-preview-today" aria-label="Today">14</span>
       </div>
       <div className="appearance-preview-band"><span>Admin</span> <span className="appearance-preview-band-accent">3 waiting</span></div>
+    </div>
+    </div>
     </div>
   </figure>;
 }

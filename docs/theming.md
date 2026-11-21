@@ -191,3 +191,28 @@ compact mark while it is in force. Emails keep the co-op's own logo.
   designed, added to the asset catalog, shipped in an App Store update, and switched by the frame from a bridge message
   (the page knows which variant is in force). Not built here. The native header's logo and the splash also still use
   the bundled art; downloading the uploaded file in the frame is the step that would bring seasonal lockups there.
+
+## Fonts, header and sidebar, small touches (issue #140, follow-on)
+
+Admin > Appearance also sets:
+
+- **Fonts.** Two drop-downs: headings (22 faces in four groups: classic serif, storybook, handwritten, modern
+  sans) and text (12 faces chosen for long reading). Everything except Georgia and the book serif is a self-hosted
+  variable font (`app/fonts.css`, files in `public/fonts`, SIL Open Font License); a browser downloads a file only
+  when a page uses that family. The lists are `HEADING_FONTS` and `BODY_FONTS` in `lib/coop-theme.ts`; the headings
+  set `--serif`, the text sets `--sans`. "Same as the text" sets `--serif` to `var(--sans)`.
+- **Header and sidebar.** Plain, Tinted, Ink or Accent (`BAND_STYLES`), separately for each. A style is an
+  attribute on `<html>` (`data-coop-header`, `data-coop-sidebar`) and the stylesheet (`app/desktop-nav.css`) sets
+  the band's variables: the header's `--portal-band-*`, the sidebar's `--sn-*`. Each style only pairs colours that
+  are already checked: page roles; the accent tint with its ink (`--nav-on`, the night tint in Dark); the navy band
+  with cream; the accent's deep fill (`--accent-night-fill`) with cream. So no new contrast check is needed, and a
+  new style must stick to those pairs. Admin keeps its navy band; the installed apps keep their own header.
+- **Small touches** (`whimsy`): the greeting, the village, what falls through it (the season by the calendar, a
+  fixed season, or nothing), the shape of the current-page mark (diamond, star, heart, leaf, dot), the quill
+  underline, and motion. Each one turned off is `data-coop-<touch>="off"` on `<html>`; motion off is treated exactly
+  like the device's reduced-motion setting.
+
+All of it is in `public.coop_settings` (`body_font`, `header_style`, `sidebar_style`, `whimsy`; migration
+`20261120130000_coop_style`), saved with `admin_save_coop_style`, put back by Reset, and applied before the first
+paint by `COOP_SCRIPT` from the copy on the device. `tests/coop-theme.test.mjs` checks the database's lists match the
+code's, and that every attribute the theme sets has rules in the stylesheet.

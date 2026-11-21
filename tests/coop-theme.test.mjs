@@ -194,3 +194,93 @@ test("a variant replaces only the slots it has, with its own shape; the head scr
     assert.deepEqual(runScript(theme, { now: `${day}T12:00:00Z` }), coop.themeVars(theme, day), day);
   }
 });
+
+// ---- Fonts, header and sidebar, small touches ------------------------------------------------------------------------
+
+const styleSql = await readFile(new URL("../supabase/migrations/20261120130000_coop_style.sql", import.meta.url), "utf8");
+/** The ids in an SQL list like ('a', 'b', ...), wherever it is found after `marker`. */
+function sqlList(marker, from = 0) {
+  const at = styleSql.indexOf(marker, from);
+  assert.ok(at >= 0, `${marker} is in the migration`);
+  const open = styleSql.indexOf("(", at + marker.length - 1);
+  const close = styleSql.indexOf(")", open);
+  return [...styleSql.slice(open + 1, close).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+}
+
+test("the database allows exactly the fonts, styles and touches the page knows", () => {
+  const heading = coop.HEADING_FONTS.map((f) => f.id);
+  assert.deepEqual(sqlList("check (heading_font in ("), heading, "the table's heading font check");
+  assert.deepEqual(sqlList("if coalesce(p_heading_font, '') not in ("), heading, "admin_save_coop_settings");
+  const body = coop.BODY_FONTS.map((f) => f.id);
+  assert.deepEqual(sqlList("check (body_font in ("), body, "the table's text font check");
+  assert.deepEqual(sqlList("if coalesce(p_body_font, '') not in ("), body, "admin_save_coop_style");
+  const bands = coop.BAND_STYLES.map((b) => b.id);
+  assert.deepEqual(sqlList("check (header_style in ("), bands);
+  assert.deepEqual(sqlList("check (sidebar_style in ("), bands);
+  assert.deepEqual(sqlList("whimsy->>'season' in ("), [...coop.WHIMSY_SEASONS]);
+  assert.deepEqual(sqlList("whimsy->>'marker' in ("), [...coop.WHIMSY_MARKERS]);
+  // The database's default touches are the page's.
+  assert.ok(styleSql.includes(`'${JSON.stringify(coop.DEFAULT_WHIMSY)}'::jsonb`), "the default whimsy");
+});
+
+test("every self-hosted font in the lists has its files, and nothing is loaded from elsewhere", async () => {
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  assert.match(layout, /import "\.\/fonts\.css";/, "the layout loads app/fonts.css");
+  const css = await readFile(new URL("../app/fonts.css", import.meta.url), "utf8");
+  const families = new Set([...css.matchAll(/font-family:\s*'([^']+)'/g)].map((m) => m[1]));
+  for (const f of [...coop.HEADING_FONTS, ...coop.BODY_FONTS]) {
+    const first = f.stack.match(/^"([^"]+)"/)?.[1];
+    if (first?.endsWith(" Variable")) assert.ok(families.has(first), `${f.label} (${first}) has an @font-face`);
+  }
+  for (const url of css.matchAll(/url\("([^"]+)"\)/g)) assert.match(url[1], /^\/fonts\/[a-z0-9-]+\.woff2$/, "same-origin font files only");
+  const files = [...css.matchAll(/url\("\/fonts\/([^"]+)"\)/g)].map((m) => m[1]);
+  for (const file of files) await readFile(new URL(`../public/fonts/${file}`, import.meta.url));
+});
+
+test("a cached theme keeps only known fonts, styles and touches; anything else falls back", () => {
+  const good = coop.parseTheme({ v: 1, bodyFont: "atkinson", font: "fraunces", header: "ink", sidebar: "tint",
+    whimsy: { greeting: false, village: true, season: "winter", marker: "heart", quill: false, motion: false } });
+  assert.equal(good.bodyFont, "atkinson");
+  assert.equal(good.font, "fraunces");
+  assert.equal(good.header, "ink");
+  assert.equal(good.sidebar, "tint");
+  assert.deepEqual(good.whimsy, { greeting: false, village: true, season: "winter", marker: "heart", quill: false, motion: false });
+  const bad = coop.parseTheme({ v: 1, bodyFont: "papyrus", header: "rainbow", sidebar: 3, whimsy: { marker: "skull", season: "monsoon", greeting: "no" } });
+  assert.equal(bad.bodyFont, "inter");
+  assert.equal(bad.header, "plain");
+  assert.equal(bad.sidebar, "plain");
+  assert.deepEqual(bad.whimsy, coop.DEFAULT_WHIMSY);
+});
+
+test("the head script puts the styles and touches on the page before it paints, as themeDataset would", () => {
+  const theme = coop.parseTheme({ v: 1, accent: coop.PALETTES[0].tokens, bodyFont: "lexend", header: "accent", sidebar: "ink",
+    whimsy: { greeting: false, village: false, season: "none", marker: "star", quill: false, motion: false } });
+  const dataset = {};
+  const set = runScript(theme, { dataset });
+  assert.deepEqual(set, coop.themeVars(theme), "the fonts and colours");
+  assert.equal(set["--sans"], coop.BODY_FONTS.find((f) => f.id === "lexend").stack);
+  assert.deepEqual(dataset, coop.themeDataset(theme), "the attributes");
+  assert.deepEqual(coop.themeDataset(theme), { coopHeader: "accent", coopSidebar: "ink", coopMarker: "star",
+    coopGreeting: "off", coopVillage: "off", coopQuill: "off", coopMotion: "off" });
+  // The defaults: plain bands, the diamond, and nothing turned off.
+  const plain = {};
+  runScript(coop.DEFAULT_THEME, { dataset: plain });
+  assert.deepEqual(plain, { coopHeader: "plain", coopSidebar: "plain", coopMarker: "diamond" });
+  // Junk is ignored.
+  const junk = {};
+  runScript({ v: 1, header: "<script>", sidebar: "x", whimsy: { marker: "skull", greeting: "no" } }, { dataset: junk });
+  assert.deepEqual(junk, {});
+});
+
+test("every dataset key the theme sets is one the stylesheet reads, and every style has its rules", async () => {
+  const css = await readFile(new URL("../app/desktop-nav.css", import.meta.url), "utf8");
+  for (const key of coop.THEME_DATASET_KEYS) {
+    const attr = "data-" + key.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+    assert.ok(css.includes(`[${attr}`), `${attr} is used`);
+  }
+  for (const b of coop.BAND_STYLES.filter((x) => x.id !== "plain")) {
+    assert.ok(css.includes(`[data-coop-sidebar="${b.id}"] .side-nav`), `sidebar style ${b.id}`);
+    assert.ok(css.includes(`[data-coop-header="${b.id}"] .app-header:not(.app-header-admin)`), `header style ${b.id}`);
+  }
+  for (const m of coop.WHIMSY_MARKERS.filter((x) => x !== "diamond")) assert.ok(css.includes(`[data-coop-marker="${m}"]`), `marker ${m}`);
+});

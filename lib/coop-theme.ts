@@ -8,7 +8,10 @@
  * - The accent: the brand's terracotta family. Ten colours (light and dark variants) that feed the role tokens
  *   through a handful of brand-level custom properties (ACCENT_VARS). Ink (navy), the canvas, the surfaces, the
  *   focus gold and every alert or error colour stay as they are, so urgent and error styles cannot be themed away.
- * - The heading font, from a short list of safe faces (HEADING_FONTS).
+ * - The heading and body fonts, from lists of self-hosted faces (HEADING_FONTS, BODY_FONTS; app/fonts.css).
+ * - How the header and the sidebar are drawn (BAND_STYLES), from colours that are already checked: the page, the
+ *   accent's own tint, the navy band or the accent's deep fill. Admin keeps its navy band whatever is chosen.
+ * - The small touches (WHIMSY): greeting, village, season, the marker's shape, the quill underline, motion.
  * - The logos (lockup and compact mark, each for light and dark grounds), uploaded to the coop-brand bucket.
  *
  * Every accent is checked against the role backgrounds it is drawn on (ACCENT_CHECKS): 4.5:1 for text, 3:1 for
@@ -281,23 +284,122 @@ export function paletteById(id: unknown): Palette | undefined {
   return PALETTES.find((p) => p.id === id);
 }
 
-// ---- Heading fonts ---------------------------------------------------------------------------------------------
+// ---- Fonts -------------------------------------------------------------------------------------------------------
 
 /**
- * Safe heading faces: Playfair Display is hosted with the site; the others are fonts every phone and computer
- * already has (or falls back from gracefully), so a choice never costs a download or a third-party request.
+ * Heading faces. Playfair Display and Inter are hosted with the site, Georgia and the book serif are on every device,
+ * and the rest are self-hosted variable fonts (app/fonts.css, SIL Open Font License). A browser only downloads the
+ * one in use, so a long list costs nothing. The ids are also checked in the database (coop_settings.heading_font);
+ * tests/coop-theme.test.mjs keeps the two lists the same.
  */
 export const HEADING_FONTS = [
-  { id: "playfair", label: "Playfair Display", hint: "The portal's own serif", stack: '"Playfair Display",Georgia,"Times New Roman",serif' },
-  { id: "georgia", label: "Georgia", hint: "A plain, sturdy serif", stack: 'Georgia,"Times New Roman",serif' },
-  { id: "book", label: "Book serif", hint: "Palatino or Iowan, like a printed book", stack: '"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif' },
-  { id: "sans", label: "Plain sans", hint: "Headings in the same face as the text", stack: 'Inter,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif' },
+  { id: "playfair", label: "Playfair Display", group: "Classic serif", hint: "The portal's own serif", stack: '"Playfair Display",Georgia,"Times New Roman",serif' },
+  { id: "georgia", label: "Georgia", group: "Classic serif", hint: "A plain, sturdy serif", stack: 'Georgia,"Times New Roman",serif' },
+  { id: "book", label: "Book serif", group: "Classic serif", hint: "Palatino or Iowan, like a printed book", stack: '"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif' },
+  { id: "eb-garamond", label: "EB Garamond", group: "Classic serif", hint: "Old-style and bookish", stack: '"EB Garamond Variable",Garamond,Georgia,serif' },
+  { id: "cormorant", label: "Cormorant Garamond", group: "Classic serif", hint: "Tall and elegant", stack: '"Cormorant Garamond Variable",Garamond,Georgia,serif' },
+  { id: "lora", label: "Lora", group: "Classic serif", hint: "Warm, with gentle curves", stack: '"Lora Variable",Georgia,serif' },
+  { id: "merriweather", label: "Merriweather", group: "Classic serif", hint: "Sturdy and easy to read", stack: '"Merriweather Variable",Georgia,serif' },
+  { id: "source-serif", label: "Source Serif", group: "Classic serif", hint: "Clean and modern", stack: '"Source Serif 4 Variable",Georgia,serif' },
+  { id: "literata", label: "Literata", group: "Classic serif", hint: "Made for reading on screens", stack: '"Literata Variable",Georgia,serif' },
+  { id: "alegreya", label: "Alegreya", group: "Classic serif", hint: "Lively, a little calligraphic", stack: '"Alegreya Variable",Georgia,serif' },
+  { id: "fraunces", label: "Fraunces", group: "Storybook", hint: "Soft and a little old-fashioned", stack: '"Fraunces Variable",Georgia,serif' },
+  { id: "comfortaa", label: "Comfortaa", group: "Storybook", hint: "Round and playful", stack: '"Comfortaa Variable",system-ui,sans-serif' },
+  { id: "quicksand", label: "Quicksand", group: "Storybook", hint: "Light and friendly", stack: '"Quicksand Variable",system-ui,sans-serif' },
+  { id: "nunito", label: "Nunito", group: "Storybook", hint: "Rounded and warm", stack: '"Nunito Variable",system-ui,sans-serif' },
+  { id: "caveat", label: "Caveat", group: "Handwritten", hint: "Like a quick note", stack: '"Caveat Variable","Bradley Hand",cursive' },
+  { id: "dancing", label: "Dancing Script", group: "Handwritten", hint: "Joined-up script", stack: '"Dancing Script Variable","Snell Roundhand",cursive' },
+  { id: "sans", label: "Same as the text", group: "Modern sans", hint: "Headings in the body font", stack: "var(--sans)" },
+  { id: "montserrat", label: "Montserrat", group: "Modern sans", hint: "Geometric and bold", stack: '"Montserrat Variable",system-ui,sans-serif' },
+  { id: "raleway", label: "Raleway", group: "Modern sans", hint: "Slim and stylish", stack: '"Raleway Variable",system-ui,sans-serif' },
+  { id: "josefin", label: "Josefin Sans", group: "Modern sans", hint: "Vintage and geometric", stack: '"Josefin Sans Variable",system-ui,sans-serif' },
+  { id: "lexend", label: "Lexend", group: "Modern sans", hint: "Wide and very clear", stack: '"Lexend Variable",system-ui,sans-serif' },
+  { id: "work-sans", label: "Work Sans", group: "Modern sans", hint: "Plain and steady", stack: '"Work Sans Variable",system-ui,sans-serif' },
 ] as const;
 export type HeadingFontId = (typeof HEADING_FONTS)[number]["id"];
 export const DEFAULT_HEADING_FONT: HeadingFontId = "playfair";
 
 export function isHeadingFont(value: unknown): value is HeadingFontId {
   return HEADING_FONTS.some((f) => f.id === value);
+}
+
+/** Body text faces: chosen for long reading, so no display or handwritten fonts. Checked in the database too. */
+export const BODY_FONTS = [
+  { id: "inter", label: "Inter", group: "Sans serif", hint: "The portal's own text font", stack: 'Inter,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif' },
+  { id: "system", label: "The device's own", group: "Sans serif", hint: "San Francisco, Segoe or Roboto", stack: 'system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif' },
+  { id: "atkinson", label: "Atkinson Hyperlegible", group: "Sans serif", hint: "Designed to be easy to tell letters apart", stack: '"Atkinson Hyperlegible Next Variable",system-ui,sans-serif' },
+  { id: "lexend", label: "Lexend", group: "Sans serif", hint: "Wide spacing, easy on tired eyes", stack: '"Lexend Variable",system-ui,sans-serif' },
+  { id: "source-sans", label: "Source Sans", group: "Sans serif", hint: "Neat and compact", stack: '"Source Sans 3 Variable",system-ui,sans-serif' },
+  { id: "open-sans", label: "Open Sans", group: "Sans serif", hint: "Friendly and familiar", stack: '"Open Sans Variable",system-ui,sans-serif' },
+  { id: "work-sans", label: "Work Sans", group: "Sans serif", hint: "Plain and steady", stack: '"Work Sans Variable",system-ui,sans-serif' },
+  { id: "nunito", label: "Nunito", group: "Sans serif", hint: "Rounded and warm", stack: '"Nunito Variable",system-ui,sans-serif' },
+  { id: "literata", label: "Literata", group: "Serif", hint: "Made for reading on screens", stack: '"Literata Variable",Georgia,serif' },
+  { id: "source-serif", label: "Source Serif", group: "Serif", hint: "Clean and modern", stack: '"Source Serif 4 Variable",Georgia,serif' },
+  { id: "lora", label: "Lora", group: "Serif", hint: "Warm, with gentle curves", stack: '"Lora Variable",Georgia,serif' },
+  { id: "merriweather", label: "Merriweather", group: "Serif", hint: "Sturdy and easy to read", stack: '"Merriweather Variable",Georgia,serif' },
+] as const;
+export type BodyFontId = (typeof BODY_FONTS)[number]["id"];
+export const DEFAULT_BODY_FONT: BodyFontId = "inter";
+
+export function isBodyFont(value: unknown): value is BodyFontId {
+  return BODY_FONTS.some((f) => f.id === value);
+}
+
+// ---- Header and sidebar -----------------------------------------------------------------------------------------
+
+/**
+ * How the header band and the sidebar are drawn. Each style only pairs colours that are already checked for
+ * contrast (docs/theming.md): the page's own surfaces; the accent's tint with its ink; the navy band with cream; the
+ * accent's deep fill with cream. So a band can never make its text unreadable, whatever the palette.
+ */
+export const BAND_STYLES = [
+  { id: "plain", label: "Plain", hint: "The page colour, with an accent rule" },
+  { id: "tint", label: "Tinted", hint: "A soft wash of the accent colour" },
+  { id: "ink", label: "Ink", hint: "The deep navy band, like Admin" },
+  { id: "accent", label: "Accent", hint: "The accent colour, deep and bold" },
+] as const;
+export type BandStyle = (typeof BAND_STYLES)[number]["id"];
+
+export function isBandStyle(value: unknown): value is BandStyle {
+  return BAND_STYLES.some((b) => b.id === value);
+}
+
+// ---- The small touches ------------------------------------------------------------------------------------------
+
+export const WHIMSY_SEASONS = ["auto", "autumn", "winter", "spring", "summer", "none"] as const;
+export type WhimsySeason = (typeof WHIMSY_SEASONS)[number];
+export const WHIMSY_MARKERS = ["diamond", "star", "heart", "leaf", "dot"] as const;
+export type WhimsyMarker = (typeof WHIMSY_MARKERS)[number];
+
+/** The co-op's choices for the sidebar's small pleasures (app/family-village/side-nav.tsx). */
+export type Whimsy = {
+  /** The time-of-day greeting at the top of the sidebar. */
+  greeting: boolean;
+  /** The engraved village at the foot of the sidebar. */
+  village: boolean;
+  /** What blows through the village: the season by the calendar, a fixed one, or nothing. */
+  season: WhimsySeason;
+  /** The shape that marks the current page (and ends the tab underline). */
+  marker: WhimsyMarker;
+  /** The quill underline under the current page's name. */
+  quill: boolean;
+  /** The springs, wiggles and falling things. Off is the same as the device's reduced-motion setting. */
+  motion: boolean;
+};
+
+export const DEFAULT_WHIMSY: Whimsy = { greeting: true, village: true, season: "auto", marker: "diamond", quill: true, motion: true };
+
+export function parseWhimsy(value: unknown): Whimsy {
+  const w = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  const flag = (v: unknown, fallback: boolean) => (typeof v === "boolean" ? v : fallback);
+  return {
+    greeting: flag(w.greeting, DEFAULT_WHIMSY.greeting),
+    village: flag(w.village, DEFAULT_WHIMSY.village),
+    season: (WHIMSY_SEASONS as readonly string[]).includes(w.season as string) ? (w.season as WhimsySeason) : DEFAULT_WHIMSY.season,
+    marker: (WHIMSY_MARKERS as readonly string[]).includes(w.marker as string) ? (w.marker as WhimsyMarker) : DEFAULT_WHIMSY.marker,
+    quill: flag(w.quill, DEFAULT_WHIMSY.quill),
+    motion: flag(w.motion, DEFAULT_WHIMSY.motion),
+  };
 }
 
 // ---- Logos -----------------------------------------------------------------------------------------------------
@@ -331,6 +433,10 @@ export type CoopTheme = {
   paletteId: string;
   accent: AccentTokens;
   font: HeadingFontId;
+  bodyFont: BodyFontId;
+  header: BandStyle;
+  sidebar: BandStyle;
+  whimsy: Whimsy;
   logos: Partial<Record<LogoSlot, string>>;
   /** The light lockup's width / height, so a co-op's own logo keeps its shape. */
   ratio: number | null;
@@ -349,6 +455,7 @@ export const DEFAULT_TIME_ZONE = "America/Chicago";
 
 export const DEFAULT_THEME: CoopTheme = {
   v: 1, name: DEFAULT_COOP_NAME, paletteId: DEFAULT_PALETTE_ID, accent: VERITAS_ACCENT, font: DEFAULT_HEADING_FONT,
+  bodyFont: DEFAULT_BODY_FONT, header: "plain", sidebar: "plain", whimsy: DEFAULT_WHIMSY,
   logos: {}, ratio: null, supportEmail: null, supportPhone: null, personalPalettes: DEFAULT_PERSONAL_PALETTES,
   seasonal: [], timeZone: DEFAULT_TIME_ZONE,
 };
@@ -432,6 +539,7 @@ export function themeVars(theme: CoopTheme, today: string = coopToday(theme.time
   const vars: Record<string, string> = {};
   for (const key of ACCENT_KEYS) vars[ACCENT_VARS[key]] = theme.accent[key];
   vars["--serif"] = HEADING_FONTS.find((f) => f.id === theme.font)?.stack ?? HEADING_FONTS[0].stack;
+  vars["--sans"] = BODY_FONTS.find((f) => f.id === theme.bodyFont)?.stack ?? BODY_FONTS[0].stack;
   const season = activeVariant(theme.seasonal, today);
   const logos = { ...theme.logos, ...(season?.logos ?? {}) };
   for (const slot of LOGO_SLOTS) {
@@ -443,8 +551,25 @@ export function themeVars(theme: CoopTheme, today: string = coopToday(theme.time
   return vars;
 }
 
+/**
+ * The attributes a theme puts on <html> for the stylesheet (app/desktop-nav.css): the header and sidebar styles, the
+ * marker's shape, and "off" for each small touch that is turned off. Keys are dataset names (data-coop-header...).
+ */
+export function themeDataset(theme: CoopTheme): Record<string, string> {
+  const w = theme.whimsy;
+  const data: Record<string, string> = { coopHeader: theme.header, coopSidebar: theme.sidebar, coopMarker: w.marker };
+  if (!w.greeting) data.coopGreeting = "off";
+  if (!w.village) data.coopVillage = "off";
+  if (!w.quill) data.coopQuill = "off";
+  if (!w.motion) data.coopMotion = "off";
+  return data;
+}
+
+/** Every dataset key themeDataset may set, so a change of theme can clear what the new one leaves out. */
+export const THEME_DATASET_KEYS = ["coopHeader", "coopSidebar", "coopMarker", "coopGreeting", "coopVillage", "coopQuill", "coopMotion"];
+
 /** Every custom property a theme may set, so a change of theme can clear what the new one leaves out. */
-export const THEME_VAR_NAMES = [...ACCENT_KEYS.map((k) => ACCENT_VARS[k]), "--serif", ...LOGO_SLOTS.map((s) => LOGO_VARS[s]), "--coop-lockup-ratio"];
+export const THEME_VAR_NAMES = [...ACCENT_KEYS.map((k) => ACCENT_VARS[k]), "--serif", "--sans", ...LOGO_SLOTS.map((s) => LOGO_VARS[s]), "--coop-lockup-ratio"];
 
 /**
  * Reads a cached or fetched theme defensively: anything malformed falls back to the default, and an accent is
@@ -468,6 +593,10 @@ export function parseTheme(value: unknown): CoopTheme {
     paletteId: typeof t.paletteId === "string" ? t.paletteId : DEFAULT_PALETTE_ID,
     accent,
     font: isHeadingFont(t.font) ? t.font : DEFAULT_HEADING_FONT,
+    bodyFont: isBodyFont(t.bodyFont) ? t.bodyFont : DEFAULT_BODY_FONT,
+    header: isBandStyle(t.header) ? t.header : "plain",
+    sidebar: isBandStyle(t.sidebar) ? t.sidebar : "plain",
+    whimsy: parseWhimsy(t.whimsy),
     logos,
     ratio,
     supportEmail: text(t.supportEmail, 200),
@@ -513,7 +642,8 @@ export function themeFromRow(row: Record<string, unknown> | null | undefined, pu
     if (typeof path === "string" && path) logos[slot] = publicUrl(path);
   }
   return parseTheme({
-    name: row.name, paletteId: row.palette_id, accent: row.accent, font: row.heading_font, logos,
+    name: row.name, paletteId: row.palette_id, accent: row.accent, font: row.heading_font,
+    bodyFont: row.body_font, header: row.header_style, sidebar: row.sidebar_style, whimsy: row.whimsy, logos,
     ratio: typeof row.logo_ratio === "number" ? row.logo_ratio : row.logo_ratio == null ? null : Number(row.logo_ratio),
     supportEmail: row.support_email, supportPhone: row.support_phone,
     personalPalettes: Array.isArray(row.personal_palettes) ? row.personal_palettes : undefined,
@@ -523,7 +653,7 @@ export function themeFromRow(row: Record<string, unknown> | null | undefined, pu
 
 /**
  * Runs in the document head before the first paint (app/layout.tsx), after THEME_SCRIPT: dresses the page in the
- * co-op's cached palette, font and logos so nothing flashes in the default look first. Plain old JavaScript on
+ * co-op's cached palette, fonts, header and sidebar styles, small touches and logos so nothing flashes in the default look first. Plain old JavaScript on
  * purpose. The cache only ever holds what parseTheme accepted; the script still applies an accent whole or not at
  * all, and a logo only from the brand bucket.
  * With nothing cached (a first visit) the stylesheet's own defaults show until lib/coop-settings.ts has fetched.
@@ -540,6 +670,12 @@ for(i=0;i<keys.length;i++){if(typeof a[keys[i]]!=='string'||!hex.test(a[keys[i]]
 if(ok){for(i=0;i<keys.length;i++)s.setProperty(vars[i],a[keys[i]])}
 var fonts=${JSON.stringify(Object.fromEntries(HEADING_FONTS.map((f) => [f.id, f.stack])))};
 if(typeof t.font==='string'&&fonts.hasOwnProperty(t.font))s.setProperty('--serif',fonts[t.font]);
+var bodies=${JSON.stringify(Object.fromEntries(BODY_FONTS.map((f) => [f.id, f.stack])))};
+if(typeof t.bodyFont==='string'&&bodies.hasOwnProperty(t.bodyFont))s.setProperty('--sans',bodies[t.bodyFont]);
+var d=document.documentElement.dataset,bands=${JSON.stringify(BAND_STYLES.map((b) => b.id))},marks=${JSON.stringify(WHIMSY_MARKERS)},w=t.whimsy||{};
+if(bands.indexOf(t.header)>=0)d.coopHeader=t.header;if(bands.indexOf(t.sidebar)>=0)d.coopSidebar=t.sidebar;
+if(marks.indexOf(w.marker)>=0)d.coopMarker=w.marker;
+if(w.greeting===false)d.coopGreeting='off';if(w.village===false)d.coopVillage='off';if(w.quill===false)d.coopQuill='off';if(w.motion===false)d.coopMotion='off';
 var re=${LOGO_URL_RE.toString()},slots=${JSON.stringify(LOGO_VARS)},L={},B=t.logos||{},ratio=t.ratio,season=null,k;
 for(k in B)if(B.hasOwnProperty(k))L[k]=B[k];
 if(Object.prototype.toString.call(t.seasonal)==='[object Array]'){
