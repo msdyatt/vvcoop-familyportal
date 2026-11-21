@@ -5,6 +5,7 @@ import { buildIcs, byDayCode, IcsEvent } from "../_shared/ics.ts";
 import { addDaysDateOnly, DateRange, mergeContiguousRanges } from "../_shared/date-ranges.ts";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { corsHeaders } from "../_shared/http.ts";
+import { personalFeedAudiences } from "../_shared/feed-audiences.ts";
 
 /**
  * Serves a subscribable calendar feed -- no interactive login, because a
@@ -193,7 +194,7 @@ async function handle(req: Request): Promise<Response> {
   if (scope === "personal") {
     const token = url.searchParams.get("token");
     if (!token) return text("Missing token.", 400, "text/plain");
-    const { data: profile } = await admin.from("profiles").select("id,display_name,email").eq("calendar_token", token).maybeSingle();
+    const { data: profile } = await admin.from("profiles").select("id,display_name,email,is_demo,status").eq("calendar_token", token).maybeSingle();
     if (!profile) return text("That calendar link is no longer valid.", 404, "text/plain");
     const personalName = profile.display_name || profile.email || "My";
 
@@ -222,7 +223,7 @@ async function handle(req: Request): Promise<Response> {
         ? admin.from("classes").select("id,title,block_id,room_id,school_year_id").in("id", classIds).eq("active", true)
         : Promise.resolve({ data: [] as { id: string; title: string; block_id: string | null; room_id: string | null; school_year_id: string | null }[] }),
       admin.from("events").select(EVENT_SELECT + ",audience")
-        .in("audience", roles.has("teacher") || roles.has("admin") ? ["public", "families", "teachers"] : ["public", "families"])
+        .in("audience", personalFeedAudiences({ roles, isDemo: profile.is_demo === true, active: profile.status === "active" }))
         .order("starts_at"),
     ]);
 

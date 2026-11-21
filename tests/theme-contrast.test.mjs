@@ -123,6 +123,7 @@ const PAIRS = [
   ["white", "sage-text", 4.5, "white on a status chip (complete)"],
   ["cream", "cal-coop", 4.5, "co-op event pill"],
   ["cream", "cal-class", 4.5, "class event pill"],
+  ["cream", "cal-admin", 4.5, "admin-only event pill"],
   ["fg-rgb@.66", "canvas", 4.5, "inactive tab label (iOS style)"],
   ["fg-rgb@.72", "canvas", 4.5, "inactive tab label (Android style)"],
   ["m3-on-secondary-container", "m3-secondary-container", 4.5, "selected tab label (Android style)"],

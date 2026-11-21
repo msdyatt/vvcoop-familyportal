@@ -59,7 +59,7 @@ export const ADMIN_GROUPS: AdminGroup[] = [
     { id: "inbox", label: "Office inbox" }, { id: "news", label: "News & calendar" }, { id: "broadcasts", label: "Broadcasts" }, { id: "message-reports", label: "Reported messages" },
   ] },
   { id: "money", label: "Money", hint: "Dues and expenses", icon: "money", tabs: [{ id: "dues", label: "Dues" }, { id: "expenses", label: "Expenses" }] },
-  { id: "records", label: "Records", hint: "Documents, reports, activity", icon: "records", tabs: [{ id: "documents", label: "Documents" }, { id: "reports", label: "Reports" }, { id: "activity", label: "Activity" }] },
+  { id: "records", label: "Records", hint: "Documents, reports, compliance", icon: "records", tabs: [{ id: "documents", label: "Documents" }, { id: "reports", label: "Reports" }, { id: "deadlines", label: "Compliance" }, { id: "activity", label: "Activity" }] },
   { id: "settings", label: "Settings", hint: "Appearance, integrations", icon: "settings", tabs: [{ id: "appearance", label: "Appearance" }, { id: "integrations", label: "Integrations" }] },
 ];
 
@@ -142,6 +142,7 @@ const WORDS: Record<string, string> = {
   "message-reports": "flagged reported messaging moderation",
   expenses: "receipts reimbursements spending",
   reports: "export csv roster print",
+  deadlines: "compliance irs tax 990 filing deadlines renewals 1099 nonprofit",
   commitment: "teaching commitment teach assist assistant hall monitor volunteer spreadsheet roles balance",
   activity: "log audit history",
   appearance: "theme colours colors logo seasonal brand",
