@@ -12,6 +12,7 @@ import {
 import DetailModal from "../detail-modal";
 import CommitmentImport from "./commitment-import";
 import { CommitmentSettingsCard, HallMonitorsCard } from "./commitment-setup";
+import { DaysView, PointsView } from "./commitment-days";
 
 /**
  * Admin, Classes, Teaching commitment (issue #151): who taught, assisted or was hall monitor in each term, per adult
@@ -20,6 +21,7 @@ import { CommitmentSettingsCard, HallMonitorsCard } from "./commitment-setup";
  */
 
 type View = "household" | "everyone";
+type Section = "roles" | "points" | "days";
 type Show = "all" | "short" | "heavy";
 type Sort = "most" | "fewest" | "name";
 type Editing = { person: CommitmentPerson; term: CommitmentTerm; role: CommitmentRole };
@@ -36,6 +38,7 @@ export default function CommitmentTab() {
   const [yearId, setYearId] = useState<string | null>(null);
   const [data, setData] = useState<CommitmentData | null>(null);
   const [problem, setProblem] = useState("");
+  const [section, setSection] = useState<Section>("roles");
   const [view, setView] = useState<View>("household");
   const [show, setShow] = useState<Show>("all");
   const [sort, setSort] = useState<Sort>("most");
@@ -125,6 +128,22 @@ export default function CommitmentTab() {
       </p>
     </div>
 
+    <nav className="tc-sections" aria-label="Teaching commitment views">
+      {([["roles", "Roles"], ["points", "Points"], ["days", "Co-op days"]] as const).map(([id, label]) =>
+        <button key={id} type="button" aria-pressed={section === id} className={section === id ? "active" : ""} onClick={() => setSection(id)}>{label}</button>)}
+    </nav>
+
+    {section !== "roles" && <div className="tc-controls">
+      <label><span className="field-caption">School year</span>
+        <select value={data.school_year?.id ?? ""} onChange={(event) => setYearId(event.target.value || null)}>
+          {data.years.map((year) => <option key={year.id} value={year.id}>{year.label}{year.is_current ? " (current)" : ""}</option>)}
+        </select>
+      </label>
+    </div>}
+    {section === "points" && <PointsView key={data.school_year?.id ?? "none"} yearId={data.school_year?.id ?? null} />}
+    {section === "days" && <DaysView key={data.school_year?.id ?? "none"} yearId={data.school_year?.id ?? null} />}
+
+    {section === "roles" && <>
     <div className="tc-controls">
       <label><span className="field-caption">School year</span>
         <select value={data.school_year?.id ?? ""} onChange={(event) => setYearId(event.target.value || null)}>
@@ -208,6 +227,7 @@ export default function CommitmentTab() {
       <CommitmentImport data={data} onSaved={reload} />
     </>}
     <CommitmentSettingsCard settings={settings} onSaved={reload} />
+    </>}
 
     {editing && <CellEditor data={data} editing={editing} onClose={() => setEditing(null)} onSaved={async () => {
       const next = await reload();
@@ -363,7 +383,7 @@ function CellEditor({ data, editing, onClose, onSaved }: { data: CommitmentData;
       </ul>
     </>}
 
-    <div className="portal-form">
+    <div className="portal-form tc-form">
       <p className="card-kicker">Change this count</p>
       <label><span className="field-caption">How</span>
         <select value={kind} onChange={(event) => { setKind(event.target.value as "adjust" | "set"); setAmount(event.target.value === "set" ? String(cell.value) : "1"); }}>
@@ -433,7 +453,7 @@ function PersonPanel({ data, person, onClose, onSaved }: { data: CommitmentData;
       })}
       {!person.classes.length && !person.hall.length && <li><div>No class or hall monitor assignments in the portal this year.</div></li>}
     </ul>
-    <div className="portal-form">
+    <div className="portal-form tc-form">
       <label><span className="field-caption">Notes</span>
         <textarea value={note} rows={3} maxLength={2000} placeholder="Classes covered outside the portal, substitutions, anything to remember" onChange={(event) => setNote(event.target.value)} />
       </label>

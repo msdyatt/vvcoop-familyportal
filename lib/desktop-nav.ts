@@ -37,6 +37,7 @@ export const FAMILY_TABS: AreaTab[] = [
   { id: "children", label: "Children", href: `${FV}/children` },
   { id: "documents", label: "Documents and forms", href: `${FV}/documents` },
   { id: "dues", label: "Dues", href: `${FV}/dues` },
+  { id: "co-op-days", label: "Co-op days", href: `${FV}/co-op-days` },
 ];
 
 /** Only shown to people who teach this year; everyone else has just the one Classes page, so no tabs at all. */
@@ -72,7 +73,7 @@ export function activePortalItem(pathname: string): string | null {
   if (under(path, `${FV}/messages`)) return "messages";
   if (under(path, `${FV}/calendar`)) return "calendar";
   if (under(path, `${FV}/classes`) || under(path, `${FV}/teacher`)) return "classes";
-  if (["children", "documents", "dues", "paperwork"].some((part) => under(path, `${FV}/${part}`))) return "family";
+  if (["children", "documents", "dues", "paperwork", "co-op-days"].some((part) => under(path, `${FV}/${part}`))) return "family";
   if (under(path, `${FV}/photos`)) return "photos";
   if (under(path, `${FV}/news`)) return "news";
   return null;
@@ -128,6 +129,7 @@ const WORDS: Record<string, string> = {
   children: "kids enroll enrollment child profiles",
   documents: "forms waiver handbook sign signature paperwork files handouts",
   dues: "pay payment money balance fees tuition",
+  "co-op-days": "absent absence sick cover substitute sub shift can't make it friday attend",
   "classes-children": "kids classes",
   "classes-teaching": "teach my classes roster",
   "teaching-news": "team news teachers lounge",

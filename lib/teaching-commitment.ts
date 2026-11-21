@@ -386,3 +386,108 @@ export function buildCommitmentDoc(data: CommitmentData, options: DocOptions): R
   if (loose.length) sections.push({ heading: "Not in a household", columns, rows: loose.map(personRow) });
   return { title, subtitle, landscape: true, sections };
 }
+
+// --- co-op days and points (migration 20261121100000_coop_days_coverage) ----------------------------------------------
+
+export type ShiftState = {
+  user_id: string; owner_name: string; role: CommitmentRole; class_id: string | null; block_id: string | null;
+  title: string; period: string | null; released: boolean; cover_id: string | null; covering_user_id: string | null;
+  covering_name: string | null; needed: boolean;
+};
+
+export type CoopDay = {
+  id: string; term_id: string; day: string; cancelled: boolean; note: string | null;
+  absences: { id: string; family_id: string | null; user_id: string | null; name: string; reason: string | null }[];
+  /** Only the shifts that were released or covered. */ shifts: ShiftState[];
+  open_count: number;
+};
+
+export type PointsTerm = { term_id: string; earned: number; days_present: number | null; days_absent: number | null; covers_given: number; no_shows: number };
+export type PointsPerson = {
+  key: string; user_id: string | null; name: string; household_id: string | null; household_name: string | null;
+  earned: number; covers_given: number; no_shows: number; days_absent: number; terms: PointsTerm[];
+};
+export type PointsHouseholdTerm = { term_id: string; days_attended: number; days_away: number; earned: number; expected: number; balance: number };
+export type PointsHousehold = { id: string; name: string; terms: PointsHouseholdTerm[] | null; earned: number; expected: number; balance: number };
+
+export type DaysData = {
+  school_year: { id: string; label: string; is_current: boolean } | null;
+  settings: CommitmentSettings & { teach_points: number; assist_points: number; hall_points: number };
+  today: string;
+  day_points?: number;
+  terms?: (CommitmentTerm & { day_count: number })[];
+  households?: PointsHousehold[];
+  people?: PointsPerson[];
+  days?: CoopDay[];
+  families?: { id: string; name: string }[];
+  members?: { user_id: string; name: string; household_name: string | null }[];
+};
+
+/** "Fri, Nov 20" for a date stored as YYYY-MM-DD (read as a calendar date, never shifted by time zone). */
+export function dayLabel(day: string): string {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, date, 12)).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/** What a balance means in plain words, measured in assisting periods (the smallest role). */
+export function balanceText(balance: number, assistPoints: number): string {
+  if (balance === 0) return "Even";
+  const per = Math.max(1, assistPoints);
+  const periods = Math.ceil(Math.abs(balance) / per);
+  const unit = `${periods} assisting period${periods === 1 ? "" : "s"}`;
+  return balance < 0 ? `Behind by ${Math.abs(balance)} (about ${unit})` : `Ahead by ${balance}`;
+}
+
+/** Households that should pick up more next block first: the lowest balance, then the fewest points. */
+export function byBalance<T extends { balance: number; earned: number; name: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => a.balance - b.balance || a.earned - b.earned || a.name.localeCompare(b.name));
+}
+
+/** The Points view as a report: one section per household with its adults, balance per term and for the year. */
+export function buildPointsDoc(data: DaysData): ReportDoc {
+  const terms = data.terms ?? [];
+  const people = data.people ?? [];
+  const columns: ReportSection["columns"] = [
+    { label: "Household / adult", weight: 1.8 },
+    ...terms.flatMap((term) => [{ label: `${term.label} days`, weight: 0.5 }, { label: `${term.label} points`, weight: 0.6 }, { label: `${term.label} balance`, weight: 0.6 }]),
+    { label: "Points", weight: 0.6 }, { label: "Expected", weight: 0.6 }, { label: "Balance", weight: 0.6 }, { label: "Covers", weight: 0.5 },
+  ];
+  const rows: string[][] = [];
+  for (const household of byBalance(data.households ?? [])) {
+    const byTerm = new Map((household.terms ?? []).map((term) => [term.term_id, term]));
+    rows.push([household.name, ...terms.flatMap((term) => { const row = byTerm.get(term.id); return [String(row?.days_attended ?? 0), String(row?.earned ?? 0), String(row?.balance ?? 0)]; }),
+      String(household.earned), String(household.expected), String(household.balance), ""]);
+    for (const person of people.filter((row) => row.household_id === household.id)) {
+      const mine = new Map(person.terms.map((term) => [term.term_id, term]));
+      rows.push([`   ${person.name}`, ...terms.flatMap((term) => ["", String(mine.get(term.id)?.earned ?? 0), ""]), String(person.earned), "", "", String(person.covers_given)]);
+    }
+  }
+  for (const person of people.filter((row) => !row.household_id)) {
+    const mine = new Map(person.terms.map((term) => [term.term_id, term]));
+    rows.push([`${person.name} (no household)`, ...terms.flatMap((term) => ["", String(mine.get(term.id)?.earned ?? 0), ""]), String(person.earned), "", "", String(person.covers_given)]);
+  }
+  const s = data.settings;
+  return {
+    title: `${data.school_year?.label ?? ""} Teaching Commitment Points`.trim(),
+    subtitle: `Teach ${s.teach_points}, assist ${s.assist_points}, hall monitor ${s.hall_points} points. Expected per co-op day attended: ${data.day_points ?? 0}. Lowest balance first.`,
+    landscape: true,
+    sections: [{ columns, rows }],
+  };
+}
+
+/** What a member sees (public.my_coop_days). */
+export type MyShift = { role: CommitmentRole; class_id: string | null; block_id: string | null; title: string; period: string | null; starts_at: string | null };
+export type MyCoopDay = {
+  id: string; day: string; term: string; cancelled: boolean; note: string | null; me_absent: boolean; family_absent: boolean;
+  mine: (MyShift & { released: boolean; covering_name: string | null })[];
+  open: (MyShift & { owner_id: string; owner_name: string; needed: boolean })[];
+  my_covers: { id: string; role: CommitmentRole; title: string; period: string | null; owner_name: string }[];
+  loggable: (MyShift & { owner_id: string; owner_name: string })[];
+};
+export type MyCoopDays = { today: string; household: { id: string; name: string } | null; days: MyCoopDay[] };
+
+/** "Teaching History K-3 (History)", "Assisting Pottery", "Hall monitor (Science)". */
+export function shiftLabel(shift: { role: CommitmentRole; title: string; period: string | null }): string {
+  const what = shift.role === "taught" ? `Teaching ${shift.title}` : shift.role === "assisted" ? `Assisting ${shift.title}` : "Hall monitor";
+  return shift.period ? `${what} (${shift.period})` : what;
+}

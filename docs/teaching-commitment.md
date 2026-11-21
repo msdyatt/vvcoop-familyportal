@@ -56,7 +56,44 @@ Every change is an entry in `teaching_commitment_entries`, always with a reason:
 Entries are never edited or deleted; an admin removes one with a reason, and it stays in the history. Each change is
 also in Admin, Activity. Notes are per person per year (`teaching_commitment_notes`).
 
-**Hook for substitutes (#129).** When substitute requests are built, record coverage with
+## Co-op days, absences and covers (day by day)
+
+The Roles grid is what each adult signed up for. **Co-op days** records what actually happened (migration
+`20261121100000_coop_days_coverage.sql`), so nobody has to log routine work:
+
+- **Co-op days** (Admin, Teaching commitment, Co-op days): the dates the co-op meets, per term. "Add every Friday in
+  Block 1" fills a term from its dates (the weekday of its periods by default); single dates can be added; a holiday is
+  **cancelled** (it stays listed and counts for no one). A date with absences or covers can only be cancelled.
+- **Shifts** are not stored. On each co-op day, every class assignment of that term (lead = teaching, assistant =
+  assisting) and every hall monitor assignment is a shift, **assumed worked**.
+- **Family, Co-op days** (`/family-village/co-op-days`, in the Family tabs and the Menu): each adult sees their shifts
+  for the coming ten weeks and the last two. **I can't make it** releases their shifts that day. **Our family won't be
+  there** releases every adult's shifts in the household and takes the day out of the household's expectation (the
+  children are not there either). Both can be taken back before the day, unless someone is already covering.
+- **Shifts to cover**: anyone sees the shifts others released and takes one with **I'll cover it**. A released
+  assistant shift in a class that still has two adults is marked optional (the handbook's "just tell the group").
+- **Logging a cover afterwards**: on the day and for two weeks after, someone who covered for a person who did not say
+  they were out picks that shift under "Covered for someone who didn't come?". The person who did not come loses that
+  shift's points; administrators see it as "covered without notice" (a quiet no-show count, #129).
+- Administrators can do all of this for anyone, on any date, from the day's panel. Everything is in Admin, Activity.
+
+## Points
+
+The **Points** view answers "who should pick up more next block". Weights (Points per role card): teach 2, assist 1,
+hall monitor 1. For each adult and term, on every co-op day that has passed and was not cancelled:
+
+- present: their Roles-grid counts times the weights (so imported spreadsheet counts and adjustments count too);
+- out (themselves or their household): nothing that day;
+- less the weight of any of their shifts someone covered while they were not marked out;
+- plus the weight of every shift they covered.
+
+A household's **expected** points are the days it attended times the handbook's day (teach 1 x 2 + assist 2 x 1 = 4 by
+default); **balance** = earned - expected. Households are listed lowest balance first, with "Behind by 6 (about 6
+assisting periods)". Days the household was not there do not count against it. A term with no co-op days set up (for
+example a block imported from the spreadsheet) counts as one day once it has started. PDF and CSV export as the Roles
+view does.
+
+**Hook for other sources (#129).** Substitutions are recorded as covers (above). For any other source of corrections in the Roles grid, use
 `private.record_commitment_entry(actor, term, user, null, role, 'adjust', +1 or -1, reason, 'substitute', request_id)`:
 +1 for the person covering, -1 for the person absent. They show as "From a substitution" in the cell's history.
 
@@ -85,5 +122,6 @@ The parser is `parseCommitmentSheet` in `lib/teaching-commitment.ts`; the databa
   `lib/teaching-commitment.test.ts` (Deno, in CI's edge-function-tests).
 - Screens: `app/family-village/admin/commitment-tab.tsx`, `commitment-import.tsx`, `commitment-setup.tsx`; styles in
   `app/teaching-commitment.css`.
-- pgTAP: `supabase/tests/database/036_teaching_commitment.test.sql`.
+- pgTAP: `supabase/tests/database/036_teaching_commitment.test.sql`, `037_coop_days_coverage.test.sql`.
+- Co-op days screens: `app/family-village/admin/commitment-days.tsx` (Points, Co-op days), `app/family-village/co-op-days/`.
 - The Class roster report fills its hall monitor fields from the stored assignments for the chosen block.

@@ -225,3 +225,76 @@
   .tc-scroller { max-height:none; overflow:visible; border:0; }
   .tc-table thead th, .tc-table .tc-name, .tc-household-row th { position:static; }
 }
+
+/* --- views, points and co-op days (commitment-days.tsx) -------------------------------------------------------------- */
+.tc-sections { display:flex; flex-wrap:wrap; gap:6px; }
+.tc-sections button {
+  padding:7px 14px;
+  font:600 13px var(--sans);
+  color:var(--text);
+  background:var(--surface);
+  border:1px solid rgba(var(--fg-rgb),.18);
+  border-radius:999px;
+  cursor:pointer;
+}
+.tc-sections button.active { color:var(--cream); background:var(--action); border-color:var(--action); }
+.tc-subrow th, .tc-subrow td { font-weight:500; }
+.tc-indent { padding-left:18px; color:var(--text-muted); }
+.tc-behind .tc-notes { color:var(--danger-text); font-weight:600; }
+.tc-table td.tc-short { background:var(--warm-tint); color:var(--danger-text); }
+.tc-days .tc-notes { min-width:160px; }
+.tc-cancelled th, .tc-cancelled td { color:var(--text-muted); }
+.tc-cancelled .tc-person b { text-decoration:line-through; }
+.tc-cover-pick { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.tc-cover-pick select { max-width:200px; padding:6px 8px; color:var(--text); background:var(--surface); border:1px solid rgba(var(--fg-rgb),.18); border-radius:8px; }
+
+/* The cell editor and panels: one field per row, so a narrow dialog stays readable. */
+.tc-form { grid-template-columns:1fr; margin-top:12px; }
+.tc-form .row-actions button { grid-column:auto; }
+
+/* --- Family, Co-op days (app/family-village/co-op-days) -------------------------------------------------------------- */
+.coop-days-page { display:grid; gap:16px; }
+.coop-days-heading { margin:12px 0 0; font:600 20px var(--serif); color:var(--text); }
+.coop-day {
+  display:grid;
+  gap:10px;
+  padding:16px 18px;
+  background:var(--surface);
+  border:1px solid rgba(var(--fg-rgb),.14);
+  border-radius:14px;
+}
+.coop-day.out { border-left:4px solid var(--danger-line); }
+.coop-day.cancelled { color:var(--text-muted); background:var(--surface-sunken); }
+.coop-day header { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; }
+.coop-day h3 { margin:0; font:600 18px var(--serif); color:var(--text); }
+.coop-day header small { font:500 12px var(--sans); color:var(--text-muted); }
+.coop-day p { margin:0; font:500 14px var(--sans); color:var(--text); }
+.coop-day-row { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; }
+.coop-shifts { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.coop-shifts li {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:center;
+  gap:6px 12px;
+  padding:8px 10px;
+  font:500 14px var(--sans);
+  color:var(--text);
+  background:var(--surface-sunken);
+  border-radius:8px;
+}
+.coop-shifts small { font:500 12px var(--sans); color:var(--text-muted); }
+.coop-log label { display:grid; gap:4px; flex:1 1 240px; }
+.coop-log .field-caption { font:600 12px var(--sans); color:var(--text-muted); }
+.coop-log select { max-width:100%; padding:8px 10px; color:var(--text); background:var(--surface-sunken); border:1px solid rgba(var(--fg-rgb),.18); border-radius:8px; }
+.tc-controls > button {
+  padding:8px 14px;
+  font:600 13px var(--sans);
+  color:var(--cream);
+  background:var(--action);
+  border:1px solid var(--action);
+  border-radius:8px;
+  cursor:pointer;
+}
+.tc-controls > button.ghost { color:var(--text); background:var(--surface); border-color:rgba(var(--fg-rgb),.22); }
+.tc-controls > button:disabled { opacity:.55; cursor:default; }

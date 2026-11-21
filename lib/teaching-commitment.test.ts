@@ -214,3 +214,49 @@ Deno.test("buildCommitmentDoc: by household, with the household total and whethe
   assertEquals(total.slice(1, 7), ["1", "2", "0", "0", "1", "0"]);
   assertEquals(total.length, testwood.columns.length);
 });
+
+import { balanceText, buildPointsDoc, byBalance, dayLabel, shiftLabel, type DaysData } from "./teaching-commitment.ts";
+
+Deno.test("dayLabel: a stored date reads as that calendar day", () => {
+  assertEquals(dayLabel("2090-11-17"), "Fri, Nov 17");
+});
+
+Deno.test("balanceText: behind is measured in assisting periods", () => {
+  assertEquals(balanceText(0, 1), "Even");
+  assertEquals(balanceText(-6, 1), "Behind by 6 (about 6 assisting periods)");
+  assertEquals(balanceText(-3, 2), "Behind by 3 (about 2 assisting periods)");
+  assertEquals(balanceText(4, 1), "Ahead by 4");
+});
+
+Deno.test("byBalance: the household furthest behind comes first", () => {
+  const rows = byBalance([{ name: "B", balance: -2, earned: 6 }, { name: "A", balance: 3, earned: 9 }, { name: "C", balance: -6, earned: 6 }]);
+  assertEquals(rows.map((row) => row.name), ["C", "B", "A"]);
+});
+
+Deno.test("shiftLabel", () => {
+  assertEquals(shiftLabel({ role: "taught", title: "History K-3", period: "History" }), "Teaching History K-3 (History)");
+  assertEquals(shiftLabel({ role: "hall_monitor", title: "Hall monitor", period: "Science" }), "Hall monitor (Science)");
+});
+
+Deno.test("buildPointsDoc: households by balance, with their adults beneath", () => {
+  const data: DaysData = {
+    school_year: { id: "y", label: "2090-91", is_current: true },
+    settings: { teach_target: 1, assist_target: 2, hall_counts_as_assist: true, heavy_load: 4, teach_points: 2, assist_points: 1, hall_points: 1 },
+    today: "2090-11-20", day_points: 4,
+    terms: [{ id: "t1", label: "Block 1", starts_on: "", ends_on: "", checked: true, day_count: 3 }],
+    households: [
+      { id: "h2", name: "Sampleford", earned: 6, expected: 8, balance: -2, terms: [{ term_id: "t1", days_attended: 2, days_away: 1, earned: 6, expected: 8, balance: -2 }] },
+      { id: "h1", name: "Testwood", earned: 6, expected: 12, balance: -6, terms: [{ term_id: "t1", days_attended: 3, days_away: 0, earned: 6, expected: 12, balance: -6 }] },
+    ],
+    people: [
+      { key: "u1", user_id: "u1", name: "Avery Testwood", household_id: "h1", household_name: "Testwood", earned: 4, covers_given: 0, no_shows: 0, days_absent: 1, terms: [{ term_id: "t1", earned: 4, days_present: 2, days_absent: 1, covers_given: 0, no_shows: 0 }] },
+      { key: "u4", user_id: "u4", name: "Drew Exampleton", household_id: null, household_name: null, earned: 6, covers_given: 2, no_shows: 0, days_absent: 0, terms: [{ term_id: "t1", earned: 6, days_present: 3, days_absent: 0, covers_given: 2, no_shows: 0 }] },
+    ],
+  };
+  const doc = buildPointsDoc(data);
+  const rows = doc.sections[0].rows;
+  assertEquals(rows.map((row) => row[0]), ["Testwood", "   Avery Testwood", "Sampleford", "Drew Exampleton (no household)"]);
+  assertEquals(rows[0].slice(1), ["3", "6", "-6", "6", "12", "-6", ""]);
+  assertEquals(rows[0].length, doc.sections[0].columns.length);
+  assert(doc.landscape);
+});
