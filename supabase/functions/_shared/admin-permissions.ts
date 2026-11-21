@@ -1,5 +1,3 @@
-import type { AdminClient } from "./types.ts";
-
 /**
  * Board-only admin permissions (migration 20261121160000_admin_permissions.sql).
  * The database is the source of truth; Edge Functions ask it about the person they
@@ -15,7 +13,8 @@ export const PERMISSION_LABELS: Record<AdminPermission, string> = {
   manage_permissions: "Admin permissions",
 };
 
-type RpcClient = Pick<AdminClient, "rpc">;
+/** The one call this needs; the service-role client fits it, and so does a test fake. */
+export type RpcClient = { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> };
 
 /** True only when the database says this admin holds the permission. Any error counts as no. */
 export async function hasAdminPermission(admin: RpcClient, userId: string, permission: AdminPermission): Promise<boolean> {
