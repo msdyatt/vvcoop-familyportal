@@ -172,7 +172,8 @@ begin
   select * into v_threshold from private.nec_threshold(p_year);
   select coalesce(jsonb_agg(jsonb_build_object('payee', p.vendor, 'cents', p.cents, 'count', p.n, 'categories', p.categories) order by p.cents desc), '[]'::jsonb)
   into v_payees
-  from (select min(btrim(e.vendor)) as vendor, sum(e.amount_cents)::bigint as cents, count(*)::int as n,
+  -- The payee's name as first entered (by date), so the choice does not depend on collation.
+  from (select (array_agg(btrim(e.vendor) order by e.spent_on, e.created_at, e.id))[1] as vendor, sum(e.amount_cents)::bigint as cents, count(*)::int as n,
                array_agg(distinct c.name order by c.name) as categories
         from public.expenses e join public.expense_categories c on c.id = e.category_id
         where e.voided_at is null and e.spent_on between make_date(p_year, 1, 1) and make_date(p_year, 12, 31)
