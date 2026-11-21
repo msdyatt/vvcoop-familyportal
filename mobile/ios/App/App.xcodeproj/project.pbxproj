@@ -52,6 +52,7 @@
 		F4A1ED9E83ABFF061A115C7D /* ThreadSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1BFC0F4C3FEB25F11CF35 /* ThreadSheets.swift */; };
 		F4A1DCDD8632500F6181F305 /* Attachments.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A188A665ABD49AFEFAB35A /* Attachments.swift */; };
 		F4A17E4B9E1AE264BE005163 /* ReactionIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A1CDE603AC540BFCCB2541 /* ReactionIcons.swift */; };
+		F4A15B459B94D656F6CF0CA3 /* InkLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A16EDF09A43B7D095752B4 /* InkLoadingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -101,6 +102,7 @@
 		F4A1BFC0F4C3FEB25F11CF35 /* ThreadSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadSheets.swift; sourceTree = "<group>"; };
 		F4A188A665ABD49AFEFAB35A /* Attachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attachments.swift; sourceTree = "<group>"; };
 		F4A1CDE603AC540BFCCB2541 /* ReactionIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReactionIcons.swift; sourceTree = "<group>"; };
+		F4A16EDF09A43B7D095752B4 /* InkLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkLoadingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -152,6 +154,7 @@
 			sourceTree = "<group>";
 		};
 		F4A11E000000000000000300 /* Frame */ = {isa = PBXGroup; children = (
+				F4A16EDF09A43B7D095752B4 /* InkLoadingView.swift */,
 				F4A1CCF75B9E8E06D4CF98B3 /* NativeScreenController.swift */,
 				F4A11E04EDCC82A019C17B4E /* SplashView.swift */,
 				F4A11E9EA07930C5BDC87051 /* HeaderBand.swift */,
@@ -290,6 +293,7 @@
 				F4A11E000000000000000204 /* Navigator.swift in Sources */,
 				F4A11E000000000000000205 /* FrameNavigationController.swift in Sources */,
 				F4A11E000000000000000206 /* FrameController.swift in Sources */,
+				F4A15B459B94D656F6CF0CA3 /* InkLoadingView.swift in Sources */,
 				F4A17E4B9E1AE264BE005163 /* ReactionIcons.swift in Sources */,
 				F4A1DCDD8632500F6181F305 /* Attachments.swift in Sources */,
 				F4A1ED9E83ABFF061A115C7D /* ThreadSheets.swift in Sources */,
