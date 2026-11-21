@@ -207,3 +207,9 @@
   background:var(--panel);
   color:var(--text-muted);
 }
+
+/* The co-op turned motion off (Admin > Appearance). */
+html[data-coop-motion="off"] .live-portal .portal-people div.person-card,
+html[data-coop-motion="off"] .today-date-chip { transition:none; }
+html[data-coop-motion="off"] .live-portal .portal-people div.person-card:hover,
+html[data-coop-motion="off"] .today-date:hover .today-date-chip { transform:none; }

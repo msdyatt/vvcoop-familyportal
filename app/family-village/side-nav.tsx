@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import CoopLogo from "../coop-logo";
 import { useUnreadCount } from "./messages/messages-link";
+import { useCoopTheme } from "../../lib/coop-settings";
 import {
   ADMIN_GROUPS, ADMIN_PATH, ADMIN_TAB_EVENT, PORTAL_PRIMARY, PORTAL_SECONDARY,
   DRAWER_EVENT, SIDENAV_KEY, activePortalItem, adminGroupOf, adminHref, adminTabFrom, dayPartOf, greeting, seasonOf,
@@ -183,8 +184,10 @@ export default function SideNav({ current, roles, name }: { current: PortalKey; 
     window.dispatchEvent(new CustomEvent(ADMIN_TAB_EVENT, { detail: adminGroupOf(adminTab).tabs.some((row) => row.id === tab) ? adminTab : tab }));
   }
 
-  // Unknown until the clock is read, so the weather never starts in the wrong season.
-  const season = now ? seasonOf(now) : null;
+  // The co-op chooses the season (Admin > Appearance): the calendar's, a fixed one, or none. Unknown until the clock
+  // is read, so the weather never starts in the wrong season.
+  const chosen = useCoopTheme().whimsy.season;
+  const season = chosen === "none" ? null : chosen !== "auto" ? chosen : now ? seasonOf(now) : null;
   const firstName = name.split(/\s+/)[0] ?? "";
 
   return <div ref={shell} className="side-nav-shell" {...(drawer ? { role: "dialog", "aria-modal": true, "aria-label": "Menu" } : {})}>
@@ -192,8 +195,11 @@ export default function SideNav({ current, roles, name }: { current: PortalKey; 
     <nav className={`side-nav${admin ? " side-nav-admin" : ""}`} aria-label={admin ? "Admin" : "Main"}>
     <div className="side-nav-top">
       <a className="side-nav-brand" href={admin ? ADMIN_PATH : "/family-village/home"} aria-label={admin ? "Admin overview" : "Today"}>
-        <CoopLogo className="side-nav-lockup" tone={admin ? "on-dark" : "auto"} />
-        <CoopLogo kind="mark" className="side-nav-mark" tone={admin ? "on-dark" : "auto"} decorative />
+        {/* Both versions; the stylesheet shows the one that suits the sidebar's style (a dark band needs the light logo). */}
+        <CoopLogo className="side-nav-lockup sn-day" />
+        <CoopLogo className="side-nav-lockup sn-night" tone="on-dark" decorative />
+        <CoopLogo kind="mark" className="side-nav-mark sn-day" decorative />
+        <CoopLogo kind="mark" className="side-nav-mark sn-night" tone="on-dark" decorative />
       </a>
       {admin && <span className="side-nav-admin-chip">Admin</span>}
       <button type="button" className="side-nav-close" onClick={close} aria-label="Close the menu">
