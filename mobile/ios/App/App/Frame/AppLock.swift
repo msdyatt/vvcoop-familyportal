@@ -28,11 +28,15 @@ final class AppLock {
     private var cover: LockView?
     private var leftAt: Date? = .distantPast // a fresh launch counts as having been away
     private var evaluating = false
+    /// True from the moment the app locks until Face ID (or the passcode) succeeds. Only success clears it, so
+    /// cancelling the prompt can never leave the app open, and the Unlock button is always there while it is locked.
+    private var locked = false
 
     func attach(to window: UIWindow) { self.window = window }
 
     func willResignActive() {
-        guard isSignedIn(), isEnabled else { return }
+        // The Face ID prompt itself makes the app inactive: leave the locked cover (and its Unlock button) as it is.
+        guard isSignedIn(), isEnabled, !evaluating, !locked else { return }
         showCover(locked: false)
     }
 
@@ -44,12 +48,18 @@ final class AppLock {
         #endif
         // Time away is measured from the last trip to the background (or from launch). A system alert, the
         // share sheet or the Face ID prompt itself make the app inactive without leaving it, and must not lock.
+        // Coming back from the Face ID prompt: its own result decides (unlock() below).
+        if evaluating { return }
         let away = leftAt.map { Date().timeIntervalSince($0) } ?? 0
         leftAt = nil
-        if isSignedIn(), isEnabled, canLock, away >= grace {
+        if locked {
+            // Still locked (the prompt was cancelled or failed): keep the cover, with the Unlock button showing.
+            showCover(locked: true)
+        } else if isSignedIn(), isEnabled, canLock, away >= grace {
+            locked = true
             showCover(locked: true)
             unlock()
-        } else if cover != nil, !evaluating {
+        } else if cover != nil {
             removeCover()
         }
     }
@@ -60,8 +70,16 @@ final class AppLock {
         let context = LAContext()
         context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock Veritas Village") { [weak self] success, _ in
             DispatchQueue.main.async {
-                self?.evaluating = false
-                if success { Haptics.play("success"); self?.removeCover() }
+                guard let self else { return }
+                self.evaluating = false
+                if success {
+                    self.locked = false
+                    Haptics.play("success")
+                    self.removeCover()
+                } else {
+                    // Cancelled or failed: stay locked, and offer the button to try again.
+                    self.showCover(locked: true)
+                }
             }
         }
     }
@@ -104,17 +122,26 @@ final class LockView: UIView {
         super.init(frame: frame)
         backgroundColor = Brand.navy
 
+        // The mark and name, as on the launch screen, so coming back to the app looks like the app (it used to be the
+        // name alone on navy, which read as something stuck).
+        let mark = UIImageView(image: UIImage(named: "SplashMark"))
+        mark.contentMode = .scaleAspectFit
+        mark.isAccessibilityElement = false
+        mark.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([mark.widthAnchor.constraint(equalToConstant: 80), mark.heightAnchor.constraint(equalToConstant: 80)])
+
         let title = UILabel()
-        title.text = "Veritas Village"
-        title.font = UIFont.systemFont(ofSize: 26, weight: .semibold)
+        title.text = Brand.coopName
+        title.font = UIFont(name: "Georgia-Bold", size: 24) ?? UIFont.systemFont(ofSize: 24, weight: .semibold)
         title.textColor = Brand.cream
 
         button.addAction(UIAction { [weak self] _ in self?.onUnlock?() }, for: .touchUpInside)
         button.isHidden = true
 
-        let stack = UIStackView(arrangedSubviews: [title, button])
+        let stack = UIStackView(arrangedSubviews: [mark, title, button])
         stack.axis = .vertical
-        stack.spacing = 24
+        stack.spacing = 18
+        stack.setCustomSpacing(28, after: title)
         stack.alignment = .center
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
