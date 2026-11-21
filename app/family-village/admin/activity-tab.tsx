@@ -107,6 +107,27 @@ function describe(row: AuditRow): string {
       return `moved ${text(d, "first_name") ?? "a child"} from ${text(d, "from") ?? "one household"} to ${text(d, "to") ?? "another"}`;
     case "family_adult_invited":
       return `invited another adult to join ${text(d, "family_name") ?? "a household"}`;
+    case "teaching_commitment_adjusted": {
+      const role = text(d, "role")?.replace("hall_monitor", "hall monitor") ?? "a";
+      const amount = num(d, "amount") ?? 0;
+      const who = text(d, "person_label") ? ` for ${text(d, "person_label")}` : "";
+      return (text(d, "kind") === "set" ? `set a teaching commitment ${role} count to ${amount}` : `adjusted a teaching commitment ${role} count by ${amount > 0 ? "+" : ""}${amount}`)
+        + `${who}: ${text(d, "reason") ?? ""}`;
+    }
+    case "teaching_commitment_entry_removed":
+      return `removed a teaching commitment entry: ${text(d, "reason") ?? ""}`;
+    case "teaching_commitment_imported":
+      return `imported the teaching commitment spreadsheet for ${num(d, "people") ?? 0} people`;
+    case "teaching_commitment_settings_saved":
+      return `set the teaching commitment to teach ${num(d, "teach_target") ?? "?"} and assist ${num(d, "assist_target") ?? "?"} each co-op day`;
+    case "teaching_commitment_note_saved":
+      return "updated a teaching commitment note";
+    case "teaching_commitment_label_linked":
+      return `linked ${text(d, "person_label") ?? "a name"} from the teaching commitment spreadsheet to an account`;
+    case "hall_monitor_assigned":
+      return "assigned a hall monitor";
+    case "hall_monitor_removed":
+      return "took a hall monitor off a period";
     default:
       return row.action.replace(/_/g, " ");
   }

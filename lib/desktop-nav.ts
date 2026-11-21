@@ -53,7 +53,7 @@ export type AdminGroup = { id: string; label: string; hint: string; icon: NavIco
 export const ADMIN_GROUPS: AdminGroup[] = [
   { id: "overview", label: "Overview", hint: "What needs attention", icon: "overview", tabs: [{ id: "dashboard", label: "Overview" }] },
   { id: "people", label: "People", hint: "Families and invitations", icon: "people", tabs: [{ id: "families", label: "Families" }, { id: "invitations", label: "Invitations" }] },
-  { id: "classes", label: "Classes", hint: "Classes and enrollment", icon: "classes", tabs: [{ id: "classes", label: "Classes" }] },
+  { id: "classes", label: "Classes", hint: "Classes, enrollment, teaching commitment", icon: "classes", tabs: [{ id: "classes", label: "Classes" }, { id: "commitment", label: "Teaching commitment" }] },
   { id: "comms", label: "Messages and news", hint: "Inbox, news, broadcasts", icon: "comms", tabs: [
     { id: "inbox", label: "Office inbox" }, { id: "news", label: "News & calendar" }, { id: "broadcasts", label: "Broadcasts" }, { id: "message-reports", label: "Reported messages" },
   ] },
@@ -140,6 +140,7 @@ const WORDS: Record<string, string> = {
   "message-reports": "flagged reported messaging moderation",
   expenses: "receipts reimbursements spending",
   reports: "export csv roster print",
+  commitment: "teaching commitment teach assist assistant hall monitor volunteer spreadsheet roles balance",
   activity: "log audit history",
   appearance: "theme colours colors logo seasonal brand",
   integrations: "services stripe email push",
