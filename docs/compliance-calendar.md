@@ -30,7 +30,7 @@ pgTAP `036_compliance_calendar.test.sql` checks each row of this table.
 
 ## The rules
 
-They're kept in code: `private.compliance_rule_catalog()` in `supabase/migrations/20261121090100_compliance_calendar.sql`.
+They're kept in code: `private.compliance_rule_catalog()` in `supabase/migrations/20261121130100_compliance_calendar.sql`.
 
 | Rule | Applies to | Date | Moves off weekends and holidays | Source |
 | --- | --- | --- | --- | --- |

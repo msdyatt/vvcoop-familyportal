@@ -1,7 +1,7 @@
 /**
  * The date rules behind the compliance calendar, for the browser.
  *
- * The database generates the deadlines (migration 20261121090100_compliance_calendar.sql);
+ * The database generates the deadlines (migration 20261121130100_compliance_calendar.sql);
  * these mirror its date functions so the Compliance page can preview a custom deadline's
  * roll-forward and explain why a date moved. lib/compliance-dates.test.ts and pgTAP 036 check
  * the same cases, so the two cannot drift apart unnoticed.
