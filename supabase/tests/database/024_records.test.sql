@@ -214,7 +214,7 @@ reset role;
 -- ---- key facts -------------------------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-select is((select count(*)::int from public.admin_list_org_facts()), 8, 'the key facts start with the eight the co-op needs');
+select is((select count(*)::int from public.admin_list_org_facts()), 12, 'the key facts start with the twelve the co-op needs (eight, plus the four the 990-N checklist added)');
 select is((select sensitive from public.admin_list_org_facts() where key = 'ein'), true, 'the EIN is sensitive');
 select throws_ok($$select public.admin_set_org_fact('ein', '12345', 'Entered')$$, 'P0001', 'An EIN looks like 12-3456789.', 'an EIN has to look like one');
 select is(public.admin_set_org_fact('ein', '123456789', null), 1, 'the first entry needs no reason');

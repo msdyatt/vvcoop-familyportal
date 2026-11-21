@@ -36,6 +36,7 @@
     "lib/office-inbox.test.ts",
     "lib/teaching-commitment.test.ts",
     "lib/compliance-dates.test.ts",
+    "lib/tax-form-choice.test.ts",
     "mobile"
   ]
 }

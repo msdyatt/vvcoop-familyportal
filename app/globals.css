@@ -12766,3 +12766,36 @@ a.messages-file:hover { text-decoration:underline; }
   .deadline-summary { grid-template-columns:1fr auto; }
   .deadline-date { grid-column:1 / -1; display:flex; gap:6px; align-items:baseline; min-width:0; }
 }
+
+/* ---- Admin, Money, Year-end tax summary --------------------------------------------------------- */
+.tax-summary { display:grid; gap:14px; }
+.tax-summary h2 { margin:0 0 4px; }
+.tax-not-advice { margin:0; padding:10px 14px; border-left:4px solid var(--status-waiting); border-radius:6px; background:var(--panel); color:var(--text); font-size:14px; }
+.tax-test-mode { margin:0; padding:8px 12px; border-radius:6px; background:var(--warm-tint); color:var(--danger-text); font-size:13px; }
+.tax-card { display:grid; gap:10px; padding:14px 16px; border:1px solid rgba(var(--fg-rgb),.12); border-radius:12px; background:var(--surface); }
+.tax-card h3 { margin:0; font-size:16px; color:var(--text); }
+.tax-form-name { color:var(--text-accent); }
+.tax-figures { display:grid; grid-template-columns:1fr auto; gap:4px 16px; margin:0; font-size:14px; }
+.tax-figures dt { color:var(--text-muted); }
+.tax-figures dd { margin:0; color:var(--text); text-align:right; font-variant-numeric:tabular-nums; }
+.tax-figures .total { padding-top:4px; border-top:1px solid rgba(var(--fg-rgb),.14); color:var(--text); font-weight:700; }
+.tax-table { width:100%; border-collapse:collapse; font-size:13px; }
+.tax-table caption { text-align:left; font-weight:600; color:var(--text); padding-bottom:4px; }
+.tax-table th, .tax-table td { padding:5px 6px; border-bottom:1px solid rgba(var(--fg-rgb),.1); text-align:left; color:var(--text); }
+.tax-table th:last-child, .tax-table td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+.tax-income-list { display:grid; gap:4px; margin:0; padding:0; list-style:none; font-size:13px; }
+.tax-income-list li { display:grid; grid-template-columns:auto auto 1fr auto auto; gap:10px; align-items:baseline; color:var(--text); }
+.tax-steps { margin:0; padding-left:20px; color:var(--text); font-size:14px; line-height:1.55; }
+.tax-cautions { margin:0; padding-left:20px; color:var(--danger-text); font-size:13px; }
+.tax-checklist { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.tax-checklist li { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:start; padding:8px 10px; border-radius:8px; background:var(--surface-sunken); color:var(--text); font-size:13px; }
+.tax-checklist li.missing { background:var(--warm-tint); }
+.tax-check-mark { display:inline-grid; place-items:center; width:20px; height:20px; border-radius:50%; border:1px solid var(--status-done); color:var(--text); font-size:12px; }
+.tax-checklist li.missing .tax-check-mark { border-color:var(--status-new); color:var(--danger-text); }
+.tax-check-state { color:var(--text-muted); font-size:12px; white-space:nowrap; }
+.tax-checklist li.missing .tax-check-state { color:var(--danger-text); font-weight:600; }
+.tax-inline-form, .tax-inputs { margin-top:4px; }
+@media (max-width:560px) {
+  .tax-income-list li { grid-template-columns:1fr auto; }
+}
+.tax-facts summary { cursor:pointer; color:var(--text-accent); font-weight:600; }
