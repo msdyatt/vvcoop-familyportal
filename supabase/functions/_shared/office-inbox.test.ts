@@ -8,7 +8,7 @@ import {
   buildReplyMime, decodeEncodedWords, guessCategory, parseAddressList, parseGmailMessage, referencesFor, sanitizeEmailHtml, wantedLabels,
 } from "./office-inbox-mail.ts";
 import { ReplyRefused, runSync, sendReply } from "./office-inbox.ts";
-import { loadInboxConfig } from "./office-inbox-env.ts";
+import { loadInboxConfig, readSavedInboxConfig } from "./office-inbox-env.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // deno-lint-ignore-file no-explicit-any
@@ -455,4 +455,24 @@ Deno.test("loadInboxConfig: names every missing secret and builds the redirect a
   assertEquals(ok.config.redirectUri, "https://axfikwoazkvtnwcgpyhg.supabase.co/functions/v1/office-inbox-oauth");
   const bad = loadInboxConfig((n) => ({ ...env, PORTAL_SITE_URL: "http://evil.example/path" })[n]);
   assert(!bad.ok && bad.missing[0].startsWith("PORTAL_SITE_URL"));
+});
+
+Deno.test("loadInboxConfig: what an administrator saved wins; a blank saved value falls back to the function secret", async () => {
+  const env: Record<string, string> = {
+    GOOGLE_OAUTH_CLIENT_ID: "env-client-id", GOOGLE_OAUTH_CLIENT_SECRET: "env-secret", OFFICE_INBOX_ADDRESS: "env@veritasvillage.org",
+    SUPABASE_URL: "https://ref.supabase.co",
+  };
+  const saved = await readSavedInboxConfig(() => Promise.resolve({
+    data: { GOOGLE_OAUTH_CLIENT_ID: "saved-client-id", GOOGLE_OAUTH_CLIENT_SECRET: "saved-secret", OFFICE_INBOX_ADDRESS: " ", PORTAL_SITE_URL: "https://family.veritasvillage.org" },
+    error: null,
+  }));
+  const loaded = loadInboxConfig((n) => env[n], saved);
+  assert(loaded.ok);
+  assertEquals([loaded.config.clientId, loaded.config.clientSecret, loaded.config.mailbox, loaded.config.siteUrl],
+    ["saved-client-id", "saved-secret", "env@veritasvillage.org", "https://family.veritasvillage.org"]);
+
+  // Nothing saved yet, or the lookup failed: only the function secrets count.
+  assertEquals(await readSavedInboxConfig(() => Promise.resolve({ data: null, error: { message: "boom" } })), {});
+  const envOnly = loadInboxConfig((n) => env[n], {});
+  assert(!envOnly.ok && envOnly.missing.join() === "PORTAL_SITE_URL");
 });

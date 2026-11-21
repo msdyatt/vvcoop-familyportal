@@ -61,20 +61,33 @@ In **APIs & Services → Credentials → Create credentials → OAuth client ID*
 Google then shows a client ID and a client secret. Copy them straight into Supabase in the next
 step. You can use one client for both environments (with both redirect URIs), or make two.
 
-## 5. Set the Edge Function secrets (staging first)
+## 5. Enter the Google details in the portal (staging first)
 
-In the Supabase dashboard for the **staging** project (`vvcoop-staging`), open **Edge Functions →
-Secrets** and add:
+Sign in to the **staging** portal as an administrator and open **Admin → Integrations → Office
+inbox → Google setup**. The card shows the redirect URI to add in step 4, with a Copy button. Fill
+in:
 
-| Name | Value |
+| Box | Value |
 | --- | --- |
-| `GOOGLE_OAUTH_CLIENT_ID` | the client ID from step 4 |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | the client secret from step 4 |
-| `OFFICE_INBOX_ADDRESS` | the test mailbox, for example `office-test@veritasvillage.org` |
-| `PORTAL_SITE_URL` | the staging site address, for example `https://staging.veritasvillage.org` (no trailing slash) |
+| Google client ID | the client ID from step 4 |
+| Google client secret | the client secret from step 4 |
+| Office mailbox | the test mailbox, for example `office-test@veritasvillage.org` |
+| Portal address | the staging site, for example `https://staging.veritasvillage.org` (filled in for you) |
 
-Later, repeat this on the **production** project with the real office mailbox and
+Press **Save Google setup**. The client secret goes into Supabase Vault. After that the card only
+says that a secret is saved; it never shows it again, and nobody can read it from the browser. To
+change it, paste a new one. To remove it, use **Remove it**. Each save is recorded in Admin →
+Activity, naming which boxes changed but never the secret.
+
+The office mailbox can't be changed while a different mailbox is connected. Disconnect first.
+
+Later, do the same on **production** with the real office mailbox and
 `https://family.veritasvillage.org`.
+
+The same four values can instead be set as Edge Function secrets in the Supabase dashboard
+(**Edge Functions → Secrets**), named `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`,
+`OFFICE_INBOX_ADDRESS` and `PORTAL_SITE_URL`. A value saved on the card is used first. A box left
+blank on the card falls back to the secret of the same name.
 
 The migration also creates a Vault secret, `OFFICE_INBOX_CRON_SECRET`, with a random value. It is
 what the every-minute job presents to the sync function. Nobody needs to know or set it.
@@ -85,8 +98,7 @@ for staging it is whatever process deploys there.
 
 ## 6. Connect from the portal
 
-Sign in to the portal as an administrator (with your second factor), then **Admin → Integrations →
-Office inbox → Connect**. Google asks you to sign in: use the office mailbox itself (the test one on
+On the same card, press **Connect**. Google asks you to sign in: use the office mailbox itself (the test one on
 staging), not your own account, and allow access. You come back to Integrations, which shows the
 connected address and the last sync time.
 

@@ -4,7 +4,7 @@ import { safeEqual } from "../_shared/crypto.ts";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
 import { runSync } from "../_shared/office-inbox.ts";
-import { authenticateInboxAdmin, loadInboxConfig } from "../_shared/office-inbox-env.ts";
+import { authenticateInboxAdmin, loadInboxConfig, readSavedInboxConfig } from "../_shared/office-inbox-env.ts";
 
 /**
  * Brings new office mail into the portal.
@@ -36,8 +36,8 @@ async function handle(req: Request): Promise<Response> {
     return json({ error: "Unknown mode." }, 400);
   }
 
-  const loaded = loadInboxConfig();
-  if (!loaded.ok) return json({ error: `The office inbox is not set up yet. Missing function secrets: ${loaded.missing.join(", ")}.` }, 400);
+  const loaded = loadInboxConfig(undefined, await readSavedInboxConfig((fn) => admin.rpc(fn)));
+  if (!loaded.ok) return json({ error: `The office inbox is not set up yet. Missing: ${loaded.missing.join(", ")}. Fill them in on the Office inbox card in Admin, Integrations.` }, 400);
 
   const result = await runSync({
     rpc: (fn, args) => admin.rpc(fn, args),
