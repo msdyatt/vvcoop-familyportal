@@ -31,9 +31,10 @@ const BroadcastsTab = dynamic(() => import("./broadcasts-tab"));
 const InboxTab = dynamic(() => import("./inbox-tab"));
 const AppearanceTab = dynamic(() => import("./appearance-tab"));
 const ComplianceTab = dynamic(() => import("./compliance-tab"));
+const TaxSummaryTab = dynamic(() => import("./tax-summary-tab"));
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-const TABS = ["dashboard", "inbox", "invitations", "families", "classes", "documents", "dues", "expenses", "news", "broadcasts", "reports", "deadlines", "activity", "message-reports", "appearance", "integrations"] as const;
+const TABS = ["dashboard", "inbox", "invitations", "families", "classes", "documents", "dues", "expenses", "tax-summary", "news", "broadcasts", "reports", "deadlines", "activity", "message-reports", "appearance", "integrations"] as const;
 type Tab = (typeof TABS)[number];
 
 async function signOutToEntry() {
@@ -103,7 +104,7 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Overview</option><option value="inbox">Office inbox</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="deadlines">Compliance</option><option value="activity">Activity</option><option value="message-reports">Reported messages</option><option value="appearance">Appearance</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Overview</option><option value="inbox">Office inbox</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="tax-summary">Year-end tax summary</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="deadlines">Compliance</option><option value="activity">Activity</option><option value="message-reports">Reported messages</option><option value="appearance">Appearance</option><option value="integrations">Integrations</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
@@ -115,6 +116,7 @@ export default function AdminWorkspace() {
       <button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>Documents</button>
       <button className={tab === "dues" ? "active" : ""} onClick={() => setTab("dues")}>Dues</button>
       <button className={tab === "expenses" ? "active" : ""} onClick={() => setTab("expenses")}>Expenses</button>
+      <button className={tab === "tax-summary" ? "active" : ""} onClick={() => setTab("tax-summary")}>Year-end tax summary</button>
       <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News &amp; calendar</button>
       <button className={tab === "broadcasts" ? "active" : ""} onClick={() => setTab("broadcasts")}>Broadcasts</button>
       <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Reports</button>
@@ -139,6 +141,7 @@ export default function AdminWorkspace() {
         {tab === "documents" && <DocumentsTab actorUserId={userId} />}
     {tab === "dues" && <DuesTab actorUserId={userId} />}
     {tab === "expenses" && <ExpensesTab />}
+    {tab === "tax-summary" && <TaxSummaryTab />}
     {tab === "news" && <NewsTab actorUserId={userId} />}
     {tab === "broadcasts" && <BroadcastsTab />}
     {tab === "reports" && <ReportsTab />}
