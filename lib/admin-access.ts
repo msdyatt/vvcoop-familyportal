@@ -5,7 +5,7 @@ import { getSupabaseBrowserClient } from "./supabase";
 
 /**
  * Board-only admin permissions, as the signed-in person holds them
- * (public.my_admin_access, migration 20261121150000_admin_permissions.sql).
+ * (public.my_admin_access, migration 20261121160000_admin_permissions.sql).
  *
  * This only decides what the admin screens show. The database checks the same
  * permission on every call, so a hidden button is a courtesy, not the lock.

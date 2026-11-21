@@ -1,7 +1,7 @@
 import type { AdminClient } from "./types.ts";
 
 /**
- * Board-only admin permissions (migration 20261121150000_admin_permissions.sql).
+ * Board-only admin permissions (migration 20261121160000_admin_permissions.sql).
  * The database is the source of truth; Edge Functions ask it about the person they
  * have already identified, with the service-role client.
  */

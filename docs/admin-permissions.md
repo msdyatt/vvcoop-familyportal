@@ -48,7 +48,7 @@ At least one active board admin must always hold Admin permissions. A change tha
 
 - `public.admin_tiers` (user, `board` or `admin`), `public.admin_permission_overrides` (user, permission, on or off), `public.admin_permission_audit`. No direct writes from the browser.
 - `public.my_admin_access()`, `public.admin_permissions_overview()`, `public.admin_set_admin_tier(user, tier)`, `public.admin_set_admin_permission(user, permission, on)`.
-- Migration `supabase/migrations/20261121150000_admin_permissions.sql`; tests `supabase/tests/database/038_admin_permissions.test.sql`.
+- Migration `supabase/migrations/20261121160000_admin_permissions.sql`; tests `supabase/tests/database/039_admin_permissions.test.sql`.
 
 ## Adding a new board-only area later
 
