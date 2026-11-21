@@ -61,11 +61,11 @@ select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'plain'
 select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'plain', '{"village":"yes"}'::jsonb)$$,
   'P0001', 'One of the small touches has a value that is not on the list.', 'and an on/off touch that is not true or false');
 
--- The longer heading font list.
-select lives_ok($$select public.admin_save_coop_settings('Veritas Village', 'veritas', private.default_coop_accent(), 'fraunces', null, null)$$,
+-- The longer heading font list. (The Veritas palette is written out: a signed-in caller may not run private.default_coop_accent.)
+select lives_ok($$select public.admin_save_coop_settings('Veritas Village', 'veritas', '{"accent":"#bb6141","accent_text":"#a85539","accent_on_ink":"#d7a590","accent_deep":"#6b3826","accent_tint":"#efd9cd","accent_tint_ink":"#4a2417","night_ink":"#e8a98d","night_fill":"#a85539","night_tint":"#5b3324","night_tint_ink":"#f6d9cb"}'::jsonb, 'fraunces', null, null)$$,
   'a heading font from the longer list can be saved');
 select is((select heading_font from public.coop_settings), 'fraunces', 'and is kept');
-select throws_ok($$select public.admin_save_coop_settings('Veritas Village', 'veritas', private.default_coop_accent(), 'papyrus', null, null)$$,
+select throws_ok($$select public.admin_save_coop_settings('Veritas Village', 'veritas', '{"accent":"#bb6141","accent_text":"#a85539","accent_on_ink":"#d7a590","accent_deep":"#6b3826","accent_tint":"#efd9cd","accent_tint_ink":"#4a2417","night_ink":"#e8a98d","night_fill":"#a85539","night_tint":"#5b3324","night_tint_ink":"#f6d9cb"}'::jsonb, 'papyrus', null, null)$$,
   'P0001', 'Choose a heading font from the list.', 'a heading font that is not on the list is still refused');
 
 -- Reset brings all of it back.
