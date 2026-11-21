@@ -58,7 +58,7 @@ export const ADMIN_GROUPS: AdminGroup[] = [
   { id: "comms", label: "Messages and news", hint: "Inbox, news, broadcasts", icon: "comms", tabs: [
     { id: "inbox", label: "Office inbox" }, { id: "news", label: "News & calendar" }, { id: "broadcasts", label: "Broadcasts" }, { id: "message-reports", label: "Reported messages" },
   ] },
-  { id: "money", label: "Money", hint: "Dues and expenses", icon: "money", tabs: [{ id: "dues", label: "Dues" }, { id: "expenses", label: "Expenses" }] },
+  { id: "money", label: "Money", hint: "Dues, expenses, tax summary", icon: "money", tabs: [{ id: "dues", label: "Dues" }, { id: "expenses", label: "Expenses" }, { id: "tax-summary", label: "Year-end tax summary" }] },
   { id: "records", label: "Records", hint: "Documents, vault, reports, compliance", icon: "records", tabs: [{ id: "documents", label: "Documents" }, { id: "reports", label: "Reports" }, { id: "vault", label: "Records vault" }, { id: "deadlines", label: "Compliance" }, { id: "activity", label: "Activity" }] },
   { id: "settings", label: "Settings", hint: "Appearance, integrations", icon: "settings", tabs: [{ id: "appearance", label: "Appearance" }, { id: "integrations", label: "Integrations" }] },
 ];
@@ -143,6 +143,7 @@ const WORDS: Record<string, string> = {
   expenses: "receipts reimbursements spending",
   reports: "export csv roster print",
   vault: "insurance lease policy ein key facts nonprofit tax 501c3 files certificate renewal",
+  "tax-summary": "tax irs 990 990-n e-postcard year end gross receipts 1099 bookkeeper accountant",
   deadlines: "compliance irs tax 990 filing deadlines renewals 1099 nonprofit",
   commitment: "teaching commitment teach assist assistant hall monitor volunteer spreadsheet roles balance",
   activity: "log audit history",
