@@ -1,5 +1,7 @@
 "use client";
 
+import { useAdminAccess } from "../../../lib/admin-access";
+import AskBoardAdmin from "./ask-board-admin";
 import { useEffect, useState } from "react";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { formatCoopDateTime } from "../../../lib/coop-time";
@@ -35,6 +37,9 @@ export default function OfficeInboxCard() {
   const [unavailable, setUnavailable] = useState(false);
   const [busy, setBusy] = useState<"" | "connect" | "disconnect" | "sync">("");
   const [message, setMessage] = useState("");
+  // Connecting or disconnecting the mailbox is board-only (Integrations); checking for mail is not.
+  const access = useAdminAccess();
+  const canConnect = access.can("integrations");
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
@@ -127,10 +132,11 @@ export default function OfficeInboxCard() {
     {config && !config.ready && <p className="office-inbox-warning">Not set up on this server yet. Missing function secrets: {config.missing.join(", ")}. See docs/office-inbox-setup.md.</p>}
     {!connected && config?.ready && config.mailbox && <p className="field-note">When Google asks, sign in as <b>{config.mailbox}</b>, not your own account.</p>}
     <div className="row-actions">
-      {!connected && <button type="button" disabled={busy !== "" || config?.ready === false} onClick={connect}>{busy === "connect" ? "Opening Google…" : attention ? "Reconnect" : "Connect"}</button>}
+      {!connected && canConnect && <button type="button" disabled={busy !== "" || config?.ready === false} onClick={connect}>{busy === "connect" ? "Opening Google…" : attention ? "Reconnect" : "Connect"}</button>}
       {connected && <button type="button" className="ghost" disabled={busy !== ""} onClick={syncNow}>{busy === "sync" ? "Checking…" : "Check for mail now"}</button>}
-      {(connected || attention) && <button type="button" className="ghost danger" disabled={busy !== ""} onClick={disconnect}>{busy === "disconnect" ? "Disconnecting…" : "Disconnect"}</button>}
+      {(connected || attention) && canConnect && <button type="button" className="ghost danger" disabled={busy !== ""} onClick={disconnect}>{busy === "disconnect" ? "Disconnecting…" : "Disconnect"}</button>}
     </div>
+    {!access.loading && !canConnect && <AskBoardAdmin permission="integrations">Connecting or disconnecting the office mailbox needs the &ldquo;Integrations&rdquo; permission.</AskBoardAdmin>}
     <p className="admin-form-status" role="status">{message}</p>
   </article>;
 }

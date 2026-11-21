@@ -19,6 +19,8 @@ insert into public.user_roles (user_id, role) values
   ('00000000-0000-0000-0000-0000000000a1', 'admin'), ('00000000-0000-0000-0000-0000000000a2', 'admin'),
   ('00000000-0000-0000-0000-0000000000a3', 'admin'), ('00000000-0000-0000-0000-0000000000a4', 'admin'),
   ('00000000-0000-0000-0000-0000000000b1', 'parent'), ('00000000-0000-0000-0000-0000000000c1', 'admin');
+-- Since admin permissions (20261121150000), board-only areas need a board admin.
+insert into public.admin_tiers (user_id, tier) select user_id, 'board' from public.user_roles where role = 'admin' on conflict do nothing;
 insert into auth.mfa_factors (id, user_id, factor_type, status, created_at, updated_at)
 values (gen_random_uuid(), '00000000-0000-0000-0000-0000000000a3', 'totp', 'verified', now(), now());
 

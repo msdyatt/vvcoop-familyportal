@@ -22,6 +22,8 @@ insert into public.user_roles (user_id, role) values
   ('00000000-0000-0000-0000-0000000000b1', 'parent'), ('00000000-0000-0000-0000-0000000000b2', 'parent'),
   ('00000000-0000-0000-0000-0000000000b3', 'parent'), ('00000000-0000-0000-0000-0000000000b4', 'parent'),
   ('00000000-0000-0000-0000-0000000000c1', 'teacher'), ('00000000-0000-0000-0000-0000000000c2', 'teacher');
+-- Since admin permissions (20261121150000), board-only areas need a board admin.
+insert into public.admin_tiers (user_id, tier) select user_id, 'board' from public.user_roles where role = 'admin' on conflict do nothing;
 insert into public.families (id, display_name) values
   ('00000000-0000-0000-0000-0000000000f1', 'One'), ('00000000-0000-0000-0000-0000000000f2', 'Two'),
   ('00000000-0000-0000-0000-0000000000f3', 'Three'), ('00000000-0000-0000-0000-0000000000f4', 'Demo'),

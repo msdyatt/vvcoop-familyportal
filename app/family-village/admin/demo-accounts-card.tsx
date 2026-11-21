@@ -1,5 +1,7 @@
 "use client";
 
+import { useAdminAccess } from "../../../lib/admin-access";
+import AskBoardAdmin from "./ask-board-admin";
 import { useState } from "react";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 
@@ -16,6 +18,9 @@ export default function DemoAccountsCard() {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState("");
+  // Reviewer accounts are sign-ins, so they sit with the board-only Integrations.
+  const access = useAdminAccess();
+  const allowed = access.can("integrations");
 
   async function run(action: "create" | "remove") {
     if (action === "remove" && !confirm("Remove the reviewer accounts and all of their sample data? Reviewers who are still testing will lose access.")) return;
@@ -43,9 +48,10 @@ export default function DemoAccountsCard() {
     <div className="integration-card-head"><h3>App store reviewer accounts</h3></div>
     <p className="field-note">Apple and Google reviewers need to sign in. These two accounts, a demo parent and a demo teacher, see only made-up sample content (a sample class, posts, an event and messages) and never any real family. Creating them again resets both passwords and the sample data.</p>
     <div className="field-row">
-      <button type="button" disabled={busy} onClick={() => run("create")}>Create or reset reviewer accounts</button>
-      <button type="button" className="ghost" disabled={busy} onClick={() => run("remove")}>Remove them</button>
+      <button type="button" disabled={busy || !allowed} onClick={() => run("create")}>Create or reset reviewer accounts</button>
+      <button type="button" className="ghost" disabled={busy || !allowed} onClick={() => run("remove")}>Remove them</button>
     </div>
+    {!access.loading && !allowed && <AskBoardAdmin permission="integrations" />}
     {status && <p className="admin-form-status" role="status">{status}</p>}
     {credentials.length > 0 && <div className="demo-credentials">
       {credentials.map((c) => <div key={c.role} className="demo-credential">
