@@ -1,10 +1,12 @@
 import UIKit
 
-/// The loading screen: the co-op's mark and name on navy, with a short line under them, shown from launch until the first
+/// The loading screen: the co-op's mark and name on navy, with the ink loading animation under them, shown from launch until the first
 /// page has loaded. It is laid out exactly like the system launch screen (Base.lproj/LaunchScreen.storyboard), so the two
 /// read as one screen, and it replaces the web launch page the old Capacitor app showed. If the first page cannot load,
 /// the page's own "Can't reach Veritas Village" screen takes over.
 final class SplashView: UIView {
+    private let loading = InkLoadingView(style: .onNavy)
+
     init() {
         super.init(frame: .zero)
         backgroundColor = Brand.navy
@@ -20,13 +22,10 @@ final class SplashView: UIView {
         title.textAlignment = .center
         title.translatesAutoresizingMaskIntoConstraints = false
 
-        let status = UILabel()
-        status.text = "Opening your portal…"
-        status.font = UIFont.preferredFont(forTextStyle: .body)
-        status.textColor = UIColor(red: 0xBB / 255, green: 0xC0 / 255, blue: 0xB8 / 255, alpha: 1)
-        status.textAlignment = .center
+        // The same animation the pages show while they open, so it is always clear the app is working.
+        let status = loading
+        status.initialCaption = "Opening your portal…"
         status.translatesAutoresizingMaskIntoConstraints = false
-        status.accessibilityTraits = .updatesFrequently
 
         addSubview(mark)
         addSubview(title)
@@ -38,10 +37,16 @@ final class SplashView: UIView {
             mark.heightAnchor.constraint(equalToConstant: 96),
             title.centerXAnchor.constraint(equalTo: centerXAnchor),
             title.topAnchor.constraint(equalTo: mark.bottomAnchor, constant: 14),
-            status.centerXAnchor.constraint(equalTo: centerXAnchor),
-            status.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 8),
+            status.leadingAnchor.constraint(equalTo: leadingAnchor),
+            status.trailingAnchor.constraint(equalTo: trailingAnchor),
+            status.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 14),
         ])
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil { loading.start() } else { loading.stop() }
+    }
 }

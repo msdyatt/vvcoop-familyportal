@@ -23,6 +23,9 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate, Ch
     private lazy var top = UIStackView(arrangedSubviews: [band])
     private let progress = UIProgressView(progressViewStyle: .bar)
     private let failure = FailureView()
+    /// Over the page while it opens, until the page's own content is on screen (InkLoadingView).
+    private let loader = InkLoadingView(style: .onCanvas)
+    private var loaderDelay: DispatchWorkItem?
     private let refresh = UIRefreshControl()
     private var pageTitle: String?
     /// Light clock text on the navy strip and the admin band; dark on the lighter bands.
@@ -55,6 +58,7 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate, Ch
         buildWebView()
         buildProgress()
         buildFailureView()
+        buildLoader()
         buildEdgeSwipe()
         load()
     }
@@ -160,6 +164,44 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate, Ch
         ])
     }
 
+    private func buildLoader() {
+        loader.isHidden = true
+        loader.alpha = 0
+        loader.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(loader, belowSubview: failure)
+        NSLayoutConstraint.activate([
+            loader.topAnchor.constraint(equalTo: top.bottomAnchor),
+            loader.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            loader.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            loader.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+    }
+
+    /// Shows the loading animation if the page has not appeared within a moment, so a fast page never blinks.
+    private func showLoader() {
+        loaderDelay?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.loaderDelay != nil else { return }
+            self.loader.isHidden = false
+            self.loader.start()
+            UIView.animate(withDuration: 0.18) { self.loader.alpha = 1 }
+        }
+        loaderDelay = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    /// Fades the animation out once the page's content is on screen (or the load failed).
+    private func hideLoader() {
+        loaderDelay?.cancel()
+        loaderDelay = nil
+        guard !loader.isHidden else { return }
+        UIView.animate(withDuration: 0.22, animations: { self.loader.alpha = 0 }, completion: { _ in
+            guard self.loaderDelay == nil else { return }
+            self.loader.stop()
+            self.loader.isHidden = true
+        })
+    }
+
     private func buildFailureView() {
         failure.isHidden = true
         failure.onRetry = { [weak self] in self?.load() }
@@ -246,6 +288,7 @@ final class WebPageController: UIViewController, UIGestureRecognizerDelegate, Ch
     func load() {
         committed = false
         failure.isHidden = true
+        showLoader()
         webView.load(URLRequest(url: url))
     }
 
@@ -382,6 +425,9 @@ extension WebPageController: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refresh.endRefreshing()
+        // Signed-in pages say when their header is up ("title"); public pages and any page that never says still lose
+        // the animation shortly after they finish loading.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.hideLoader() }
         navigator?.chromeSource?.hideSplash()
         #if DEBUG
         probeWidth()
@@ -391,12 +437,14 @@ extension WebPageController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         refresh.endRefreshing()
         if (error as NSError).code == NSURLErrorCancelled { return }
+        hideLoader()
         failure.isHidden = false
         navigator?.chromeSource?.hideSplash()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         refresh.endRefreshing()
+        hideLoader()
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -475,6 +523,8 @@ extension WebPageController: WKScriptMessageHandler {
             if let size = request.payload["textSize"] as? String { Brand.setTextSize(size) }
 
         case "title":
+            // The page's own header and placeholder are on screen now (AppHeader sends this when it mounts).
+            hideLoader()
             pageTitle = request.payload["title"] as? String
             themeName = request.payload["theme"] as? String
             navigationItem.title = pageTitle
