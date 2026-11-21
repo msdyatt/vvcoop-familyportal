@@ -122,7 +122,8 @@ test("a file is only ever read through the logged open step", async () => {
 test("the tab is in the Admin workspace and the Records group", async () => {
   const workspace = await readFile(new URL("../app/family-village/admin/workspace.tsx", import.meta.url), "utf8");
   assert.match(workspace, /import\("\.\/records-vault-tab"\)/);
-  assert.match(workspace, /tab === "vault" && <RecordsVaultTab \/>/);
+  // Board-only since admin permissions: shown with the "Tax and compliance records" permission.
+  assert.match(workspace, /tab === "vault" && \(adminAccess\.loading \? null : adminAccess\.can\("tax_compliance"\) \? <RecordsVaultTab \/>/);
   const nav = await readFile(new URL("../lib/desktop-nav.ts", import.meta.url), "utf8");
   assert.match(nav, /id: "records",[^\n]*\{ id: "vault", label: "Records vault" \}/);
 });

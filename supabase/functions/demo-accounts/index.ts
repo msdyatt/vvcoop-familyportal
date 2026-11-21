@@ -4,6 +4,7 @@ import { logEdgeError } from "../_shared/error-log.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
 import { needsMfaStepUp } from "../_shared/aal.ts";
 import { createOrResetDemoAccounts, removeDemoAccounts } from "../_shared/demo-accounts.ts";
+import { hasAdminPermission, permissionRefusal } from "../_shared/admin-permissions.ts";
 
 /**
  * Administrator-only: create (or reset the passwords and sample data of) the
@@ -35,6 +36,8 @@ async function handle(req: Request): Promise<Response> {
   ]);
   if (profile?.status !== "active" || !role || profile?.is_demo) return json({ error: "Administrator access is required." }, 403);
   if (await needsMfaStepUp(userClient)) return json({ error: "Complete two-factor verification before continuing." }, 403);
+  // Reviewer accounts live on the Integrations screen and create sign-ins, so they are board-only.
+  if (!(await hasAdminPermission(admin, user.id, "integrations"))) return json({ error: permissionRefusal("integrations") }, 403);
 
   const body = await req.json().catch(() => null) as { action?: string } | null;
   if (body?.action === "create") {

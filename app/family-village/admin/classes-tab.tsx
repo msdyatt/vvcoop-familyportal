@@ -1,5 +1,7 @@
 "use client";
 
+import { useAdminAccess } from "../../../lib/admin-access";
+import AskBoardAdmin from "./ask-board-admin";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrl, uploadPrivateFile } from "../../../lib/storage";
@@ -36,6 +38,8 @@ function fullName(displayName: string | null, surname: string | null, email: str
 }
 
 export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
+  const adminAccess = useAdminAccess();
+  const canYearSetup = adminAccess.can("year_setup");
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [teacherOptions, setTeacherOptions] = useState<TeacherOption[]>([]);
   const [childOptions, setChildOptions] = useState<ChildOption[]>([]);
@@ -325,13 +329,15 @@ export default function ClassesTab({ actorUserId }: { actorUserId: string }) {
     <details className="schedule-settings">
       <summary><span>Schedule &amp; enrollment settings</span><small>School years, terms, meeting times, rooms, and enrollment windows</small></summary>
       <div className="schedule-settings-body">
-        <SchoolYears years={years} onSaved={load} onStatus={setStatus} />
-        <YearRollover years={years} onSaved={load} onStatus={setStatus} />
+        {/* School years, terms, enrollment windows and starting the next year are board-only (School year setup). */}
+        {!adminAccess.loading && !canYearSetup && <AskBoardAdmin permission="year_setup">School years, terms, enrollment windows and starting the next year need the &ldquo;School year setup&rdquo; permission.</AskBoardAdmin>}
+        {canYearSetup && <SchoolYears years={years} onSaved={load} onStatus={setStatus} />}
+        {canYearSetup && <YearRollover years={years} onSaved={load} onStatus={setStatus} />}
         <GradePlacement years={years} onSaved={load} onStatus={setStatus} />
-        <AcademicTerms terms={terms} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
+        {canYearSetup && <AcademicTerms terms={terms} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />}
         <TimeBlocks blocks={blocks} years={years} currentYearId={currentYear?.id ?? null} onSaved={load} onStatus={setStatus} />
         <Rooms rooms={rooms} onSaved={load} onStatus={setStatus} />
-        <EnrollmentPeriods years={years} currentYearId={currentYear?.id ?? null} onStatus={setStatus} />
+        {canYearSetup && <EnrollmentPeriods years={years} currentYearId={currentYear?.id ?? null} onStatus={setStatus} />}
       </div>
     </details>
   </section>

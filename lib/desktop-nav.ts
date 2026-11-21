@@ -60,7 +60,7 @@ export const ADMIN_GROUPS: AdminGroup[] = [
   ] },
   { id: "money", label: "Money", hint: "Dues, expenses, tax summary", icon: "money", tabs: [{ id: "dues", label: "Dues" }, { id: "expenses", label: "Expenses" }, { id: "tax-summary", label: "Year-end tax summary" }] },
   { id: "records", label: "Records", hint: "Documents, vault, reports, compliance", icon: "records", tabs: [{ id: "documents", label: "Documents" }, { id: "reports", label: "Reports" }, { id: "vault", label: "Records vault" }, { id: "deadlines", label: "Compliance" }, { id: "activity", label: "Activity" }] },
-  { id: "settings", label: "Settings", hint: "Appearance, integrations", icon: "settings", tabs: [{ id: "appearance", label: "Appearance" }, { id: "integrations", label: "Integrations" }] },
+  { id: "settings", label: "Settings", hint: "Appearance, integrations, admin permissions", icon: "settings", tabs: [{ id: "appearance", label: "Appearance" }, { id: "integrations", label: "Integrations" }, { id: "permissions", label: "Admin permissions" }] },
 ];
 
 const tidy = (pathname: string) => pathname.replace(/\/+$/, "") || "/";
@@ -149,6 +149,7 @@ const WORDS: Record<string, string> = {
   activity: "log audit history",
   appearance: "theme colours colors logo seasonal brand",
   integrations: "services stripe email push",
+  permissions: "board admins roles tiers access who can",
 };
 
 /** Every page a person can jump to, in sidebar order, with Admin last and only for admins. */

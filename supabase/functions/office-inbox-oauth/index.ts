@@ -5,6 +5,7 @@ import { buildAuthUrl, exchangeCode, GmailClient, GoogleAuthError, pkceChallenge
 import { corsHeaders, json } from "../_shared/http.ts";
 import { REFRESH_TOKEN_SECRET } from "../_shared/office-inbox.ts";
 import { authenticateInboxAdmin, loadInboxConfig, readSavedInboxConfig } from "../_shared/office-inbox-env.ts";
+import { hasAdminPermission, permissionRefusal } from "../_shared/admin-permissions.ts";
 
 /**
  * Connecting the office mailbox (Admin, Integrations, "Office inbox").
@@ -96,6 +97,12 @@ async function handle(req: Request): Promise<Response> {
   const auth = await authenticateInboxAdmin(req);
   if (!auth.ok) return auth.response;
   const body = await req.json().catch(() => null) as { action?: string } | null;
+
+  // Connecting and disconnecting the mailbox are board-only (Integrations). Reading the
+  // card's status stays open to every admin.
+  if ((body?.action === "start" || body?.action === "disconnect") && !(await hasAdminPermission(admin, auth.caller.userId, "integrations"))) {
+    return json({ error: permissionRefusal("integrations") }, 403);
+  }
 
   if (body?.action === "start") {
     if (!loaded.ok) return json({ error: `The office inbox is not set up yet. Missing: ${loaded.missing.join(", ")}. Fill them in on the Office inbox card in Admin, Integrations.` }, 400);

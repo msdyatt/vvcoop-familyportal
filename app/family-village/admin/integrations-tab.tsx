@@ -1,5 +1,7 @@
 "use client";
 
+import { useAdminAccess } from "../../../lib/admin-access";
+import AskBoardAdmin from "./ask-board-admin";
 import { useEffect, useState } from "react";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import DemoAccountsCard from "./demo-accounts-card";
@@ -21,6 +23,8 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
+  const access = useAdminAccess();
+  const canEdit = access.can("integrations");
 
   async function load() {
     const supabase = getSupabaseBrowserClient();
@@ -86,6 +90,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
 
   return <section className="integrations-manage">
     <p className="admin-form-status" role="status">{status || "Everything on this page is a real, working connection."}</p>
+    {!access.loading && !canEdit && <AskBoardAdmin permission="integrations">You can look and run the tests, but changing connections and settings here needs the &ldquo;Integrations&rdquo; permission.</AskBoardAdmin>}
     <aside className="integration-help">
       <p className="card-kicker">Resend setup</p>
       <ol>
@@ -107,7 +112,7 @@ export default function IntegrationsTab({ actorUserId }: { actorUserId: string }
     <div className="integrations-list">
       <OfficeInboxCard />
       {integrations.map((row) => <IntegrationCard
-        key={row.id} row={row} onSave={save}
+        key={row.id} row={row} onSave={save} canEdit={canEdit}
         live={row.id === "resend"}
         onTest={row.id === "resend" ? testResend : row.id === "printer" ? testPrint : undefined}
         testLabel={row.id === "resend" ? "Send test email" : row.id === "printer" ? "Queue a test page" : "Test connection"}
@@ -171,8 +176,8 @@ function RecentPrintJobs() {
   </div>;
 }
 
-function IntegrationCard({ row, onSave, live = false, onTest, testLabel = "Test connection", showFromAddress = false }: {
-  row: Integration; onSave: (row: Integration) => void; live?: boolean; onTest?: () => void; testLabel?: string; showFromAddress?: boolean;
+function IntegrationCard({ row, onSave, canEdit, live = false, onTest, testLabel = "Test connection", showFromAddress = false }: {
+  row: Integration; onSave: (row: Integration) => void; canEdit: boolean; live?: boolean; onTest?: () => void; testLabel?: string; showFromAddress?: boolean;
 }) {
   const [local, setLocal] = useState(row);
 
@@ -180,6 +185,7 @@ function IntegrationCard({ row, onSave, live = false, onTest, testLabel = "Test 
   useEffect(() => { setLocal(row); }, [row]);
 
   return <article className="integration-card">
+    <fieldset className="board-only-fieldset" disabled={!canEdit}>
     <div className="integration-card-head">
       <h3>{local.display_name}{live && <span className="live-badge">live</span>}</h3>
       <select value={local.status} onChange={(event) => setLocal({ ...local, status: event.target.value })}>
@@ -210,8 +216,9 @@ function IntegrationCard({ row, onSave, live = false, onTest, testLabel = "Test 
     {row.id === "facebook" && <p className="field-note">
       This link is what shows on the public site and in the family portal — saving it here updates it everywhere at once.
     </p>}
+    </fieldset>
     <div className="row-actions">
-      <button onClick={() => onSave(local)}>Save</button>
+      <button disabled={!canEdit} onClick={() => onSave(local)}>Save</button>
       {onTest && <button type="button" className="ghost" onClick={onTest}>{testLabel}</button>}
     </div>
   </article>;

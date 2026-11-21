@@ -1,5 +1,7 @@
 "use client";
 
+import { useAdminAccess } from "../../../lib/admin-access";
+import AskBoardAdmin from "./ask-board-admin";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { downloadReceipt } from "../../../lib/dues-api";
@@ -154,6 +156,9 @@ function Ledger({ charges, requirements, options, discountTypes, busy, run }: { 
 function SetUp({ requirements, options, busy, run }: { requirements: Requirement[]; options: RequirementOptions[]; busy: boolean; run: Run }) {
   const [title, setTitle] = useState("Annual dues"); const [perFamily, setPerFamily] = useState("300"); const [perChild, setPerChild] = useState("150"); const [dueOn, setDueOn] = useState("");
   const [creating, setCreating] = useState(false);
+  // Amounts and plan options are board-only (Dues and fees); opening dues for families is not.
+  const setupAccess = useAdminAccess();
+  const canDues = setupAccess.can("dues_settings");
   async function create(event: FormEvent) {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient(); if (!supabase) return;
@@ -169,18 +174,19 @@ function SetUp({ requirements, options, busy, run }: { requirements: Requirement
   }
   return <section className="dues-setup">
     <h3>Dues for the year</h3>
+    {!setupAccess.loading && !canDues && <AskBoardAdmin permission="dues_settings">Setting dues amounts and monthly plans needs the &ldquo;Dues and fees&rdquo; permission.</AskBoardAdmin>}
     {requirements.map((r) => {
       const o = options.find((x) => x.requirement_id === r.id);
       return <div key={r.id} className="dues-setup-row">
         <div><b>{r.title}</b><span>{formatCents(Math.round(Number(r.amount_per_family ?? 0) * 100))} per family + {formatCents(Math.round(Number(r.amount_per_child ?? 0) * 100))} per child{r.due_on ? ` · due ${formatDueDate(r.due_on)}` : ""}</span></div>
         <button type="button" className="compliance-cta" disabled={busy} onClick={() => run("admin_open_dues", { p_requirement: r.id }, "Dues opened for every household that did not have a charge yet.")}>Open dues for all families</button>
-        <label className="dues-agree"><input type="checkbox" checked={o?.monthly_enabled ?? false} disabled={busy}
+        <label className="dues-agree"><input type="checkbox" checked={o?.monthly_enabled ?? false} disabled={busy || !canDues}
           onChange={(e) => run("admin_set_dues_options", { p_requirement: r.id, p_monthly_enabled: e.target.checked, p_monthly_count: o?.monthly_count ?? 9, p_first_due_on: o?.monthly_first_due_on ?? null }, "Saved.")} /> <span>Offer a monthly plan ({o?.monthly_count ?? 9} payments)</span></label>
-        {o?.monthly_enabled && <label>Payments<select value={o.monthly_count} disabled={busy} onChange={(e) => run("admin_set_dues_options", { p_requirement: r.id, p_monthly_enabled: true, p_monthly_count: Number(e.target.value), p_first_due_on: o.monthly_first_due_on }, "Saved.")}>
+        {o?.monthly_enabled && <label>Payments<select value={o.monthly_count} disabled={busy || !canDues} onChange={(e) => run("admin_set_dues_options", { p_requirement: r.id, p_monthly_enabled: true, p_monthly_count: Number(e.target.value), p_first_due_on: o.monthly_first_due_on }, "Saved.")}>
           {[2, 3, 4, 5, 6, 8, 9, 10, 12].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>}
       </div>;
     })}
-    {!requirements.length && <form className="compliance-form" onSubmit={create}>
+    {!requirements.length && canDues && <form className="compliance-form" onSubmit={create}>
       <label>Name<input required value={title} onChange={(e) => setTitle(e.target.value)} /></label>
       <label>Per family ($)<input required inputMode="decimal" value={perFamily} onChange={(e) => setPerFamily(e.target.value)} /></label>
       <label>Per child ($)<input required inputMode="decimal" value={perChild} onChange={(e) => setPerChild(e.target.value)} /></label>
@@ -295,6 +301,9 @@ function Settings({ settings, approvals, actorUserId, busy, run, callAdmin }: { 
   const [status, setStatus] = useState<string>("");
   const [form, setForm] = useState(() => ({ reminder: settings?.reminder_days_before ?? 3, retry: settings?.retry_after_days ?? 3, attempts: settings?.max_attempts ?? 3, name: settings?.receipt_org_name ?? "Veritas Village", ein: settings?.receipt_ein ?? "", address: settings?.receipt_address ?? "", note: settings?.receipt_note ?? "" }));
   const provider = settings?.provider ?? "off";
+  const access = useAdminAccess();
+  const canIntegrations = access.can("integrations");
+  const canDues = access.can("dues_settings");
   const goLive = approvals.find((a) => a.action === "enable_livemode" && a.status === "approved" && a.approved_by !== actorUserId && new Date(a.expires_at) > new Date());
 
   async function check() {
@@ -306,9 +315,10 @@ function Settings({ settings, approvals, actorUserId, busy, run, callAdmin }: { 
   return <div className="dues-settings">
     <section><h3>Mode</h3>
       <p className="dues-note">Off: families see the old payment link. Test: practice payments with Stripe test cards. Live: real money.</p>
+      {!access.loading && !canIntegrations && <AskBoardAdmin permission="integrations">Changing the Stripe mode or clearing test data needs the &ldquo;Integrations&rdquo; permission.</AskBoardAdmin>}
       <div className="dues-actions">
         <button type="button" className="ghost" disabled={busy} onClick={check}>Check Stripe connection</button>
-        <select aria-label="Mode" value={provider} disabled={busy} onChange={(e) => { if (e.target.value !== "stripe_live") void run("admin_set_billing_provider", { p_provider: e.target.value }, "Mode changed."); }}>
+        <select aria-label="Mode" value={provider} disabled={busy || !canIntegrations} onChange={(e) => { if (e.target.value !== "stripe_live") void run("admin_set_billing_provider", { p_provider: e.target.value }, "Mode changed."); }}>
           <option value="off">Off</option><option value="stripe_test">Test mode</option>{provider === "stripe_live" && <option value="stripe_live">Live</option>}</select>
       </div>
       {status && <p className="dues-flash" role="status">{status}</p>}
@@ -316,11 +326,13 @@ function Settings({ settings, approvals, actorUserId, busy, run, callAdmin }: { 
         <p className="dues-note">One administrator requests, a different one approves in Approvals, then the first switches the mode. Do the checklist in docs/stripe-setup-checklist.md first, and clear test data.</p>
         <div className="dues-actions">
           <button type="button" className="ghost" disabled={busy} onClick={() => { const note = prompt("Why go live now?"); if (note) void run("admin_request_approval", { p_action: "enable_livemode", p_target_type: null, p_target_id: null, p_amount_cents: 0, p_note: note }, "Requested. Another administrator can approve it in Approvals."); }}>Request to go live</button>
-          <button type="button" className="compliance-cta" disabled={busy || !goLive} onClick={() => run("admin_set_billing_provider", { p_provider: "stripe_live", p_approval: goLive?.id }, "Live mode is on.")}>Switch to live (needs an approved request)</button>
-          <button type="button" className="ghost danger" disabled={busy} onClick={() => { if (confirm("Delete all test-mode payments, customers and events? Real records are untouched.")) void run("admin_purge_test_billing_data", {}, "Test data cleared."); }}>Clear test data</button>
+          <button type="button" className="compliance-cta" disabled={busy || !goLive || !canIntegrations} onClick={() => run("admin_set_billing_provider", { p_provider: "stripe_live", p_approval: goLive?.id }, "Live mode is on.")}>Switch to live (needs an approved request)</button>
+          <button type="button" className="ghost danger" disabled={busy || !canIntegrations} onClick={() => { if (confirm("Delete all test-mode payments, customers and events? Real records are untouched.")) void run("admin_purge_test_billing_data", {}, "Test data cleared."); }}>Clear test data</button>
         </div></div>}
     </section>
     <form onSubmit={(e) => { e.preventDefault(); void run("admin_update_billing_settings", { p_reminder_days: form.reminder, p_retry_after_days: form.retry, p_max_attempts: form.attempts, p_org_name: form.name, p_ein: form.ein, p_address: form.address, p_note: form.note }, "Settings saved."); }}>
+      {!access.loading && !canDues && <AskBoardAdmin permission="dues_settings">Reminder, retry and receipt settings need the &ldquo;Dues and fees&rdquo; permission.</AskBoardAdmin>}
+      <fieldset className="board-only-fieldset" disabled={!canDues}>
       <h3>Reminders and retries</h3>
       <label>Remind families this many days before an installment<input type="number" min={0} max={14} value={form.reminder} onChange={(e) => setForm({ ...form, reminder: Number(e.target.value) })} /></label>
       <label>Wait this many days before retrying a failed automatic payment<input type="number" min={1} max={14} value={form.retry} onChange={(e) => setForm({ ...form, retry: Number(e.target.value) })} /></label>
@@ -331,6 +343,7 @@ function Settings({ settings, approvals, actorUserId, busy, run, callAdmin }: { 
       <label>Address<textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
       <label>Wording at the bottom (ask your CPA before saying anything about tax deductibility)<textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
       <button disabled={busy}>Save</button>
+      </fieldset>
     </form>
   </div>;
 }

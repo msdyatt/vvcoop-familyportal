@@ -31,6 +31,8 @@ update public.profiles set is_demo = true where email = 'demo@t.test';
 insert into public.user_roles (user_id, role) values
   ('00000000-0000-0000-0000-0000000000a1', 'admin'),
   ('00000000-0000-0000-0000-0000000000b1', 'parent'), ('00000000-0000-0000-0000-0000000000c1', 'teacher');
+-- Since admin permissions (20261121160000), board-only areas need a board admin.
+insert into public.admin_tiers (user_id, tier) select user_id, 'board' from public.user_roles where role = 'admin' on conflict do nothing;
 insert into public.families (id, display_name) values
   ('00000000-0000-0000-0000-0000000000f1', 'Alpha'), ('00000000-0000-0000-0000-0000000000f2', 'Bravo'),
   ('00000000-0000-0000-0000-0000000000f3', 'Charlie'), ('00000000-0000-0000-0000-0000000000f4', 'Delta'),

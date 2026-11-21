@@ -1,5 +1,7 @@
 "use client";
 
+import { useAdminAccess } from "../../../lib/admin-access";
+import AskBoardAdmin from "./ask-board-admin";
 import { useEffect, useMemo, useState } from "react";
 import { functionErrorMessage, getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrls, storeAvatar } from "../../../lib/storage";
@@ -398,6 +400,9 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
   const [deletingChild, setDeletingChild] = useState<Child | null>(null);
   const [deletingPerson, setDeletingPerson] = useState<{ userId: string; name: string } | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  // Making someone an admin, or removing an admin's access, is "who has what" (Admin permissions).
+  const adminAccess = useAdminAccess();
+  const canManageAdmins = adminAccess.can("manage_permissions");
   const [deletingHousehold, setDeletingHousehold] = useState(false);
   const [deleteHouseholdBusy, setDeleteHouseholdBusy] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
@@ -458,11 +463,14 @@ function FamilyCard({ family, allFamilies, roleMap, compliance, metrics, avatarU
           </div>
           <div className="role-chips">
             {ASSIGNABLE_ROLES.map((role) => <button key={role} className={`role-chip${roles.includes(role) ? " active" : ""}`}
+              disabled={role === "admin" && !canManageAdmins}
+              title={role === "admin" && !canManageAdmins ? "Ask a board admin. This needs the Admin permissions permission." : undefined}
               onClick={() => (roles.includes(role) ? onRevokeRole(member.user_id, role) : onGrantRole(member.user_id, role))}>{role}</button>)}
           </div>
+          {roles.includes("admin") && !adminAccess.loading && !canManageAdmins && <AskBoardAdmin permission="manage_permissions">Removing an admin&rsquo;s access or account needs the &ldquo;Admin permissions&rdquo; permission.</AskBoardAdmin>}
           <div className="row-actions">
-            <button className="danger" onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
-            <button className="danger" onClick={() => setDeletingPerson({ userId: member.user_id, name: member.profiles?.display_name || member.profiles?.email || "this person" })}>Delete account</button>
+            <button className="danger" disabled={roles.includes("admin") && !canManageAdmins} onClick={() => onRemoveUser(family.id, member.user_id, member.profiles?.display_name || member.profiles?.email || "")}>Remove access</button>
+            <button className="danger" disabled={roles.includes("admin") && !canManageAdmins} onClick={() => setDeletingPerson({ userId: member.user_id, name: member.profiles?.display_name || member.profiles?.email || "this person" })}>Delete account</button>
           </div>
         </div>;
       })}

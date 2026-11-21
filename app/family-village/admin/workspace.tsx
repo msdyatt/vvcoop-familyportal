@@ -11,6 +11,8 @@ import MfaChallengeScreen from "../mfa-challenge";
 import AppHeader from "../app-header";
 import AdminDashboard from "./dashboard";
 import { ADMIN_TAB_EVENT } from "../../../lib/desktop-nav";
+import { useAdminAccess } from "../../../lib/admin-access";
+import AskBoardAdmin from "./ask-board-admin";
 
 // Every tab used to be a static import, so an admin session downloaded all
 // eight tabs' code (and everything they pull in -- rich text, CSV export,
@@ -34,9 +36,10 @@ const AppearanceTab = dynamic(() => import("./appearance-tab"));
 const RecordsVaultTab = dynamic(() => import("./records-vault-tab"));
 const ComplianceTab = dynamic(() => import("./compliance-tab"));
 const TaxSummaryTab = dynamic(() => import("./tax-summary-tab"));
+const PermissionsTab = dynamic(() => import("./permissions-tab"));
 
 type Invitation = { id: string; email: string; expires_at: string; accepted_at: string | null; families: { display_name: string } | null };
-const TABS = ["dashboard", "inbox", "invitations", "families", "classes", "commitment", "documents", "dues", "expenses", "tax-summary", "news", "broadcasts", "reports", "vault", "deadlines", "activity", "message-reports", "appearance", "integrations"] as const;
+const TABS = ["dashboard", "inbox", "invitations", "families", "classes", "commitment", "documents", "dues", "expenses", "tax-summary", "news", "broadcasts", "reports", "vault", "deadlines", "activity", "message-reports", "appearance", "integrations", "permissions"] as const;
 type Tab = (typeof TABS)[number];
 
 async function signOutToEntry() {
@@ -47,6 +50,7 @@ async function signOutToEntry() {
 export default function AdminWorkspace() {
   const { state: access, userId, roles, recheck } = usePortalAccess("admin");
   const coopName = useCoopName();
+  const adminAccess = useAdminAccess();
   // The bottom bar links straight to a tab with ?tab=, so read it once on load.
   const [tab, setTabState] = useState<Tab>(() => {
     if (typeof window === "undefined") return "dashboard";
@@ -106,7 +110,7 @@ export default function AdminWorkspace() {
   return <main className="admin-live">
     <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
-      <option value="dashboard">Overview</option><option value="inbox">Office inbox</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="commitment">Teaching commitment</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="tax-summary">Year-end tax summary</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="vault">Records vault</option><option value="deadlines">Compliance</option><option value="activity">Activity</option><option value="message-reports">Reported messages</option><option value="appearance">Appearance</option><option value="integrations">Integrations</option>
+      <option value="dashboard">Overview</option><option value="inbox">Office inbox</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="commitment">Teaching commitment</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="tax-summary">Year-end tax summary</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="vault">Records vault</option><option value="deadlines">Compliance</option><option value="activity">Activity</option><option value="message-reports">Reported messages</option><option value="appearance">Appearance</option><option value="integrations">Integrations</option><option value="permissions">Admin permissions</option>
     </select></label>
     <div className="admin-workspace-layout">
     <nav className="admin-tabs" aria-label="Administration sections">
@@ -129,6 +133,7 @@ export default function AdminWorkspace() {
       <button className={tab === "message-reports" ? "active" : ""} onClick={() => setTab("message-reports")}>Reported messages</button>
       <button className={tab === "appearance" ? "active" : ""} onClick={() => setTab("appearance")}>Appearance</button>
       <button className={tab === "integrations" ? "active" : ""} onClick={() => setTab("integrations")}>Integrations</button>
+      <button className={tab === "permissions" ? "active" : ""} onClick={() => setTab("permissions")}>Admin permissions</button>
     </nav>
     <div className="admin-workspace-main">
 
@@ -146,16 +151,18 @@ export default function AdminWorkspace() {
         {tab === "documents" && <DocumentsTab actorUserId={userId} />}
     {tab === "dues" && <DuesTab actorUserId={userId} />}
     {tab === "expenses" && <ExpensesTab />}
-    {tab === "tax-summary" && <TaxSummaryTab />}
+    {/* Board-only areas: the database refuses them too; this just says so up front. */}
+    {tab === "tax-summary" && (adminAccess.loading ? null : adminAccess.can("tax_compliance") ? <TaxSummaryTab /> : <AskBoardAdmin permission="tax_compliance" />)}
     {tab === "news" && <NewsTab actorUserId={userId} />}
     {tab === "broadcasts" && <BroadcastsTab />}
     {tab === "reports" && <ReportsTab />}
-    {tab === "vault" && <RecordsVaultTab />}
-    {tab === "deadlines" && <ComplianceTab />}
+    {tab === "vault" && (adminAccess.loading ? null : adminAccess.can("tax_compliance") ? <RecordsVaultTab /> : <AskBoardAdmin permission="tax_compliance" />)}
+    {tab === "deadlines" && (adminAccess.loading ? null : adminAccess.can("tax_compliance") ? <ComplianceTab /> : <AskBoardAdmin permission="tax_compliance" />)}
     {tab === "activity" && <ActivityTab />}
     {tab === "message-reports" && <MessageReportsTab />}
     {tab === "appearance" && <AppearanceTab />}
     {tab === "integrations" && <IntegrationsTab actorUserId={userId} />}
+    {tab === "permissions" && <PermissionsTab />}
     </div>
     </div>
   </main>;

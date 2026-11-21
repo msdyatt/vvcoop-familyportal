@@ -7,6 +7,7 @@ import { deleteAccount } from "../_shared/account-deletion.ts";
 import { scrubBillingForErasure } from "../_shared/billing-erasure.ts";
 import { getFromAddress, readVaultSecret, sendViaResend } from "../_shared/resend.ts";
 import { escapeHtml, renderEmail } from "../_shared/email-template.ts";
+import { hasAdminPermission, permissionRefusal } from "../_shared/admin-permissions.ts";
 import { loadEmailBrand } from "../_shared/coop-brand.ts";
 
 /**
@@ -49,6 +50,11 @@ async function handle(req: Request): Promise<Response> {
       admin.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
     ]);
     if (profile?.status !== "active" || !role) return json({ error: "Administrator access is required." }, 403);
+    // Deleting another admin's account takes their admin access away, which is "who has what".
+    const { data: targetAdmin } = await admin.from("user_roles").select("role").eq("user_id", targetId).eq("role", "admin").maybeSingle();
+    if (targetAdmin && !(await hasAdminPermission(admin, user.id, "manage_permissions"))) {
+      return json({ error: permissionRefusal("manage_permissions") }, 403);
+    }
   }
 
   // Payment records are kept; the person's name, email and saved method at Stripe are not.
