@@ -18,6 +18,8 @@ interface Env extends CalendarFeedEnv {
   ASSETS: Fetcher;
   SITE_PASSWORD?: string;
   SITE_AUTH_SECRET?: string;
+  /** Set only in the staging deployment to make its hostname open the portal. */
+  STAGING_ROOT_REDIRECT?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -47,6 +49,11 @@ const worker = {
     if (redirect) return redirect;
 
     const url = new URL(request.url);
+
+    // Staging opens directly into the private portal; production keeps its public homepage.
+    if (env.STAGING_ROOT_REDIRECT === "true" && url.pathname === "/") {
+      return Response.redirect(new URL("/family-village", url), 302);
+    }
 
     // Shared-password gate, ahead of everything else so no route can slip past
     // it. See worker/site-password.ts -- it stays on until this call is removed
