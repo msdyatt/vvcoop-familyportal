@@ -46,6 +46,7 @@ export const DESTINATIONS: Destination[] = [
   { id: "children", label: "Children", href: "/family-village/children", icon: "children", area: "portal" },
   { id: "family-classes", label: "Classes", href: "/family-village/classes", icon: "classes", area: "portal" },
   { id: "documents", label: "Documents", href: "/family-village/documents", icon: "paperwork", area: "portal" },
+  { id: "co-op-days", label: "Co-op days", href: "/family-village/co-op-days", icon: "calendar", area: "portal" },
   { id: "photos", label: "Photos", href: "/family-village/photos", icon: "photos", area: "portal" },
   { id: "messages", label: "Messages", href: "/family-village/messages", icon: "messages", area: "portal" },
   { id: "teacher-home", label: "Teaching", href: TEACHER, icon: "teach", role: "teacher", area: "portal" },

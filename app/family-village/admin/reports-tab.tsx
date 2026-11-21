@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { downloadCsv, toCsv } from "../../../lib/csv";
 import { printElement } from "../../../lib/dom";
 import {
-  buildClassLists, buildClassReadiness, buildRoster, buildStudentSchedules, buildTeacherSchedule, docToRows,
+  buildClassLists, buildClassReadiness, buildRoster, buildStudentSchedules, buildTeacherSchedule, docToRows, firstName,
   type ReportDoc, type RosterClass,
 } from "../../../lib/report-doc";
 import { buildFamilyDirectory, buildFamilyReadiness, type FamilyRow, type RequirementRow, type TeacherLink } from "../../../lib/report-doc-families";
 import { deliverPdf, makePdf } from "../../../lib/report-pdf";
 import { useBackLayer } from "../../../lib/use-back-layer";
+import { ADMIN_TAB_EVENT } from "../../../lib/desktop-nav";
 
 type ReportId = "roster" | "schedules" | "teachers" | "lists" | "class-readiness" | "family-readiness" | "directory";
 
@@ -106,6 +107,11 @@ export default function ReportsTab() {
         {REPORTS.map((report) => <li key={report.id}>
           <button type="button" onClick={() => void open(report.id)}><b>{report.title}</b><span>{report.blurb}</span></button>
         </li>)}
+        <li>
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(ADMIN_TAB_EVENT, { detail: "commitment" }))}>
+            <b>Teaching commitment</b><span>Who taught, assisted and monitored the halls each term, household by household. Opens the tracker, which exports to PDF and CSV.</span>
+          </button>
+        </li>
       </ul>
     </section>;
   }
@@ -124,6 +130,24 @@ function ClassReport({ id, data }: { id: ReportId; data: ClassData }) {
   const [termId, setTermId] = useState<string>("");
   const [hall, setHall] = useState<Record<string, string>>({});
   const deferredHall = useDeferredValue(hall);
+  // The hall monitors stored for the chosen block (Admin, Teaching commitment) fill in the fields; they can still be typed over.
+  useEffect(() => {
+    if (id !== "roster" || !termId) return;
+    let live = true;
+    void (async () => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      const { data: rows } = await supabase.from("hall_monitor_assignments")
+        .select("block_id,profiles!hall_monitor_assignments_user_id_fkey(display_name,email)").eq("term_id", termId);
+      if (!live || !rows) return;
+      const stored: Record<string, string[]> = {};
+      for (const row of rows as unknown as { block_id: string; profiles: { display_name: string | null; email: string } | null }[]) {
+        stored[row.block_id] = [...(stored[row.block_id] ?? []), firstName(row.profiles?.display_name || row.profiles?.email || "")].filter(Boolean);
+      }
+      setHall(Object.fromEntries(Object.entries(stored).map(([block, names]) => [block, names.join(", ").slice(0, 40)])));
+    })();
+    return () => { live = false; };
+  }, [id, termId]);
   const term = data.terms.find((entry) => entry.id === termId) ?? null;
   const options = { yearLabel: data.yearLabel, termLabel: term?.label ?? null, termId: term?.id ?? null };
 
