@@ -9,14 +9,14 @@
  */
 import { useSyncExternalStore } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { COOP_THEME_KEY, DEFAULT_THEME, LOGO_BUCKET, PERSONAL_ACCENT_KEY, THEME_VAR_NAMES, activeVariant, coopToday, effectiveAccent, parseTheme, themeFromRow, themeVars, type CoopTheme } from "./coop-theme";
+import { COOP_THEME_KEY, DEFAULT_THEME, LOGO_BUCKET, PERSONAL_ACCENT_KEY, THEME_DATASET_KEYS, THEME_VAR_NAMES, activeVariant, coopToday, effectiveAccent, parseTheme, themeDataset, themeFromRow, themeVars, type CoopTheme } from "./coop-theme";
 import { nativeFrame } from "./native-frame";
 
 export const LOGO_VARIANT_COLUMNS =
   "id,name,starts_on,ends_on,yearly,override,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,updated_at";
 
 export const COOP_SETTINGS_COLUMNS =
-  "name,palette_id,accent,heading_font,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,support_email,support_phone,personal_palettes,updated_at";
+  "name,palette_id,accent,heading_font,body_font,header_style,sidebar_style,whimsy,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,support_email,support_phone,personal_palettes,updated_at";
 
 let current: CoopTheme | null = null;
 const listeners = new Set<() => void>();
@@ -61,6 +61,12 @@ export function applyCoopTheme(theme: CoopTheme, element?: HTMLElement) {
     else target.style.removeProperty(name);
   }
   if (!element) {
+    // Header and sidebar styles and the small touches are attributes on <html> (app/desktop-nav.css).
+    const data = themeDataset(theme);
+    for (const key of THEME_DATASET_KEYS) {
+      if (key in data) target.dataset[key] = data[key];
+      else delete target.dataset[key];
+    }
     paintFavicon(theme);
     // The frame colours its own header rule, selected tab and buttons; it keeps them for the next launch.
     nativeFrame()?.post("coopTheme", {

@@ -97,7 +97,7 @@ export default function AppHeader({ current, roles: held, title, subtitle }: { c
             Admin's navy band. Rendered at 150px wide, above its 120px minimum. */}
         {current === "admin"
           ? <CoopLogo className="app-header-lockup" tone="on-dark" />
-          : <BrandLockup className="app-header-lockup" priority />}
+          : <><BrandLockup className="app-header-lockup" priority /><CoopLogo className="app-header-lockup header-logo-night" tone="on-dark" decorative /></>}
         {/* In the apps the header takes the colour of the screen, so Admin needs the navy lockup there too. */}
         {current === "admin" && <CoopLogo className="app-header-lockup on-light" tone="on-light" decorative />}
       </a>

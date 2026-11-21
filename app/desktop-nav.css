@@ -37,6 +37,10 @@ html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .workspace-gr
 .side-nav-close,
 .side-nav-scrim { display:none; }
 
+/* The sidebar's wrapper takes no room in the page: everything in it is fixed. In the flow, its empty box upset the
+   header's pull-up margin and left a strip of page above the header band (visible above Admin's navy band). */
+.side-nav-shell { position:absolute; top:0; left:0; width:0; height:0; }
+
 @media (min-width:1024px) {
   html:not([data-app]):not([data-frame]) {
     --sidenav-w:256px;
@@ -69,7 +73,15 @@ html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .workspace-gr
   html[data-sidenav="collapsed"] .side-nav-village,
   html[data-sidenav="collapsed"] .side-nav-quill,
   html[data-sidenav="collapsed"] .side-nav-label small { display:none; }
-  html[data-sidenav="collapsed"] .side-nav-brand .side-nav-mark { display:block; }
+  html[data-sidenav="collapsed"] .side-nav-brand .side-nav-mark.sn-day { display:block; }
+  /* On a dark band the compact mark is the light one, and the full logo stays hidden while tucked away. */
+  html[data-sidenav="collapsed"]:not([data-app]) .side-nav-admin .side-nav-brand .side-nav-mark.sn-day,
+  html[data-sidenav="collapsed"][data-coop-sidebar="ink"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-day,
+  html[data-sidenav="collapsed"][data-coop-sidebar="accent"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-day,
+  html[data-sidenav="collapsed"]:not([data-app]) .side-nav .side-nav-brand .side-nav-lockup.sn-night { display:none; }
+  html[data-sidenav="collapsed"]:not([data-app]) .side-nav-admin .side-nav-brand .side-nav-mark.sn-night,
+  html[data-sidenav="collapsed"][data-coop-sidebar="ink"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-night,
+  html[data-sidenav="collapsed"][data-coop-sidebar="accent"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-night { display:block; }
   html[data-sidenav="collapsed"] .side-nav-list { margin-top:14px; }
   html[data-sidenav="collapsed"] .side-nav-item {
     flex-direction:column;
@@ -122,6 +134,141 @@ html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .workspace-gr
   .jump-to-trigger kbd { border-color:var(--portal-band-rule); color:var(--portal-band-muted); }
 }
 
+/* ---------- Sidebar colours: one set of variables per style (Admin > Appearance) ----------
+   Each style only pairs colours that are checked already (docs/theming.md): the page's own roles; the accent's tint
+   with its ink (--nav-on); the navy band with cream; the accent's deep fill (--accent-night-fill) with cream. Admin
+   is always the navy band. */
+.side-nav {
+  --sn-bg:var(--surface);
+  --sn-fg:var(--text);
+  --sn-muted:var(--text-muted);
+  --sn-mark:var(--text-accent);
+  --sn-line:rgba(var(--fg-rgb),.12);
+  --sn-hover:rgba(var(--fg-rgb),.06);
+  --sn-on:var(--nav-on);
+  --sn-on-ink:var(--nav-on-ink);
+  --sn-badge:var(--action);
+  --sn-badge-ink:var(--cream);
+}
+.side-nav-admin,
+html[data-coop-sidebar="ink"] .side-nav {
+  --sn-bg:var(--ink-surface);
+  --sn-fg:var(--cream);
+  --sn-muted:var(--sage-on-navy);
+  --sn-mark:var(--terracotta-on-navy);
+  --sn-line:rgba(var(--cream-rgb),.14);
+  --sn-hover:rgba(var(--cream-rgb),.08);
+  --sn-on:rgba(var(--cream-rgb),.14);
+  --sn-on-ink:var(--cream);
+  --sn-badge:var(--cream);
+  --sn-badge-ink:var(--navy);
+}
+html[data-coop-sidebar="tint"] .side-nav:not(.side-nav-admin) {
+  --sn-bg:var(--nav-on);
+  --sn-fg:var(--nav-on-ink);
+  --sn-muted:var(--nav-on-ink);
+  --sn-mark:var(--nav-on-ink);
+  --sn-line:rgba(var(--fg-rgb),.14);
+  --sn-hover:rgba(var(--shadow-rgb),.07);
+  --sn-on:var(--surface);
+  --sn-on-ink:var(--text);
+}
+html[data-coop-sidebar="accent"] .side-nav:not(.side-nav-admin) {
+  --sn-bg:var(--accent-night-fill);
+  --sn-fg:var(--cream);
+  --sn-muted:var(--cream);
+  --sn-mark:var(--cream);
+  --sn-line:rgba(var(--cream-rgb),.3);
+  --sn-hover:rgba(var(--shadow-rgb),.12);
+  --sn-on:rgba(var(--shadow-rgb),.24);
+  --sn-on-ink:var(--cream);
+  --sn-badge:var(--cream);
+  --sn-badge-ink:var(--accent-night-fill);
+}
+
+/* The sidebar draws the logo for light and for dark bands, and shows the one that suits its style. */
+.side-nav .sn-night { display:none; }
+.side-nav-admin .sn-day,
+html[data-coop-sidebar="ink"] .side-nav .sn-day,
+html[data-coop-sidebar="accent"] .side-nav .sn-day { display:none; }
+.side-nav-admin .side-nav-lockup.sn-night,
+html[data-coop-sidebar="ink"] .side-nav .side-nav-lockup.sn-night,
+html[data-coop-sidebar="accent"] .side-nav .side-nav-lockup.sn-night { display:block; }
+
+/* On the accent band the light logo's own accent lettering would sink into the background, and the logo is never
+   recoloured: it sits on a small navy plate instead, the ground it was drawn for. */
+html[data-coop-sidebar="accent"] .side-nav:not(.side-nav-admin) .side-nav-brand {
+  padding:6px 10px;
+  border-radius:12px;
+  background:var(--ink-surface);
+}
+html[data-coop-sidebar="accent"] .side-nav:not(.side-nav-admin) .side-nav-brand .side-nav-lockup { width:150px; }
+html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:not(.app-header-admin) .app-header-brand {
+  padding:6px 10px;
+  border-radius:12px;
+  background:var(--ink-surface);
+}
+
+/* ---------- Header colours (Admin > Appearance); Admin keeps its navy band ---------- */
+html:not([data-app]):not([data-frame])[data-coop-header="tint"] .app-header:not(.app-header-admin) {
+  --portal-band-bg:var(--nav-on);
+  --portal-band-fg:var(--nav-on-ink);
+  --portal-band-muted:var(--nav-on-ink);
+  --portal-band-rule:var(--nav-on-ink);
+}
+html:not([data-app]):not([data-frame])[data-coop-header="ink"] .app-header:not(.app-header-admin) {
+  --portal-band-bg:var(--ink-surface);
+  --portal-band-fg:var(--cream);
+  --portal-band-muted:var(--sage-on-navy);
+  --portal-band-rule:var(--terracotta-on-navy);
+}
+html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:not(.app-header-admin) {
+  --portal-band-bg:var(--accent-night-fill);
+  --portal-band-fg:var(--cream);
+  --portal-band-muted:var(--cream);
+  --portal-band-rule:var(--cream);
+}
+.app-header .header-logo-night { display:none; }
+html:not([data-app]):not([data-frame])[data-coop-header="ink"] .app-header:not(.app-header-admin) .app-header-lockup:not(.header-logo-night),
+html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:not(.app-header-admin) .app-header-lockup:not(.header-logo-night) { display:none; }
+html:not([data-app]):not([data-frame])[data-coop-header="ink"] .app-header:not(.app-header-admin) .header-logo-night,
+html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:not(.app-header-admin) .header-logo-night { display:block; }
+
+/* ---------- The small touches (Admin > Appearance) ---------- */
+html[data-coop-greeting="off"] .side-nav-hello,
+html[data-coop-village="off"] .side-nav-village,
+html[data-coop-quill="off"] .side-nav-quill { display:none; }
+
+/* The marker's shape. The diamond is the square turned; the others are masks, so they take the band's colour. */
+html[data-coop-marker="star"], [data-marker="star"] { --marker-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 .4l1.7 3.5 3.8.5-2.8 2.6.7 3.8L6 9 2.6 10.8l.7-3.8L.5 4.4l3.8-.5z'/%3E%3C/svg%3E"); }
+html[data-coop-marker="heart"], [data-marker="heart"] { --marker-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 11.2S.4 7.7.4 3.9A2.9 2.9 0 0 1 6 2.5a2.9 2.9 0 0 1 5.6 1.4c0 3.8-5.6 7.3-5.6 7.3z'/%3E%3C/svg%3E"); }
+html[data-coop-marker="leaf"], [data-marker="leaf"] { --marker-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M11.2.8C4.6.8.8 4.2.8 9.4c0 .6.1 1.1.3 1.8 5-.1 10.1-3.5 10.1-10.4z'/%3E%3C/svg%3E"); }
+html[data-coop-marker]:not([data-coop-marker="diamond"]) .side-nav-marker {
+  top:calc(var(--row) / 2 - 6px);
+  left:6px;
+  width:12px;
+  height:12px;
+  transform:translateY(calc(var(--marker, 0) * (var(--row) + 2px)));
+}
+html[data-coop-marker="star"] .side-nav-marker,
+html[data-coop-marker="heart"] .side-nav-marker,
+html[data-coop-marker="leaf"] .side-nav-marker,
+html[data-coop-marker="star"] .area-tabs a[aria-current="page"]::before,
+html[data-coop-marker="heart"] .area-tabs a[aria-current="page"]::before,
+html[data-coop-marker="leaf"] .area-tabs a[aria-current="page"]::before {
+  -webkit-mask:var(--marker-mask) center / contain no-repeat;
+  mask:var(--marker-mask) center / contain no-repeat;
+}
+html[data-coop-marker="dot"] .side-nav-marker,
+html[data-coop-marker="dot"] .area-tabs a[aria-current="page"]::before { border-radius:50%; }
+html[data-coop-marker]:not([data-coop-marker="diamond"]) .area-tabs a[aria-current="page"]::before {
+  --pop-turn:0deg;
+  bottom:-4px;
+  width:9px;
+  height:9px;
+  transform:none;
+}
+
 /* ---------- The sidebar ---------- */
 
 html:not([data-app]):not([data-frame]) .side-nav {
@@ -134,9 +281,9 @@ html:not([data-app]):not([data-frame]) .side-nav {
   box-sizing:border-box;
   flex-direction:column;
   padding:18px 14px 12px;
-  background:var(--surface);
-  color:var(--text);
-  border-right:1px solid rgba(var(--fg-rgb),.12);
+  background:var(--sn-bg);
+  color:var(--sn-fg);
+  border-right:1px solid var(--sn-line);
   overflow-x:hidden;
   overflow-y:auto;
   overscroll-behavior:contain;
@@ -146,9 +293,6 @@ html:not([data-app]):not([data-frame]) .side-nav {
 
 html:not([data-app]):not([data-frame]) .side-nav-admin {
   --row:56px;
-  background:var(--ink-surface);
-  color:var(--cream);
-  border-right-color:rgba(var(--cream-rgb),.14);
 }
 
 .side-nav-top {
@@ -186,14 +330,12 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   gap:9px;
   min-height:28px;
   margin:12px 8px 16px;
-  color:var(--text-muted);
+  color:var(--sn-muted);
   font:italic 500 16px/1.25 var(--serif);
 }
 
 .side-nav-hello span { animation:vv-hello .6s ease-out both; }
-.side-nav-daypart { flex:none; color:var(--text-accent); animation:vv-rise .9s cubic-bezier(.34,1.5,.64,1) both; }
-.side-nav-admin .side-nav-hello { color:var(--sage-on-navy); }
-.side-nav-admin .side-nav-daypart { color:var(--terracotta-on-navy); }
+.side-nav-daypart { flex:none; color:var(--sn-mark); animation:vv-rise .9s cubic-bezier(.34,1.5,.64,1) both; }
 
 .side-nav-back {
   display:flex;
@@ -226,13 +368,12 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   left:7px;
   width:9px;
   height:9px;
-  background:var(--text-accent);
+  background:var(--sn-mark);
   transform:translateY(calc(var(--marker, 0) * (var(--row) + 2px))) rotate(45deg);
   transition:transform .5s cubic-bezier(.34,1.45,.64,1);
   pointer-events:none;
   z-index:1;
 }
-.side-nav-admin .side-nav-marker { background:var(--terracotta-on-navy); }
 
 .side-nav-item {
   position:relative;
@@ -249,8 +390,7 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   transition:background .15s ease, color .15s ease;
 }
 
-.side-nav-item:hover { background:rgba(var(--fg-rgb),.06); }
-.side-nav-admin .side-nav-item:hover { background:rgba(var(--cream-rgb),.08); }
+.side-nav-item:hover { background:var(--sn-hover); }
 
 .side-nav-item .side-nav-icon {
   flex:none;
@@ -259,13 +399,9 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
 .side-nav-item:hover .side-nav-icon { transform:rotate(-9deg) scale(1.08); }
 
 .side-nav-item.active {
-  background:var(--nav-on);
-  color:var(--nav-on-ink);
+  background:var(--sn-on);
+  color:var(--sn-on-ink);
   font-weight:600;
-}
-.side-nav-admin .side-nav-item.active {
-  background:rgba(var(--cream-rgb),.14);
-  color:var(--cream);
 }
 
 .side-nav-label {
@@ -279,7 +415,7 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
 
 .side-nav-label small {
   overflow:hidden;
-  color:var(--sage-on-navy);
+  color:var(--sn-muted);
   font:400 12px var(--sans);
   white-space:nowrap;
   text-overflow:ellipsis;
@@ -292,10 +428,9 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   bottom:-6px;
   width:calc(100% + 8px);
   height:7px;
-  color:var(--text-accent);
+  color:var(--sn-mark);
   overflow:visible;
 }
-.side-nav-admin .side-nav-quill { color:var(--terracotta-on-navy); }
 .side-nav-quill path {
   stroke-dasharray:100;
   stroke-dashoffset:100;
@@ -311,8 +446,8 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   place-items:center;
   padding:0 6px;
   border-radius:11px;
-  background:var(--action);
-  color:var(--cream);
+  background:var(--sn-badge);
+  color:var(--sn-badge-ink);
   font:700 12px var(--sans);
   animation:vv-pop .4s cubic-bezier(.34,1.6,.64,1) both;
 }
@@ -321,13 +456,13 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   display:block;
   width:140px;
   margin:14px auto;
-  color:var(--text-accent);
+  color:var(--sn-mark);
   opacity:.75;
 }
 
 .side-nav-list.secondary { --row:42px; }
-.side-nav-item.quiet { color:var(--text-muted); font-size:14px; }
-.side-nav-item.quiet.active { color:var(--nav-on-ink); }
+.side-nav-item.quiet { color:var(--sn-muted); font-size:14px; }
+.side-nav-item.quiet.active { color:var(--sn-on-ink); }
 
 .side-nav-foot {
   display:grid;
@@ -338,12 +473,12 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
 
 .side-nav-to-admin {
   --row:44px;
-  border:1px dashed rgba(var(--fg-rgb),.28);
-  color:var(--text-muted);
+  border:1px dashed currentColor;
+  color:var(--sn-muted);
   font-size:14px;
   font-weight:600;
 }
-.side-nav-to-admin:hover { color:var(--text); }
+.side-nav-to-admin:hover { color:var(--sn-fg); }
 
 /* The engraved village; the season blows through when the page opens, and again on a tap. */
 .side-nav-village {
@@ -356,13 +491,11 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   border-radius:10px;
   overflow:hidden;
   background:transparent;
-  color:var(--text-muted);
+  color:var(--sn-muted);
   cursor:pointer;
   transition:color .2s ease;
 }
-.side-nav-village:hover { color:var(--text); }
-.side-nav-admin .side-nav-village { color:var(--sage-on-navy); }
-.side-nav-admin .side-nav-village:hover { color:var(--cream); }
+.side-nav-village:hover { color:var(--sn-fg); }
 .side-nav-village > svg { display:block; width:100%; height:auto; }
 
 .side-nav-smoke { animation:vv-smoke 7s ease-in-out infinite; transform-origin:35px 22px; }
@@ -377,11 +510,10 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   position:absolute;
   top:-14px;
   display:block;
-  color:var(--text-accent);
+  color:var(--sn-mark);
   opacity:0;
   animation:vv-fall 5.5s ease-in forwards;
 }
-.side-nav-admin .side-nav-bit { color:var(--terracotta-on-navy); }
 .side-nav-bit svg { display:block; }
 .side-nav-bit.bit-0 { left:6%;  animation-delay:.2s; }
 .side-nav-bit.bit-1 { left:22%; animation-delay:1.1s; }
@@ -402,13 +534,11 @@ html:not([data-app]):not([data-frame]) .side-nav-admin {
   border:0;
   border-radius:10px;
   background:transparent;
-  color:var(--text-muted);
+  color:var(--sn-muted);
   font:500 13px var(--sans);
   cursor:pointer;
 }
-.side-nav-collapse:hover { background:rgba(var(--fg-rgb),.06); color:var(--text); }
-.side-nav-admin .side-nav-collapse { color:var(--sage-on-navy); }
-.side-nav-admin .side-nav-collapse:hover { background:rgba(var(--cream-rgb),.08); color:var(--cream); }
+.side-nav-collapse:hover { background:var(--sn-hover); color:var(--sn-fg); }
 
 .side-nav :focus-visible {
   outline:2px solid var(--gold);
@@ -561,8 +691,7 @@ html:not([data-app]):not([data-frame]) .area-tabs {
     color:inherit;
     cursor:pointer;
   }
-  .side-nav-close:hover { background:rgba(var(--fg-rgb),.08); }
-  .side-nav-admin .side-nav-close:hover { background:rgba(var(--cream-rgb),.1); }
+  .side-nav-close:hover { background:var(--sn-hover); }
   /* Tucking away is a desktop choice; the drawer is always the full list. */
   .side-nav .side-nav-collapse { display:none; }
 }
@@ -723,6 +852,23 @@ html:not([data-app]):not([data-frame]) .area-tabs {
   .side-nav-quill path { stroke-dashoffset:0; }
   .side-nav-bit { display:none; }
 }
+
+/* The co-op turned motion off (Admin > Appearance): the same as the device's reduced-motion setting. */
+html[data-coop-motion="off"] .side-nav *,
+html[data-coop-motion="off"] .side-nav,
+html[data-coop-motion="off"] .area-tabs a,
+html[data-coop-motion="off"] .area-tabs a::before,
+html[data-coop-motion="off"] .area-tabs a::after,
+html[data-coop-motion="off"] .jump-to-scrim,
+html[data-coop-motion="off"] .jump-to-panel,
+html[data-coop-motion="off"] .jump-to-diamond,
+html[data-coop-motion="off"] .jump-to-empty svg,
+html[data-coop-motion="off"]:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) {
+    animation:none !important;
+    transition:none !important;
+  }
+html[data-coop-motion="off"] .side-nav-quill path { stroke-dashoffset:0; }
+html[data-coop-motion="off"] .side-nav-bit { display:none; }
 
 @media print {
   .side-nav, .area-tabs, .jump-to-trigger, .jump-to-scrim { display:none !important; }

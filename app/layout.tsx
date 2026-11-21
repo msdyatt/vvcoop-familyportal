@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./fonts.css";
 import "./platform.css";
 import "./public-site.css";
 import "./theme.css";
