@@ -34,6 +34,7 @@
     "lib/schedule.test.ts",
     "lib/coop-time.test.ts",
     "lib/office-inbox.test.ts",
+    "lib/compliance-dates.test.ts",
     "mobile"
   ]
 }

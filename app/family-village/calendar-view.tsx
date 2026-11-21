@@ -12,6 +12,10 @@ const VIEWS: { id: CalView; label: string }[] = [
   { id: "month", label: "Month" }, { id: "week", label: "Week" }, { id: "day", label: "Day" }, { id: "list", label: "List" },
 ];
 const COLUMNS = "id,title,description,starts_at,ends_at,location,class_id,audience,all_day,classes(title)";
+/** Pill colour: class dates, admin-only events (compliance deadlines and the like), everything else. */
+function calKind(event: { audience: string }): "class" | "admins" | "coop" {
+  return event.audience === "class" ? "class" : event.audience === "admins" ? "admins" : "coop";
+}
 const VIEW_KEY = "vv-calendar-view";
 const HOUR_PX = 52;
 const LIST_DAYS = 90;
@@ -112,12 +116,12 @@ export default function CalendarView() {
     setView("day");
   }
 
-  const pill = (event: CalEvent) => <button key={event.id} type="button" className={`cal-pill ${event.audience === "class" ? "class" : "coop"}`} onClick={() => setOpen(event)} title={event.title}>
+  const pill = (event: CalEvent) => <button key={event.id} type="button" className={`cal-pill ${calKind(event)}`} onClick={() => setOpen(event)} title={event.title}>
     {!event.all_day && <i>{timeLabel(event.starts_at)}</i>}{event.title}
   </button>;
 
   const agendaItem = (event: CalEvent) => <li key={event.id}>
-    <button type="button" className={`cal-item ${event.audience === "class" ? "class" : "coop"}`} onClick={() => setOpen(event)}>
+    <button type="button" className={`cal-item ${calKind(event)}`} onClick={() => setOpen(event)}>
       <time>{whenLabel(event)}</time>
       <span><b>{event.title}</b><small>{[event.classes?.title, event.location].filter(Boolean).join(" · ")}</small></span>
     </button>
@@ -161,7 +165,7 @@ export default function CalendarView() {
                   {items.slice(0, 3).map(pill)}
                   {items.length > 3 && <button type="button" className="cal-more" onClick={() => goToDay(key)}>+{items.length - 3} more</button>}
                 </div>
-                {items.length > 0 && <span className="cal-dots" aria-hidden="true">{items.slice(0, 3).map((event) => <i key={event.id} className={event.audience === "class" ? "class" : "coop"} />)}</span>}
+                {items.length > 0 && <span className="cal-dots" aria-hidden="true">{items.slice(0, 3).map((event) => <i key={event.id} className={calKind(event)} />)}</span>}
               </div>
             );
           })}
@@ -202,6 +206,7 @@ export default function CalendarView() {
     </div>}
 
     {open && <DetailModal title={open.title} onClose={() => setOpen(null)}>
+      {open.audience === "admins" && <p className="cal-admin-note">Only administrators see this event.{open.title.match(/^(Due|Filed|Not needed): /) ? <> <a href="/family-village/admin?tab=deadlines">Open Admin, Compliance</a></> : null}</p>}
       <p className="portal-empty">{dateLabel(open)}{!open.all_day ? ` · ${whenLabel(open)}` : ""}</p>
       {(open.classes?.title || open.location) && <p className="portal-empty">{[open.classes?.title, open.location].filter(Boolean).join(" · ")}</p>}
       {open.description && <p style={{ whiteSpace: "pre-wrap" }}>{open.description}</p>}
@@ -223,7 +228,7 @@ function DayGrid({ dateKey, events, loaded, onOpen }: { dateKey: string; events:
 
   return <div className="cal-day-view">
     {allDay.length > 0 && <ul className="cal-allday">{allDay.map((event) => <li key={event.id}>
-      <button type="button" className={`cal-item ${event.audience === "class" ? "class" : "coop"}`} onClick={() => onOpen(event)}>
+      <button type="button" className={`cal-item ${calKind(event)}`} onClick={() => onOpen(event)}>
         <time>All day</time><span><b>{event.title}</b><small>{[event.classes?.title, event.location].filter(Boolean).join(" · ")}</small></span>
       </button>
     </li>)}</ul>}
@@ -233,7 +238,7 @@ function DayGrid({ dateKey, events, loaded, onOpen }: { dateKey: string; events:
         <span>{new Date(2000, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" })}</span>
       </div>)}
       {timed.map(({ event, startMin, endMin, lane, lanes }) => <button key={event.id} type="button"
-        className={`cal-block ${event.audience === "class" ? "class" : "coop"}`}
+        className={`cal-block ${calKind(event)}`}
         style={{
           top: ((startMin - firstHour * 60) / 60) * HOUR_PX,
           height: Math.max(26, ((endMin - startMin) / 60) * HOUR_PX - 2),
