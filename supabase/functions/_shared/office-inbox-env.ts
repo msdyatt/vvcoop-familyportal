@@ -2,8 +2,10 @@ import { authenticate, type Caller } from "./auth.ts";
 import { json } from "./http.ts";
 
 /**
- * Settings the office-inbox functions read from Edge Function secrets (set by the owner in the
- * Supabase dashboard, once per project: staging and production each have their own):
+ * Settings the office-inbox functions need. Each one is read first from what an administrator saved
+ * on the Office inbox card (Admin, Integrations; the client secret is kept in Vault), and otherwise
+ * from an Edge Function secret of the same name set in the Supabase dashboard. Staging and
+ * production each have their own:
  *
  *   GOOGLE_OAUTH_CLIENT_ID      the web OAuth client from the co-op's Google Cloud project
  *   GOOGLE_OAUTH_CLIENT_SECRET  its secret
@@ -23,9 +25,21 @@ export type InboxConfig = {
   redirectUri: string;
 };
 
-export function loadInboxConfig(env: (name: string) => string | undefined = (n) => Deno.env.get(n)):
-  { ok: true; config: InboxConfig } | { ok: false; missing: string[] } {
-  const read = (name: string) => (env(name) ?? "").trim();
+export type SavedInboxConfig = Partial<Record<"GOOGLE_OAUTH_CLIENT_ID" | "GOOGLE_OAUTH_CLIENT_SECRET" | "OFFICE_INBOX_ADDRESS" | "PORTAL_SITE_URL", string | null>>;
+
+/** What was saved on the Office inbox card (service role only). Nothing saved, or an error, reads as empty. */
+export async function readSavedInboxConfig(
+  rpc: (fn: string) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<SavedInboxConfig> {
+  const { data, error } = await rpc("office_inbox_google_config");
+  return error || !data || typeof data !== "object" ? {} : data as SavedInboxConfig;
+}
+
+export function loadInboxConfig(
+  env: (name: string) => string | undefined = (n) => Deno.env.get(n),
+  saved: SavedInboxConfig = {},
+): { ok: true; config: InboxConfig } | { ok: false; missing: string[] } {
+  const read = (name: string) => ((saved[name as keyof SavedInboxConfig] ?? "").trim() || (env(name) ?? "").trim());
   const values = {
     GOOGLE_OAUTH_CLIENT_ID: read("GOOGLE_OAUTH_CLIENT_ID"),
     GOOGLE_OAUTH_CLIENT_SECRET: read("GOOGLE_OAUTH_CLIENT_SECRET"),

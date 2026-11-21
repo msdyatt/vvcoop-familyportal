@@ -4,7 +4,7 @@ import { logEdgeError } from "../_shared/error-log.ts";
 import { buildAuthUrl, exchangeCode, GmailClient, GoogleAuthError, pkceChallenge, randomToken, revokeToken, sha256Hex } from "../_shared/gmail.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
 import { REFRESH_TOKEN_SECRET } from "../_shared/office-inbox.ts";
-import { authenticateInboxAdmin, loadInboxConfig } from "../_shared/office-inbox-env.ts";
+import { authenticateInboxAdmin, loadInboxConfig, readSavedInboxConfig } from "../_shared/office-inbox-env.ts";
 
 /**
  * Connecting the office mailbox (Admin, Integrations, "Office inbox").
@@ -37,7 +37,7 @@ async function handle(req: Request): Promise<Response> {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) return json({ error: "Server not configured" }, 500);
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const loaded = loadInboxConfig();
+  const loaded = loadInboxConfig(undefined, await readSavedInboxConfig((fn) => admin.rpc(fn)));
 
   if (req.method === "GET") {
     if (!loaded.ok) return new Response("The office inbox is not set up on this server.", { status: 500 });
@@ -98,7 +98,7 @@ async function handle(req: Request): Promise<Response> {
   const body = await req.json().catch(() => null) as { action?: string } | null;
 
   if (body?.action === "start") {
-    if (!loaded.ok) return json({ error: `The office inbox is not set up yet. Missing function secrets: ${loaded.missing.join(", ")}.` }, 400);
+    if (!loaded.ok) return json({ error: `The office inbox is not set up yet. Missing: ${loaded.missing.join(", ")}. Fill them in on the Office inbox card in Admin, Integrations.` }, 400);
     const state = randomToken(32);
     const verifier = randomToken(48);
     const { error } = await admin.rpc("office_inbox_begin_oauth", {
@@ -118,7 +118,11 @@ async function handle(req: Request): Promise<Response> {
 
   if (body?.action === "config") {
     // What the card shows before anyone connects: whether the secrets are in place.
-    return json({ ready: loaded.ok, missing: loaded.ok ? [] : loaded.missing, mailbox: loaded.ok ? loaded.config.mailbox : null });
+    return json({
+      ready: loaded.ok, missing: loaded.ok ? [] : loaded.missing, mailbox: loaded.ok ? loaded.config.mailbox : null,
+      // The address to paste into Google Cloud as an authorised redirect URI.
+      redirectUri: `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/office-inbox-oauth`,
+    });
   }
 
   return json({ error: "Unknown action." }, 400);
