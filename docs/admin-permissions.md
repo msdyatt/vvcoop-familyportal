@@ -15,7 +15,7 @@ An admin with no tier row is an Admin. When this shipped, every existing admin w
 
 | Permission | Key | Covers |
 | --- | --- | --- |
-| Integrations | `integrations` | Stripe mode (off, test, live) and clearing Stripe test data; connecting or disconnecting the office inbox; the settings cards on Admin, Integrations (Resend From address, printer, Facebook link); the app store reviewer accounts. |
+| Integrations | `integrations` | Stripe mode (off, test, live) and clearing Stripe test data; connecting or disconnecting the office inbox and its Google setup (client ID and secret); the settings cards on Admin, Integrations (Resend From address, printer, Facebook link); the app store reviewer accounts. |
 | School year setup | `year_setup` | Start the next school year (preview, run, which families return); adding, editing or deleting school years and terms, and setting the current year; enrollment windows. |
 | Dues and fees | `dues_settings` | Dues amounts (dues requirements); monthly plan options; discount types; reminder, retry and receipt settings. |
 | Tax and compliance records | `tax_compliance` | The records vault (records, files, key facts), the compliance calendar settings and deadlines, and the year-end tax summary. Reading as well as changing. |
@@ -31,7 +31,7 @@ The database is the lock; the screens only say so first.
 
 - `private.require_admin_permission(key)`: every gated function calls it. It keeps the existing checks (admin role, active, not a reviewer account, second factor when the person has one) and adds the permission. The refusal reads `Ask a board admin. This needs the "<label>" permission.`
 - `private.require_records_admin()` (records vault, compliance calendar, tax summary) and `private.require_rollover_admin()` (rollover functions) now call it, so every function behind them is gated. Grade placement moved to `private.require_placement_admin()` and stays day-to-day.
-- Dues, billing and Stripe-mode functions, and the office inbox connect steps, call it directly.
+- Dues, billing and Stripe-mode functions, the office inbox connect steps and `office_inbox_save_setup`, call it directly.
 - Restrictive RLS policies stop direct writes to `school_years`, `academic_terms`, `enrollment_periods`, dues rows in `requirements`, `integration_settings` and admin rows in `user_roles`, and stop reads of the vault, tax and compliance tables and `records/` files.
 - Edge Functions: `office-inbox-oauth` (start, disconnect), `demo-accounts`, and `delete-account` (when the account is an admin's) ask `public.admin_has_permission(user, key)`, which only the service role can call. Shared helper: `supabase/functions/_shared/admin-permissions.ts`.
 - Screens use `lib/admin-access.ts` (`useAdminAccess()`, from `public.my_admin_access()`) and `app/family-village/admin/ask-board-admin.tsx`.

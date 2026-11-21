@@ -4,7 +4,7 @@
 -- Fixtures (all fake): A1 and A2 board admins; A3 a day-to-day admin (no tier row, the default);
 -- A4 a board admin with a second factor; P1 a parent in household F1.
 begin;
-select plan(82);
+select plan(84);
 
 insert into auth.users (id, email, aud, role) values
   ('00000000-0000-0000-0000-0000000000a1', 'board.one@example.com', 'authenticated', 'authenticated'),
@@ -83,6 +83,8 @@ select lives_ok($$insert into public.requirements (school_year_id, kind, title) 
 -- integrations
 select throws_ok($$select public.admin_set_billing_provider('stripe_test')$$, '42501', 'Ask a board admin. This needs the "Integrations" permission.', 'refused: Stripe mode');
 select throws_ok($$select public.admin_purge_test_billing_data()$$, '42501', 'Ask a board admin. This needs the "Integrations" permission.', 'refused: deleting Stripe test data');
+select throws_ok($$select public.office_inbox_save_setup('123456789-abc.apps.googleusercontent.com', 'GOCSPX-examplevalue', 'office@example.com', 'https://family.example.com')$$, '42501', 'Ask a board admin. This needs the "Integrations" permission.', 'refused: the office inbox Google setup');
+select lives_ok($$select public.office_inbox_setup()$$, 'reading the office inbox setup stays day-to-day');
 update public.integration_settings set from_address = 'someone@example.com' where id = 'resend';
 -- manage permissions
 select throws_ok($$select public.admin_permissions_overview()$$, '42501', 'Ask a board admin. Only board admins can see admin permissions.', 'refused: the permissions screen');

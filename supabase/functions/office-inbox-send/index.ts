@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { corsHeaders, json } from "../_shared/http.ts";
 import { ReplyRefused, sendReply } from "../_shared/office-inbox.ts";
-import { authenticateInboxAdmin, loadInboxConfig } from "../_shared/office-inbox-env.ts";
+import { authenticateInboxAdmin, loadInboxConfig, readSavedInboxConfig } from "../_shared/office-inbox-env.ts";
 
 /**
  * Sends an administrator's reply from the office address, in the family's Gmail thread.
@@ -20,7 +20,7 @@ async function handle(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const auth = await authenticateInboxAdmin(req);
   if (!auth.ok) return auth.response;
-  const loaded = loadInboxConfig();
+  const loaded = loadInboxConfig(undefined, await readSavedInboxConfig((fn) => auth.caller.admin.rpc(fn)));
   if (!loaded.ok) return json({ error: "The office inbox is not set up yet." }, 400);
 
   const body = await req.json().catch(() => null) as { threadId?: string; body?: string; clientKey?: string; nextStatus?: string } | null;

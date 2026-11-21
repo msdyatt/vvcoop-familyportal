@@ -4,8 +4,8 @@
 -- admins (families, classes, messages, calendar and so on) kept away from five
 -- areas unless the board grants them:
 --
---   integrations        Stripe mode, the office inbox connection, outside-service settings,
---                       reviewer (demo) accounts
+--   integrations        Stripe mode, the office inbox connection and Google setup, outside-service
+--                       settings, reviewer (demo) accounts
 --   year_setup          start the next school year, school years, terms, enrollment windows,
 --                       which families return
 --   dues_settings       dues amounts, payment plan options, discount types, billing and
@@ -731,6 +731,71 @@ revoke all on function public.office_inbox_begin_oauth(uuid, text, text), public
 grant execute on function public.office_inbox_begin_oauth(uuid, text, text), public.office_inbox_take_oauth(text),
   public.office_inbox_save_connection(uuid, text, text, text, text), public.office_inbox_clear_connection(uuid)
   to service_role;
+
+-- The Google setup on the office inbox card (#159) stores the OAuth client secret in Vault.
+-- Same function as 20261121150000_office_inbox_setup.sql, plus the permission check. Reading the
+-- setup (office_inbox_setup, which never returns the secret) stays open to every admin.
+create or replace function public.office_inbox_save_setup(
+  p_client_id text, p_client_secret text, p_allowed_mailbox text, p_portal_site_url text, p_clear_secret boolean default false)
+returns void
+language plpgsql security definer set search_path to ''
+as $function$
+declare
+  v_me uuid := private.require_inbox_admin();
+  s public.office_inbox_settings;
+  v_client_id text := nullif(btrim(coalesce(p_client_id, '')), '');
+  v_secret text := nullif(btrim(coalesce(p_client_secret, '')), '');
+  v_mailbox text := nullif(lower(btrim(coalesce(p_allowed_mailbox, ''))), '');
+  v_site text := nullif(regexp_replace(btrim(coalesce(p_portal_site_url, '')), '/+$', ''), '');
+  v_secret_id uuid;
+  v_changed text[] := '{}';
+begin
+  perform private.require_admin_permission('integrations');
+  select * into s from public.office_inbox_settings where id = 'office' for update;
+  if v_client_id is not null and v_client_id !~ '^[A-Za-z0-9._-]{10,200}$' then
+    raise exception 'That does not look like a Google client ID. Copy it from Google Cloud, Credentials.';
+  end if;
+  if v_secret is not null and (char_length(v_secret) < 10 or char_length(v_secret) > 200 or v_secret ~ '\s') then
+    raise exception 'That does not look like a Google client secret. Copy it from Google Cloud, Credentials.';
+  end if;
+  if v_mailbox is not null and v_mailbox !~ '^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$' then
+    raise exception 'Enter the office mailbox as an email address, for example office@veritasvillage.org.';
+  end if;
+  if v_site is not null and v_site !~ '^https://[A-Za-z0-9.-]+(:[0-9]+)?$' and v_site !~ '^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$' then
+    raise exception 'Enter the portal address as https:// and the host name only, for example https://family.veritasvillage.org.';
+  end if;
+  if s.status in ('connected', 'attention') and v_mailbox is distinct from s.allowed_mailbox
+     and s.mailbox_address is not null and v_mailbox is distinct from s.mailbox_address then
+    raise exception 'Disconnect the office inbox before changing which mailbox it reads.';
+  end if;
+
+  if v_client_id is distinct from s.google_client_id then v_changed := array_append(v_changed, 'client_id'); end if;
+  if v_mailbox is distinct from s.allowed_mailbox then v_changed := array_append(v_changed, 'mailbox'); end if;
+  if v_site is distinct from s.portal_site_url then v_changed := array_append(v_changed, 'portal_site_url'); end if;
+  update public.office_inbox_settings
+  set google_client_id = v_client_id, allowed_mailbox = v_mailbox, portal_site_url = v_site, updated_at = now()
+  where id = 'office';
+
+  select id into v_secret_id from vault.secrets where name = 'OFFICE_INBOX_GOOGLE_CLIENT_SECRET';
+  if v_secret is not null then
+    if v_secret_id is null then
+      perform vault.create_secret(v_secret, 'OFFICE_INBOX_GOOGLE_CLIENT_SECRET', 'Office inbox: Google OAuth client secret');
+    else
+      perform vault.update_secret(v_secret_id, v_secret);
+    end if;
+    v_changed := array_append(v_changed, 'client_secret');
+  elsif coalesce(p_clear_secret, false) and v_secret_id is not null then
+    delete from vault.secrets where id = v_secret_id;
+    v_changed := array_append(v_changed, 'client_secret_removed');
+  end if;
+
+  if cardinality(v_changed) > 0 then
+    perform private.inbox_log(null, v_me, 'setup_saved', jsonb_build_object('changed', to_jsonb(v_changed)));
+  end if;
+end;
+$function$;
+revoke all on function public.office_inbox_save_setup(text, text, text, text, boolean) from public, anon;
+grant execute on function public.office_inbox_save_setup(text, text, text, text, boolean) to authenticated;
 
 -- The Integrations screen saves rows of integration_settings directly (Resend From
 -- address, printer, Facebook group link). The anonymous Facebook read is untouched.
