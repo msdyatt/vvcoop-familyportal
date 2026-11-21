@@ -39,6 +39,7 @@ html[data-theme="dark"],
   --danger-fill:#c4472d;
   --cal-coop:#2b6a8f;
   --cal-class:var(--accent-night-fill);
+  --cal-admin:#56685b;
   --accent-on-action:var(--cream);
   --wash-on-action:rgba(2,10,16,.3);
   --chip-on-action:rgba(2,10,16,.2);
@@ -96,6 +97,7 @@ html[data-theme="dark"],
     --danger-fill:#c4472d;
     --cal-coop:#2b6a8f;
     --cal-class:var(--accent-night-fill);
+    --cal-admin:#56685b;
     --accent-on-action:var(--cream);
     --wash-on-action:rgba(2,10,16,.3);
     --chip-on-action:rgba(2,10,16,.2);

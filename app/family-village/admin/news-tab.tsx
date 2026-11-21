@@ -15,7 +15,7 @@ type Post = {
   scheduled_for: string | null; schedule_held_reason: string | null;
 };
 type ClassOption = { id: string; title: string };
-type CalendarEvent = { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; audience: string; all_day: boolean };
+type CalendarEvent = { id: string; title: string; description: string | null; starts_at: string; ends_at: string | null; location: string | null; audience: string; all_day: boolean; managed_by: string | null };
 
 const POST_COLUMNS = "id,title,body,audience,class_id,published_at,scheduled_for,schedule_held_reason";
 
@@ -53,7 +53,7 @@ export default function NewsTab({ actorUserId }: { actorUserId: string }) {
       supabase.from("posts").select(POST_COLUMNS).not("published_at", "is", null).order("created_at", { ascending: false }).limit(40),
       supabase.from("posts").select(POST_COLUMNS).is("published_at", null).order("scheduled_for", { ascending: true, nullsFirst: false }).limit(100),
       supabase.from("classes").select("id,title").order("title"),
-      supabase.from("events").select("id,title,description,starts_at,ends_at,location,audience,all_day").is("class_id", null).order("starts_at", { ascending: false }).limit(60),
+      supabase.from("events").select("id,title,description,starts_at,ends_at,location,audience,all_day,managed_by").is("class_id", null).order("starts_at", { ascending: false }).limit(60),
     ]);
     if (error) return;
     setPosts((data ?? []) as Post[]);
@@ -340,11 +340,11 @@ function CalendarPublisher({ events, onSaved, onStatus, status }: { events: Cale
           : <input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} disabled={busy} />}
       </label>
       <label><span className="field-caption">Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={busy} /></label>
-      <label><span className="field-caption">Audience</span><select value={audience} onChange={(event) => setAudience(event.target.value)} disabled={busy}><option value="families">Every family</option><option value="teachers">Teaching team</option><option value="public">Public audience</option></select></label>
+      <label><span className="field-caption">Audience</span><select value={audience} onChange={(event) => setAudience(event.target.value)} disabled={busy}><option value="families">Every family</option><option value="teachers">Teaching team</option><option value="admins">Administrators only</option><option value="public">Public audience</option></select></label>
     </div>
     <label className="checkbox-field"><input type="checkbox" checked={sendReminders} onChange={(event) => setSendReminders(event.target.checked)} disabled={busy} /> Send reminders before this event (3 days and 1 day, unless you changed that in Integrations). Everyone who can see the event gets one.</label>
     <div className="row-actions"><button disabled={busy}>{busy ? "Saving…" : editingId ? "Save event" : "Add calendar event"}</button>{editingId && <button type="button" className="ghost" onClick={cancelEdit} disabled={busy}>Cancel edit</button>}</div><p className="admin-form-status" role="status">{status}</p>
-  </form><div className="news-list calendar-admin-list">{events.map((row) => <article className="news-item" key={row.id}><time>{new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: row.all_day ? "UTC" : undefined })}</time><div><b>{row.title}</b><span>{row.all_day ? "All day" : new Date(row.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}{row.location ? ` · ${row.location}` : ""} · {row.audience}</span>{flags[row.id] === false ? <small>Reminders are off for this event.</small> : (planned[row.id] ?? []).map((reminder) => <small key={reminder.offset_days} className={reminder.status === "skipped" ? "reminder-skipped" : undefined}>{reminderLine(reminder)}</small>)}</div><div className="row-actions"><button onClick={() => editEvent(row)}>Edit</button><button className="danger" onClick={() => removeEvent(row)}>Delete</button></div></article>)}{!events.length && <p className="portal-empty">No co-op-wide events have been added yet.</p>}</div>
+  </form><div className="news-list calendar-admin-list">{events.map((row) => <article className="news-item" key={row.id}><time>{new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: row.all_day ? "UTC" : undefined })}</time><div><b>{row.title}</b><span>{row.all_day ? "All day" : new Date(row.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}{row.location ? ` · ${row.location}` : ""} · {row.audience}</span>{flags[row.id] === false ? <small>Reminders are off for this event.</small> : (planned[row.id] ?? []).map((reminder) => <small key={reminder.offset_days} className={reminder.status === "skipped" ? "reminder-skipped" : undefined}>{reminderLine(reminder)}</small>)}</div>{row.managed_by === "compliance" ? <div className="row-actions"><a className="deadline-managed-link" href="/family-village/admin?tab=deadlines">Managed on Compliance</a></div> : <div className="row-actions"><button onClick={() => editEvent(row)}>Edit</button><button className="danger" onClick={() => removeEvent(row)}>Delete</button></div>}</article>)}{!events.length && <p className="portal-empty">No co-op-wide events have been added yet.</p>}</div>
   <SubscribeLink query="scope=public" label="Subscribe to this calendar" />
   </>;
 }

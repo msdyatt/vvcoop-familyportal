@@ -135,6 +135,7 @@
   --danger-fill:var(--terracotta-deep);   /* solid alert fill (urgent banner, error toast, urgent chip) */
   --cal-coop:var(--navy);                 /* calendar: co-op event pill and dot (cream text on it) */
   --cal-class:var(--terracotta-text);     /* calendar: class event pill and dot (cream text on it) */
+  --cal-admin:#4a5a4f;                    /* calendar: admin-only event pill and dot (cream text on it) */
   --accent-on-action:var(--terracotta-on-navy);  /* accent text inside a bubble or button that has the --action fill */
   --wash-on-action:rgba(255,255,255,.14);         /* a highlight behind a mention inside such a bubble */
   --chip-on-action:rgba(var(--navy-rgb),.14);     /* a reaction chip inside such a bubble */
@@ -12700,4 +12701,68 @@ a.messages-file:hover { text-decoration:underline; }
   .inbox-context-col.open .inbox-context-sheet {
     top:auto; left:0; right:0; width:auto; max-height:80vh; border-radius:14px 14px 0 0; padding-bottom:calc(16px + env(safe-area-inset-bottom));
   }
+}
+
+/* ---- Admin, Compliance (filing deadlines) and admin-only calendar events ---------------------- */
+.cal-pill.admins,.cal-block.admins { background:var(--cal-admin); }
+.cal-dots i.admins { background:var(--cal-admin); }
+.cal-item.admins { border-left-color:var(--cal-admin); border-left-style:dashed; }
+.cal-admin-note { margin:0 0 8px; padding:6px 10px; border-left:3px dashed var(--cal-admin); background:var(--panel); color:var(--text); font-size:13px; }
+.deadline-managed-link { color:var(--text-accent); font-size:13px; }
+
+.deadlines { display:grid; gap:14px; }
+.deadlines h2 { margin:0 0 4px; }
+.deadlines h3 { margin:18px 0 8px; font-size:15px; color:var(--text); }
+.deadlines-head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:12px; }
+.deadlines-head > div { flex:1 1 320px; }
+.deadlines-why { margin:0; padding:10px 14px; border-radius:8px; background:var(--warm-tint); color:var(--text); font-size:14px; }
+.deadlines-views { display:flex; flex-wrap:wrap; gap:6px; }
+.deadlines-views button { padding:6px 12px; border:1px solid rgba(var(--fg-rgb),.18); border-radius:999px; background:var(--surface); color:var(--text); font-size:13px; }
+.deadlines-views button.active { background:var(--action); border-color:var(--action); color:var(--cream); }
+.deadlines-overdue-heading { color:var(--danger-text) !important; }
+
+.deadline-list { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.deadline-row { border:1px solid rgba(var(--fg-rgb),.12); border-radius:10px; background:var(--surface); }
+.deadline-summary {
+  display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; width:100%;
+  padding:10px 12px; border:0; background:none; color:var(--text); text-align:left;
+}
+.deadline-date { display:grid; min-width:96px; }
+.deadline-date b { font-size:14px; }
+.deadline-date small, .deadline-title small { color:var(--text-muted); font-size:12px; }
+.deadline-title { display:grid; gap:2px; min-width:0; }
+.deadline-title b { font-size:14px; overflow-wrap:anywhere; }
+.deadline-status {
+  display:inline-flex; align-items:center; gap:5px; padding:1px 8px 1px 6px;
+  border:1px solid var(--chip-mark); border-radius:999px; color:var(--text); font-size:12px; line-height:18px; white-space:nowrap;
+}
+.deadline-status-dot { width:7px; height:7px; border-radius:50%; background:var(--chip-mark); }
+.deadline-status-not_started { --chip-mark:var(--status-new); }
+.deadline-status-in_progress { --chip-mark:var(--status-waiting); }
+.deadline-status-filed { --chip-mark:var(--status-done); }
+.deadline-status-not_needed { --chip-mark:var(--status-open); }
+.deadline-detail { display:grid; gap:6px; padding:0 12px 12px; border-top:1px solid rgba(var(--fg-rgb),.08); }
+.deadline-detail p { margin:6px 0 0; }
+.deadline-details { color:var(--text); font-size:14px; line-height:1.5; }
+.deadline-form { margin-top:6px; }
+.deadline-add { margin-top:12px; }
+.deadline-add summary { cursor:pointer; color:var(--text-accent); font-weight:600; }
+.deadline-rules ul { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+.deadline-rules li { padding:12px 14px; border:1px solid rgba(var(--fg-rgb),.12); border-radius:10px; background:var(--surface); }
+.deadline-rules li.off { background:var(--surface-sunken); }
+.deadline-rules p { margin:6px 0; color:var(--text); font-size:14px; line-height:1.5; }
+.deadline-rules dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 12px; margin:0; font-size:13px; }
+.deadline-rules dt { color:var(--text-muted); }
+.deadline-rules dd { margin:0; color:var(--text); }
+.deadline-rule-head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; }
+.deadline-rule-tags { display:inline-flex; gap:6px; }
+.deadline-tag { padding:1px 7px; border-radius:4px; background:var(--panel); color:var(--text); font-size:12px; }
+.deadline-tag.check { background:var(--warm-tint); color:var(--danger-text); }
+.deadline-settings fieldset { display:grid; gap:8px; margin:0 0 12px; padding:12px; border:1px solid rgba(var(--fg-rgb),.12); border-radius:10px; }
+.deadline-settings legend { padding:0 6px; font-weight:600; color:var(--text); }
+.deadline-day { display:flex; gap:8px; }
+.deadline-day input { width:5em; }
+@media (max-width:560px) {
+  .deadline-summary { grid-template-columns:1fr auto; }
+  .deadline-date { grid-column:1 / -1; display:flex; gap:6px; align-items:baseline; min-width:0; }
 }

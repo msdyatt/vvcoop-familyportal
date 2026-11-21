@@ -107,6 +107,41 @@ function describe(row: AuditRow): string {
       return `moved ${text(d, "first_name") ?? "a child"} from ${text(d, "from") ?? "one household"} to ${text(d, "to") ?? "another"}`;
     case "family_adult_invited":
       return `invited another adult to join ${text(d, "family_name") ?? "a household"}`;
+    case "teaching_commitment_adjusted": {
+      const role = text(d, "role")?.replace("hall_monitor", "hall monitor") ?? "a";
+      const amount = num(d, "amount") ?? 0;
+      const who = text(d, "person_label") ? ` for ${text(d, "person_label")}` : "";
+      return (text(d, "kind") === "set" ? `set a teaching commitment ${role} count to ${amount}` : `adjusted a teaching commitment ${role} count by ${amount > 0 ? "+" : ""}${amount}`)
+        + `${who}: ${text(d, "reason") ?? ""}`;
+    }
+    case "teaching_commitment_entry_removed":
+      return `removed a teaching commitment entry: ${text(d, "reason") ?? ""}`;
+    case "teaching_commitment_imported":
+      return `imported the teaching commitment spreadsheet for ${num(d, "people") ?? 0} people`;
+    case "teaching_commitment_settings_saved":
+      return `set the teaching commitment to teach ${num(d, "teach_target") ?? "?"} and assist ${num(d, "assist_target") ?? "?"} each co-op day`;
+    case "teaching_commitment_note_saved":
+      return "updated a teaching commitment note";
+    case "teaching_commitment_label_linked":
+      return `linked ${text(d, "person_label") ?? "a name"} from the teaching commitment spreadsheet to an account`;
+    case "coop_absence_marked":
+      return `marked ${text(d, "family_id") ? "a household" : "someone"} as not coming on ${text(d, "day") ?? "a co-op day"}`;
+    case "coop_absence_withdrawn":
+      return `took back a "not coming" for ${text(d, "day") ?? "a co-op day"}`;
+    case "coop_shift_covered":
+      return `recorded a cover on ${text(d, "day") ?? "a co-op day"}: ${text(d, "title") ?? "a shift"}${d && d["released"] === false ? " (the person had not said they were out)" : ""}`;
+    case "coop_cover_withdrawn":
+      return `withdrew a cover on ${text(d, "day") ?? "a co-op day"}`;
+    case "coop_days_generated":
+      return `added ${num(d, "added") ?? 0} co-op days to a term`;
+    case "coop_day_add": case "coop_day_cancel": case "coop_day_restore": case "coop_day_remove":
+      return `${row.action.replace("coop_day_", "")} co-op day ${text(d, "day") ?? ""}`.replace("cancel ", "cancelled ").replace("add ", "added ").replace("restore ", "restored ").replace("remove ", "removed ");
+    case "teaching_commitment_points_saved":
+      return `set the points to teach ${num(d, "teach_points") ?? "?"}, assist ${num(d, "assist_points") ?? "?"}, hall monitor ${num(d, "hall_points") ?? "?"}`;
+    case "hall_monitor_assigned":
+      return "assigned a hall monitor";
+    case "hall_monitor_removed":
+      return "took a hall monitor off a period";
     default:
       return row.action.replace(/_/g, " ");
   }

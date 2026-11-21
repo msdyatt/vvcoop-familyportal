@@ -1,0 +1,300 @@
+/* Admin, Classes, Teaching commitment (app/family-village/admin/commitment-tab.tsx, issue #151).
+   Role tokens only (docs/theming.md), so it works in the light and the dark theme. The table scrolls inside its own
+   box on a phone; the name column and the header stay in view while it does. */
+
+.tc-tab { display:grid; gap:18px; min-width:0; }
+.tc-tab .record { min-width:0; }
+
+.tc-controls {
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px 16px;
+  align-items:flex-end;
+}
+.tc-controls label { display:grid; gap:4px; min-width:0; }
+.tc-controls select,
+.tc-controls input {
+  max-width:100%;
+  padding:8px 10px;
+  font:500 14px var(--sans);
+  color:var(--text);
+  background:var(--surface-sunken);
+  border:1px solid rgba(var(--fg-rgb),.18);
+  border-radius:8px;
+}
+.tc-search input { width:220px; }
+
+.tc-summary { display:flex; flex-wrap:wrap; gap:8px; margin:0; }
+
+.tc-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 10px;
+  font:600 12px var(--sans);
+  color:var(--text);
+  background:var(--surface);
+  border:1px solid rgba(var(--fg-rgb),.18);
+  border-left:4px solid rgba(var(--fg-rgb),.3);
+  border-radius:999px;
+  white-space:nowrap;
+}
+.tc-chip.small { padding:1px 8px; font-size:11px; margin-left:8px; }
+.tc-chip.ok { border-left-color:var(--status-done); }
+.tc-chip.short { background:var(--warm-tint); color:var(--danger-text); border-left-color:var(--danger-line); }
+.tc-chip.heavy { border-left-color:var(--status-waiting); }
+.tc-chip-x {
+  padding:0 2px;
+  font:600 14px var(--sans);
+  line-height:1;
+  color:var(--text-muted);
+  background:none;
+  border:0;
+  cursor:pointer;
+}
+
+/* --- the table --------------------------------------------------------------------------------------------------- */
+.tc-scroller {
+  max-width:100%;
+  max-height:72vh;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+  background:var(--surface);
+  border:1px solid rgba(var(--fg-rgb),.14);
+  border-radius:12px;
+}
+.tc-scroller:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+
+.tc-table {
+  border-collapse:separate;
+  border-spacing:0;
+  min-width:100%;
+  font:500 13px var(--sans);
+  color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+.tc-table th,
+.tc-table td {
+  padding:6px 8px;
+  text-align:center;
+  vertical-align:middle;
+  border-bottom:1px solid rgba(var(--fg-rgb),.08);
+  background:var(--surface);
+}
+.tc-table thead th {
+  position:sticky;
+  top:0;
+  z-index:2;
+  font:600 11px var(--sans);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--text-muted);
+  white-space:nowrap;
+  border-bottom:1px solid rgba(var(--fg-rgb),.22);
+  height:30px;
+}
+.tc-table thead tr + tr th { top:30px; }
+.tc-table thead abbr { text-decoration:none; cursor:help; }
+.tc-table .tc-term-start { border-left:1px solid rgba(var(--fg-rgb),.16); }
+
+.tc-table .tc-name {
+  position:sticky;
+  left:0;
+  z-index:1;
+  min-width:170px;
+  max-width:240px;
+  text-align:left;
+  border-right:1px solid rgba(var(--fg-rgb),.16);
+}
+.tc-table thead .tc-name { z-index:3; }
+
+.tc-person {
+  display:grid;
+  padding:0;
+  text-align:left;
+  color:var(--text);
+  background:none;
+  border:0;
+  cursor:pointer;
+}
+.tc-person b { font:600 13px var(--sans); }
+.tc-person small { font:500 11px var(--sans); color:var(--text-muted); }
+.tc-person:hover b { text-decoration:underline; }
+
+.tc-cell { padding:2px 3px; }
+.tc-cell button {
+  min-width:34px;
+  min-height:30px;
+  padding:4px 6px;
+  font:600 13px var(--sans);
+  color:var(--text);
+  background:none;
+  border:1px solid transparent;
+  border-radius:6px;
+  cursor:pointer;
+}
+.tc-cell button:hover { background:rgba(var(--fg-rgb),.06); border-color:rgba(var(--fg-rgb),.18); }
+.tc-cell.zero button { color:var(--text-muted); font-weight:500; }
+.tc-cell.adjusted button {
+  color:var(--text-accent);
+  border:1px dashed var(--text-accent);
+}
+.tc-cell.adjusted button::after { content:"*"; }
+
+.tc-num { min-width:38px; }
+.tc-strong { font-weight:700; }
+.tc-table .tc-notes {
+  min-width:220px;
+  max-width:360px;
+  text-align:left;
+  font:500 12px var(--sans);
+  line-height:16px;
+  color:var(--text-muted);
+  white-space:normal;
+}
+
+.tc-household-row th {
+  position:sticky;
+  left:0;
+  text-align:left;
+  font:600 14px var(--sans);
+  color:var(--text);
+  background:var(--panel);
+  border-top:1px solid rgba(var(--fg-rgb),.16);
+}
+.tc-household-row small { margin-left:8px; font:500 12px var(--sans); color:var(--text-muted); }
+.tc-total-row th,
+.tc-total-row td { font-weight:700; border-bottom:1px solid rgba(var(--fg-rgb),.22); }
+.tc-total-row .tc-short { background:var(--warm-tint); color:var(--danger-text); }
+.tc-total-row .tc-notes { color:var(--danger-text); font-weight:600; }
+.tc-heavy .tc-name .tc-chip { margin:4px 0 0; }
+
+/* --- the cell and person panels ------------------------------------------------------------------------------------- */
+.tc-breakdown { display:grid; gap:6px; margin:0 0 16px; }
+.tc-breakdown div { display:flex; justify-content:space-between; gap:12px; padding-bottom:6px; border-bottom:1px solid rgba(var(--fg-rgb),.1); }
+.tc-breakdown dt { font:500 13px var(--sans); color:var(--text-muted); }
+.tc-breakdown dd { margin:0; font:500 14px var(--sans); color:var(--text); text-align:right; }
+
+.tc-history { display:grid; gap:8px; margin:6px 0 16px; padding:0; list-style:none; }
+.tc-history li {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 10px;
+  font:500 13px var(--sans);
+  color:var(--text);
+  background:var(--surface-sunken);
+  border-radius:8px;
+}
+.tc-history li > div { display:grid; gap:2px; min-width:0; flex:1 1 220px; }
+.tc-history small { font:500 12px var(--sans); color:var(--text-muted); }
+.tc-history li.removed > div { text-decoration:line-through; color:var(--text-muted); }
+.tc-history li.removed small { text-decoration:none; }
+.tc-remove { display:grid; gap:8px; flex:1 1 100%; }
+.tc-remove input { padding:8px 10px; color:var(--text); background:var(--surface); border:1px solid rgba(var(--fg-rgb),.18); border-radius:8px; }
+
+/* --- hall monitors, settings, import ---------------------------------------------------------------------------------- */
+.tc-hall-list { display:grid; gap:10px; margin:12px 0 0; padding:0; list-style:none; }
+.tc-hall-list li { display:grid; gap:6px; padding:10px 0; border-bottom:1px solid rgba(var(--fg-rgb),.1); }
+.tc-hall-list b { font:600 14px var(--sans); color:var(--text); }
+.tc-hall-list small { font:500 12px var(--sans); color:var(--text-muted); }
+.tc-hall-people { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.tc-hall-people select { max-width:100%; padding:6px 8px; color:var(--text); background:var(--surface-sunken); border:1px solid rgba(var(--fg-rgb),.18); border-radius:8px; }
+
+.tc-settings input[type="number"] { max-width:120px; }
+
+.tc-import td,
+.tc-import th { white-space:nowrap; }
+.tc-import td:last-child { white-space:normal; min-width:160px; }
+.tc-import select { max-width:240px; }
+.tc-import .tc-undecided { border-color:var(--danger-line); }
+.tc-flag { display:block; font:600 11px var(--sans); color:var(--danger-text); white-space:normal; }
+.tc-skipped { font:500 13px var(--sans); color:var(--text-muted); }
+.tc-skipped summary { cursor:pointer; color:var(--text); }
+
+@media (max-width:640px) {
+  .tc-table .tc-name { min-width:128px; max-width:150px; }
+  .tc-table .tc-notes { min-width:180px; }
+  .tc-search input { width:100%; }
+  .tc-controls label { flex:1 1 140px; }
+}
+
+@media print {
+  .tc-scroller { max-height:none; overflow:visible; border:0; }
+  .tc-table thead th, .tc-table .tc-name, .tc-household-row th { position:static; }
+}
+
+/* --- views, points and co-op days (commitment-days.tsx) -------------------------------------------------------------- */
+.tc-sections { display:flex; flex-wrap:wrap; gap:6px; }
+.tc-sections button {
+  padding:7px 14px;
+  font:600 13px var(--sans);
+  color:var(--text);
+  background:var(--surface);
+  border:1px solid rgba(var(--fg-rgb),.18);
+  border-radius:999px;
+  cursor:pointer;
+}
+.tc-sections button.active { color:var(--cream); background:var(--action); border-color:var(--action); }
+.tc-subrow th, .tc-subrow td { font-weight:500; }
+.tc-indent { padding-left:18px; color:var(--text-muted); }
+.tc-behind .tc-notes { color:var(--danger-text); font-weight:600; }
+.tc-table td.tc-short { background:var(--warm-tint); color:var(--danger-text); }
+.tc-days .tc-notes { min-width:160px; }
+.tc-cancelled th, .tc-cancelled td { color:var(--text-muted); }
+.tc-cancelled .tc-person b { text-decoration:line-through; }
+.tc-cover-pick { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.tc-cover-pick select { max-width:200px; padding:6px 8px; color:var(--text); background:var(--surface); border:1px solid rgba(var(--fg-rgb),.18); border-radius:8px; }
+
+/* The cell editor and panels: one field per row, so a narrow dialog stays readable. */
+.tc-form { grid-template-columns:1fr; margin-top:12px; }
+.tc-form .row-actions button { grid-column:auto; }
+
+/* --- Family, Co-op days (app/family-village/co-op-days) -------------------------------------------------------------- */
+.coop-days-page { display:grid; gap:16px; }
+.coop-days-heading { margin:12px 0 0; font:600 20px var(--serif); color:var(--text); }
+.coop-day {
+  display:grid;
+  gap:10px;
+  padding:16px 18px;
+  background:var(--surface);
+  border:1px solid rgba(var(--fg-rgb),.14);
+  border-radius:14px;
+}
+.coop-day.out { border-left:4px solid var(--danger-line); }
+.coop-day.cancelled { color:var(--text-muted); background:var(--surface-sunken); }
+.coop-day header { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; }
+.coop-day h3 { margin:0; font:600 18px var(--serif); color:var(--text); }
+.coop-day header small { font:500 12px var(--sans); color:var(--text-muted); }
+.coop-day p { margin:0; font:500 14px var(--sans); color:var(--text); }
+.coop-day-row { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; }
+.coop-shifts { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.coop-shifts li {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:center;
+  gap:6px 12px;
+  padding:8px 10px;
+  font:500 14px var(--sans);
+  color:var(--text);
+  background:var(--surface-sunken);
+  border-radius:8px;
+}
+.coop-shifts small { font:500 12px var(--sans); color:var(--text-muted); }
+.coop-log label { display:grid; gap:4px; flex:1 1 240px; }
+.coop-log .field-caption { font:600 12px var(--sans); color:var(--text-muted); }
+.coop-log select { max-width:100%; padding:8px 10px; color:var(--text); background:var(--surface-sunken); border:1px solid rgba(var(--fg-rgb),.18); border-radius:8px; }
+.tc-controls > button {
+  padding:8px 14px;
+  font:600 13px var(--sans);
+  color:var(--cream);
+  background:var(--action);
+  border:1px solid var(--action);
+  border-radius:8px;
+  cursor:pointer;
+}
+.tc-controls > button.ghost { color:var(--text); background:var(--surface); border-color:rgba(var(--fg-rgb),.22); }
+.tc-controls > button:disabled { opacity:.55; cursor:default; }
