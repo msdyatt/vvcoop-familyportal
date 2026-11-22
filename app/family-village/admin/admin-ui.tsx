@@ -38,13 +38,15 @@ export function CollapsibleRecord({ summary, meta, chips, defaultOpen = false, c
  * so a caller shows text or inputs from one definition rather than maintaining
  * two parallel trees that can drift apart.
  */
-export function EditableSection({ label, onSave, onCancel, children }: {
+export function EditableSection({ label, onSave, onCancel, startEditing = false, children }: {
   label: string;
   onSave: () => Promise<void> | void;
   onCancel?: () => void;
+  /** Open straight into the form, for a pop-up whose only job is editing. */
+  startEditing?: boolean;
   children: (editing: boolean) => ReactNode;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [busy, setBusy] = useState(false);
 
   async function save() {

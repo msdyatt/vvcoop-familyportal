@@ -1,0 +1,278 @@
+/* ==========================================================================
+   Children: the Today cards (children/child-card.tsx), the Children page
+   (children/children-page.tsx) and the Enroll step (children/enroll-flow.tsx).
+   Roles only (docs/theming.md), so light and dark need no second rule.
+   ========================================================================== */
+
+/* ---------- Today cards ---------- */
+
+.child-cards {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap:12px;
+}
+
+.child-today {
+  display:grid;
+  align-content:start;
+  gap:10px;
+  min-width:0;
+  padding:14px 16px 16px;
+  border:1px solid rgba(var(--fg-rgb),.14);
+  border-radius:14px;
+  background:var(--canvas);
+}
+
+.child-today-head {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.child-today-head h3 {
+  flex:1;
+  min-width:0;
+  margin:0;
+  font:700 18px var(--serif);
+}
+.child-today-head h3 a {
+  color:var(--text);
+  text-decoration:none;
+}
+.child-today-head h3 a:hover { color:var(--text-accent); text-decoration:underline; }
+.child-today-head h3 a:focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:4px; }
+
+.child-today-day {
+  margin:0;
+  color:var(--text-accent);
+  font:700 12px var(--sans);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+.child-today-classes {
+  display:grid;
+  gap:6px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+.child-today-classes li {
+  display:grid;
+  grid-template-columns:4.9em minmax(0,1fr);
+  font-size:13px;
+  gap:10px;
+  align-items:baseline;
+}
+.child-today-classes time {
+  color:var(--text-muted);
+  font:600 13px var(--sans);
+  white-space:nowrap;
+}
+.child-today-classes span { display:grid; min-width:0; }
+.child-today-classes b { color:var(--text); font:600 15px var(--sans); }
+.child-today-classes small { color:var(--text-muted); font-size:13px; }
+
+.child-today .portal-empty { margin:0; }
+
+/* ---------- Assignments: a tick box a thumb can hit ---------- */
+
+.child-assignments {
+  display:grid;
+  gap:6px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+.child-assignment label {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  column-gap:10px;
+  min-height:44px;
+  padding:6px 12px 6px 10px;
+  border:1px solid rgba(var(--fg-rgb),.18);
+  border-radius:12px;
+  background:var(--surface);
+  color:var(--text);
+  cursor:pointer;
+}
+.child-assignment label:hover { border-color:var(--text-accent); }
+.child-assignment input { grid-row:span 2; width:20px; height:20px; margin:0; accent-color:var(--action); }
+.child-assignment b { font:600 14px var(--sans); }
+.child-assignment small { grid-column:2; color:var(--text-muted); font-size:12px; }
+.child-assignment.done label {
+  border-color:transparent;
+  background:var(--panel);
+}
+.child-assignment.done b { color:var(--text-muted); text-decoration:line-through; }
+
+/* ---------- Enroll buttons ---------- */
+
+.child-enroll,
+.enroll-banner-button {
+  min-height:40px;
+  padding:0 16px;
+  border:0;
+  border-radius:10px;
+  background:var(--action);
+  color:var(--cream);
+  font:700 14px var(--sans);
+  cursor:pointer;
+}
+.child-enroll:hover,
+.enroll-banner-button:hover { filter:brightness(1.12); }
+.child-enroll:focus-visible,
+.enroll-banner-button:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+.enroll-banner-button { margin-left:auto; }
+/* On a card it sits beside the name, so it is smaller. */
+.child-today-head .child-enroll { flex:none; min-height:34px; padding:0 12px; font-size:13px; }
+
+/* ---------- The Children page ---------- */
+
+.children-layout {
+  display:grid;
+  gap:16px;
+  min-width:0;
+}
+
+/* Phones and narrow windows: the names are tabs across the top. */
+.children-tabs {
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  margin:0 -4px;
+  padding:2px 4px 4px;
+  scrollbar-width:none;
+}
+.children-tabs::-webkit-scrollbar { display:none; }
+.children-tabs button {
+  flex:none;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-height:44px;
+  padding:6px 14px 6px 8px;
+  border:1px solid rgba(var(--fg-rgb),.16);
+  border-radius:22px;
+  background:var(--canvas);
+  color:var(--text);
+  font:600 15px var(--sans);
+  cursor:pointer;
+}
+.children-tabs button:hover { border-color:var(--text-accent); }
+.children-tabs button:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+.children-tabs button.active {
+  border-color:var(--action);
+  background:var(--action);
+  color:var(--cream);
+}
+
+/* Wide screens: a list of names down the side, like Messages. */
+@media (min-width:860px) {
+  .children-layout.has-tabs { grid-template-columns:200px minmax(0,1fr); align-items:start; gap:22px; }
+  .children-layout.has-tabs .children-tabs {
+    position:sticky;
+    top:calc(var(--site-header-height, 78px) + 12px);
+    flex-direction:column;
+    overflow:visible;
+    margin:0;
+    padding:0;
+  }
+  .children-layout.has-tabs .children-tabs button { border-radius:12px; padding:8px 12px 8px 8px; }
+}
+
+.child-panel { display:grid; gap:18px; min-width:0; }
+
+.child-panel-head {
+  display:flex;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+}
+.child-panel-head > div:not(.row-actions) { display:grid; gap:2px; flex:1; min-width:150px; }
+.child-panel-head h3 { margin:0; color:var(--text); font:700 22px/1.2 var(--serif); }
+.child-panel-head small { color:var(--text-muted); font-size:14px; }
+.child-panel-head .row-actions { display:flex; gap:8px; flex-wrap:wrap; }
+
+/* Edit, Enroll and "Message ..." are things a parent does here, so they get a real button size. */
+.child-panel .row-actions button {
+  min-height:40px;
+  padding:0 14px;
+  border-radius:10px;
+  font-size:14px;
+}
+.child-panel .row-actions button.child-enroll { border:0; background:var(--action); color:var(--cream); }
+
+.child-section { display:grid; gap:8px; min-width:0; }
+/* The Children block used to be a navy band, and globals.css still gives its kickers the on-navy tint. It is a light card now. */
+.live-portal .portal-module-wide .child-section > .card-kicker { margin:0; color:var(--text-accent); }
+.child-section .child-detail-list { margin:0; }
+.child-section .child-detail-list li { border-radius:12px; }
+.child-section .portal-empty { margin:0; }
+
+/* A class line: title link, when and who, then the Message buttons. */
+.child-class-list li { display:grid; gap:6px; }
+.child-class-list li > span { margin-top:0; }
+.child-class-list b a { color:var(--text); }
+.child-class-list .row-actions { display:flex; flex-wrap:wrap; gap:8px; }
+
+/* The children page keeps the "Add a child" button clear of the last section. */
+.children-page .add-child-trigger { margin-top:24px; }
+
+/* ---------- The Enroll step ---------- */
+
+.enroll-flow { display:grid; gap:10px; }
+.enroll-flow h3 { margin:0; color:var(--text); font:700 20px/1.25 var(--serif); }
+.enroll-flow .field-note { margin:0; }
+.enroll-flow .enrollment-class-options { margin:4px 0; }
+.enroll-flow .enrollment-class-options > div { border-radius:12px; }
+.enroll-flow .enrollment-class-options input { width:20px; height:20px; margin:2px 0 0; accent-color:var(--action); }
+
+.enroll-step-count {
+  margin:4px 0 0;
+  color:var(--text-accent);
+  font:700 12px var(--sans);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+.enroll-steps-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:6px;
+}
+.enroll-steps-actions .enroll-confirm { min-height:44px; border-radius:10px; }
+.enroll-steps-actions .enroll-confirm:disabled { opacity:.5; cursor:not-allowed; }
+
+.enroll-review,
+.enroll-results {
+  display:grid;
+  gap:8px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+.enroll-review > li {
+  display:grid;
+  gap:4px;
+  padding:12px 14px;
+  border-radius:12px;
+  background:var(--panel);
+}
+.enroll-review b { color:var(--text); font:700 15px var(--sans); }
+.enroll-review > li > span { color:var(--text-muted); font-size:14px; }
+.enroll-review ul { display:grid; gap:4px; margin:0; padding:0; list-style:none; }
+.enroll-review ul li { display:grid; color:var(--text); font-size:14px; }
+.enroll-review ul small { color:var(--text-muted); font-size:12px; }
+
+.enroll-results li {
+  padding:10px 14px;
+  border-radius:12px;
+  background:var(--panel);
+  color:var(--text);
+  font-size:14px;
+}
+.enroll-results li.failed { background:var(--warm-tint); color:var(--danger-text); }

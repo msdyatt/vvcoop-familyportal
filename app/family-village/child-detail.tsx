@@ -2,373 +2,79 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
-import { getSignedFileUrl, storeAvatar } from "../../lib/storage";
 import Avatar from "./avatar";
 import DetailModal from "./detail-modal";
-import { EditableSection, Field, GRADES } from "./admin/admin-ui";
-import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
-import { goTo } from "../../lib/portal-chrome";
+import { ChildClassList, ChildDateSections, ChildDetailsEditor, EnrollOptionsList } from "./children/child-parts";
+import { loadEnrollOptions, selfEnroll, useChildren, type ChildOverview, type OpenPeriod } from "./children/use-children";
+import type { EnrollOption } from "../../lib/children-view";
 
-type Teacher = { id: string; name: string };
-type ClassInfo = { id: string; title: string; schedule: string; teachers: Teacher[] };
-type ClassDateInfo = { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; class_title: string; completed: boolean };
-
-type ChildRecord = { id: string; first_name: string; last_name: string | null; age_band: string | null; age_band_override: boolean; birthdate: string | null; avatar_path: string | null };
-
-type OpenPeriod = { id: string; title: string; closes_at: string; electives_only: boolean };
-type EligibleClass = {
-  id: string; title: string; description: string | null; is_elective: boolean; schedule: string;
-  is_full: boolean; missing_prerequisites: string[];
-};
-
+/**
+ * One child in a pop-up, everything at once: details, classes, class dates and
+ * enrollment. Families no longer use this (Today and the Children page show the
+ * same things in place, with a smaller Edit pop-up); Admin, Families still does.
+ * It reads through the same loader as the family screens.
+ */
 export default function ChildDetail({ childId, onClose }: { childId: string; onClose: () => void }) {
-  const [child, setChild] = useState<ChildRecord | null>(null);
-  const [classes, setClasses] = useState<ClassInfo[]>([]);
-  const [classDates, setClassDates] = useState<ClassDateInfo[]>([]);
-  const [openPeriod, setOpenPeriod] = useState<OpenPeriod | null>(null);
-  const [eligibleClasses, setEligibleClasses] = useState<EligibleClass[]>([]);
-  const [classPick, setClassPick] = useState("");
-  const [enrollStatus, setEnrollStatus] = useState("");
-  const [childStatus, setChildStatus] = useState("");
-  const [messageStatus, setMessageStatus] = useState("");
-  const [messagingTeacherId, setMessagingTeacherId] = useState<string | null>(null);
-  const [userId, setUserId] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [editFirstName, setEditFirstName] = useState("");
-  const [editBirthdate, setEditBirthdate] = useState<string | null>(null);
-  const [editOverride, setEditOverride] = useState(false);
-  const [editGrade, setEditGrade] = useState<string | null>(null);
-
-  async function load() {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id ?? "";
-    setUserId(uid);
-
-    const [{ data: childRow }, { data: enrollments }] = await Promise.all([
-      supabase.from("children").select("id,first_name,last_name,age_band,age_band_override,birthdate,avatar_path").eq("id", childId).single(),
-      supabase.from("enrollments").select(`class_id,status,classes(id,title,${SCHEDULE_SELECT},teacher_assignments(user_id,profiles(display_name,email)))`).eq("child_id", childId).eq("status", "active"),
-    ]);
-    setChild(childRow as ChildRecord | null);
-    setAvatarUrl(childRow?.avatar_path ? await getSignedFileUrl(supabase, childRow.avatar_path) : null);
-    const rows = (enrollments ?? []) as unknown as { classes: { id: string; title: string; teacher_assignments: { user_id: string; profiles: { display_name: string | null; email: string } | null }[] } & ClassSchedule }[];
-    const classInfos = rows.map((row) => ({
-      id: row.classes.id,
-      title: row.classes.title,
-      schedule: describeSchedule(row.classes),
-      teachers: row.classes.teacher_assignments
-        .map((assignment) => ({ id: assignment.user_id, name: assignment.profiles?.display_name || assignment.profiles?.email || "" }))
-        .filter((teacher) => teacher.name),
-    }));
-    setClasses(classInfos);
-
-    const classIds = classInfos.map((info) => info.id);
-    if (classIds.length) {
-      // Class dates replaced assignments -- one entry carries the topic, the
-      // date and whether anything is needed beforehand.
-      const { data: dateRows } = await supabase.from("events")
-        .select("id,title,starts_at,location,requires_prework,class_id,classes(title)")
-        .eq("audience", "class").in("class_id", classIds)
-        .gte("starts_at", new Date().toISOString())
-        .order("starts_at", { ascending: true }).limit(10);
-      const dateBase = (dateRows ?? []) as unknown as { id: string; title: string; starts_at: string; location: string | null; requires_prework: boolean; classes: { title: string } }[];
-      const eventIds = dateBase.filter((row) => row.requires_prework).map((row) => row.id);
-      const { data: completionRows } = eventIds.length
-        ? await supabase.from("event_completions").select("event_id").eq("child_id", childId).in("event_id", eventIds)
-        : { data: [] };
-      const completed = new Set((completionRows ?? []).map((row) => row.event_id));
-      setClassDates(dateBase.map((row) => ({
-        id: row.id, title: row.title, starts_at: row.starts_at, location: row.location,
-        requires_prework: row.requires_prework, class_title: row.classes?.title ?? "",
-        completed: completed.has(row.id),
-      })));
-    }
-
-    // Enrollment: is a window open right now, and what can this child request
-    // in it. A child with no grade set yet can't be matched against anything,
-    // so the section quietly has nothing to offer rather than showing every
-    // class in the co-op.
-    const nowIso = new Date().toISOString();
-    const { data: periodRows } = await supabase.from("enrollment_periods")
-      .select("id,title,closes_at,electives_only").eq("active", true)
-      .lte("opens_at", nowIso).gte("closes_at", nowIso).limit(1);
-    const period = (periodRows ?? [])[0] as OpenPeriod | undefined;
-    setOpenPeriod(period ?? null);
-
-    if (period && childRow?.age_band) {
-      // A class with no term assigned is treated as year-round, matching the
-      // same convention private.classes_terms_overlap uses for the clash
-      // check -- otherwise every class that predates academic terms would
-      // vanish from the picker the moment terms were introduced.
-      let classQuery = supabase.from("classes")
-        .select(`id,title,description,is_elective,grades,${SCHEDULE_SELECT},class_terms(academic_terms(starts_on,ends_on))`)
-        .eq("active", true)
-        // Classes that place themselves by grade are never offered for a family to pick.
-        .is("subject", null);
-      if (period.electives_only) classQuery = classQuery.eq("is_elective", true);
-
-      const [{ data: classRows2 }, { data: enrolledRows }] = await Promise.all([
-        classQuery,
-        supabase.from("enrollments").select("class_id").eq("child_id", childId).eq("status", "active"),
-      ]);
-      const alreadyIn = new Set((enrolledRows ?? []).map((row) => row.class_id));
-      const today = new Date().toISOString().slice(0, 10);
-      const matched = ((classRows2 ?? []) as unknown as ({
-        id: string; title: string; description: string | null; is_elective: boolean; grades: string[];
-        class_terms: { academic_terms: { starts_on: string; ends_on: string } | null }[];
-      } & ClassSchedule)[])
-        // An empty grades array means "any grade" (see admin-ui.tsx's
-        // formatGrades) -- a .contains() filter on the query can't express
-        // that (an empty array never "contains" anything), so the match
-        // happens here instead.
-        .filter((row) => !row.grades.length || row.grades.includes(childRow.age_band as string))
-        .filter((row) => !alreadyIn.has(row.id))
-        // Not-yet-ended, not "currently happening" -- an enrollment period is
-        // routinely opened ahead of a term's start (families sign up for
-        // Spring in December while Fall is still current), and requiring
-        // starts_on <= today filtered out every not-yet-started term's
-        // classes for the entire time enrollment was actually meant to be
-        // open for them.
-        .filter((row) => !row.class_terms.length || row.class_terms.some((link) =>
-          link.academic_terms && today <= link.academic_terms.ends_on));
-
-      // Capacity and prerequisites can't be checked client-side -- a family
-      // can't read another household's enrollments to count seats. This
-      // SECURITY DEFINER RPC returns, for this child, which of these classes
-      // are full and which prerequisites are still outstanding. A full or
-      // locked class is still shown, greyed out with the reason, rather than
-      // hidden -- "why can't I pick this" is a worse experience than seeing it.
-      const optionMap = new Map<string, { is_full: boolean; missing_prerequisites: string[] }>();
-      if (matched.length) {
-        const { data: optionRows } = await supabase.rpc("family_enrollment_options", {
-          p_child_id: childId, p_class_ids: matched.map((row) => row.id),
-        });
-        for (const opt of (optionRows ?? []) as { class_id: string; is_full: boolean; missing_prerequisites: string[] | null }[]) {
-          optionMap.set(opt.class_id, { is_full: opt.is_full, missing_prerequisites: opt.missing_prerequisites ?? [] });
-        }
-      }
-
-      setEligibleClasses(matched.map((row) => ({
-        id: row.id, title: row.title, description: row.description, is_elective: row.is_elective,
-        schedule: describeSchedule(row),
-        is_full: optionMap.get(row.id)?.is_full ?? false,
-        missing_prerequisites: optionMap.get(row.id)?.missing_prerequisites ?? [],
-      })));
-    } else {
-      setEligibleClasses([]);
-    }
-
-    setLoading(false);
-  }
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- initial data fetch on mount
-  useEffect(() => { load(); }, [childId]);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the edit form's staged values whenever fresh data loads
-  useEffect(() => { setEditFirstName(child?.first_name ?? ""); setEditBirthdate(child?.birthdate ?? null); setEditOverride(child?.age_band_override ?? false); setEditGrade(child?.age_band ?? null); }, [child]);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) { if (event.key === "Escape") onClose(); }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  /**
-   * Opens the one thread between this child's teacher and every parent of this
-   * child who is in the portal, so the other parent is always included, whichever
-   * of them started it. Asking again returns the same thread.
-   */
-  async function messageTeacher(teacher: Teacher) {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setMessagingTeacherId(teacher.id); setMessageStatus("");
-    const { data, error } = await supabase.rpc("start_child_conversation", { p_child_id: childId, p_teacher_id: teacher.id });
-    if (error || typeof data !== "string") {
-      setMessageStatus(error?.message ?? "Could not open the conversation. Try again.");
-      setMessagingTeacherId(null);
-      return;
-    }
-    goTo(`/family-village/messages?c=${data}`);
-  }
-
-  /**
-   * A family can change a child's photo, birthdate, and grade override --
-   * nothing else. The database enforces the same boundary (a trigger rejects
-   * any other column in the same update), so this is convenience, not the
-   * real gate.
-   */
-  async function updateChild(patch: { avatar_path?: string; first_name?: string; birthdate?: string | null; age_band_override?: boolean; age_band?: string | null }, savedMessage = "Saved.") {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    const { error } = await supabase.from("children").update(patch).eq("id", childId);
-    if (error) { setChildStatus(error.message); return; }
-    setChildStatus(savedMessage);
-    await load();
-  }
-
-  async function uploadAvatar(file: File) {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-    setChildStatus("Uploading…");
-    const uploaded = await storeAvatar(supabase, file);
-    if ("error" in uploaded) { setChildStatus(uploaded.error); return; }
-    await updateChild({ avatar_path: uploaded.path }, "Photo updated.");
-  }
-
-  async function toggleCompletion(eventId: string, done: boolean) {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !userId) return;
-    const action = done
-      ? supabase.from("event_completions").delete().eq("event_id", eventId).eq("child_id", childId)
-      : supabase.from("event_completions").insert({ event_id: eventId, child_id: childId, completed_by: userId });
-    const { error } = await action;
-    if (!error) await load();
-  }
-
-  /**
-   * Enrolls immediately -- no admin approval step. family_self_enroll
-   * re-checks eligibility server-side (window open, grade matches, no
-   * same-block clash, seats left, prerequisites met) rather than trusting the
-   * picker's own filtering, since that list was built from what the page
-   * loaded with, not the instant of clicking.
-   */
-  async function enrollInClass() {
-    if (!openPeriod || !classPick) return;
-    const picked = eligibleClasses.find((option) => option.id === classPick);
-    if (picked && (picked.is_full || picked.missing_prerequisites.length)) return;
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !userId) return;
-    setEnrollStatus("Enrolling…");
-    const { error } = await supabase.rpc("family_self_enroll", {
-      p_period_id: openPeriod.id, p_class_id: classPick, p_child_id: childId,
-    });
-    if (error) {
-      setEnrollStatus(error.message);
-      return;
-    }
-    const enrolledTitle = eligibleClasses.find((option) => option.id === classPick)?.title ?? "the class";
-    setClassPick("");
-    setEnrollStatus(`Enrolled in ${enrolledTitle}.`);
-    await load();
-  }
+  const state = useChildren([childId]);
+  const entry = state.children[0];
 
   return <DetailModal onClose={onClose}>
-      {loading ? <p>Loading…</p> : <>
-        <p className="eyebrow">Student</p>
-        <div className="child-detail-heading">
-          <Avatar url={avatarUrl} label={child?.first_name ?? "?"} size="lg" />
-          <h2>{child?.first_name} {child?.last_name}</h2>
-        </div>
-
-        <section>
-          <EditableSection
-            label="Details"
-            onSave={() => updateChild({
-              first_name: editFirstName.trim() || child?.first_name,
-              birthdate: editBirthdate || null,
-              age_band_override: editOverride,
-              ...(editOverride ? { age_band: editGrade } : {}),
-            }, "Saved.")}
-            onCancel={() => {
-              setEditFirstName(child?.first_name ?? "");
-              setEditBirthdate(child?.birthdate ?? null);
-              setEditOverride(child?.age_band_override ?? false);
-              setEditGrade(child?.age_band ?? null);
-            }}
-          >
-            {(editing) => <div className="field-grid">
-              {editing && <label className="file-drop"><span className="field-caption">Photo</span>
-                <input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadAvatar(file); }} />
-              </label>}
-              <Field label="Goes by" value={child?.first_name} editing={editing}>
-                <input value={editFirstName} onChange={(event) => setEditFirstName(event.target.value)} />
-              </Field>
-              <Field
-                label="Birthdate"
-                value={child?.birthdate ? new Date(child.birthdate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null}
-                editing={editing}
-              >
-                <input type="date" value={editBirthdate ?? ""} onChange={(event) => setEditBirthdate(event.target.value || null)} />
-              </Field>
-              {editing && <label className="checkbox-field">
-                <input type="checkbox" checked={editOverride} onChange={(event) => setEditOverride(event.target.checked)} /> Set grade manually
-              </label>}
-              <Field
-                label="Grade"
-                value={child?.age_band ? `Grade ${child.age_band}${child.age_band_override ? " (set manually)" : ""}` : null}
-                editing={editing && editOverride}
-              >
-                <select value={editGrade ?? ""} onChange={(event) => setEditGrade(event.target.value || null)}>
-                  <option value="">Not set</option>
-                  {GRADES.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
-                </select>
-              </Field>
-              {editing && !editOverride && <p className="field-note">
-                {editBirthdate ? "Grade is calculated automatically from birthdate." : "Add a birthdate to calculate grade automatically."}
-              </p>}
-            </div>}
-          </EditableSection>
-          {childStatus && <p className="admin-form-status" role="status">{childStatus}</p>}
-        </section>
-
-        <section>
-          <p className="card-kicker">Classes</p>
-          {classes.length ? <ul className="child-detail-list">{classes.map((row) => <li key={row.id}>
-            <b><a href={`/family-village/classes/view?id=${row.id}`}>{row.title}</a></b>
-            <span>{row.schedule}{row.teachers.length ? ` · ${row.teachers.map((teacher) => teacher.name).join(", ")}` : ""}</span>
-            {row.teachers.length > 0 && <div className="row-actions">
-              {row.teachers.map((teacher) => <button key={teacher.id} type="button" className="ghost" disabled={messagingTeacherId !== null} onClick={() => messageTeacher(teacher)}>
-                {messagingTeacherId === teacher.id ? "Opening…" : `Message ${teacher.name}`}
-              </button>)}
-            </div>}
-          </li>)}</ul> : <p className="portal-empty">Not enrolled in any classes yet.</p>}
-          {messageStatus && <p className="admin-form-status" role="status">{messageStatus}</p>}
-        </section>
-
-        <section>
-          <p className="card-kicker">Coming up in class</p>
-          {classDates.length
-            ? <ul className="child-detail-list">{classDates.map((row) => <li key={row.id}>
-                <b>{row.title}</b>
-                <span>{[row.class_title, new Date(row.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }), row.location].filter(Boolean).join(" · ")}</span>
-                {row.requires_prework && <label className={`prep-flag${row.completed ? " prep-done" : ""}`}>
-                  <input type="checkbox" checked={row.completed} onChange={() => toggleCompletion(row.id, row.completed)} />
-                  {row.completed ? "Assignment ready" : "Assignment"}
-                </label>}
-              </li>)}</ul>
-            : <p className="portal-empty">Nothing scheduled in this child&rsquo;s classes right now.</p>}
-        </section>
-
-        {openPeriod && <section>
-          <p className="card-kicker">Enrollment is open</p>
-          <p className="field-note">
-            {openPeriod.title} closes {new Date(openPeriod.closes_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}.
-            {openPeriod.electives_only ? " Choose electives for " : " Choose classes for "}{child?.first_name} — enrolling is immediate, no approval needed.
-          </p>
-          {eligibleClasses.length
-            ? <><div className="enrollment-class-options" role="radiogroup" aria-label={`Classes available to ${child?.first_name}`}>
-                {eligibleClasses.map((option) => {
-                  const locked = option.is_full || option.missing_prerequisites.length > 0;
-                  const reason = option.is_full
-                    ? "Class full"
-                    : option.missing_prerequisites.length
-                      ? `Requires ${option.missing_prerequisites.join(", ")} first`
-                      : null;
-                  return <div key={option.id} className={`${classPick === option.id ? "selected" : ""}${locked ? " disabled" : ""}`}>
-                    <input id={`enroll-${option.id}`} type="radio" name={`class-${childId}`} value={option.id} checked={classPick === option.id} disabled={locked} onChange={() => setClassPick(option.id)} />
-                    <label htmlFor={`enroll-${option.id}`}>
-                      <b>{option.title}</b>
-                      <small>{[option.schedule, reason].filter(Boolean).join(" · ")}</small>
-                      <p>{option.description || "No class description has been added yet."}</p>
-                    </label>
-                  </div>;
-                })}
-              </div><button className="enroll-confirm" disabled={!classPick} onClick={enrollInClass}>Enroll {child?.first_name}</button></>
-            : <p className="portal-empty">No open classes match {child?.first_name}&rsquo;s grade right now.</p>}
-          {enrollStatus && <p className="admin-form-status" role="status">{enrollStatus}</p>}
-        </section>}
-      </>}
+    {state.loading ? <p>Loading…</p> : !entry ? <p className="portal-empty">{state.error || "This child could not be found."}</p> : <>
+      <p className="eyebrow">Student</p>
+      <div className="child-detail-heading">
+        <Avatar url={entry.avatarUrl} label={entry.child.first_name} size="lg" />
+        <h2>{entry.child.first_name} {entry.child.last_name}</h2>
+      </div>
+      <ChildDetailsEditor child={entry.child} onSaved={state.reload} />
+      <section>
+        <p className="card-kicker">Classes</p>
+        <ChildClassList entry={entry} />
+      </section>
+      <ChildDateSections entry={entry} onToggle={state.toggleCompletion} />
+      {state.period && <InlineEnroll entry={entry} period={state.period} onEnrolled={state.reload} />}
+    </>}
   </DetailModal>;
+}
+
+function InlineEnroll({ entry, period, onEnrolled }: { entry: ChildOverview; period: OpenPeriod; onEnrolled: () => Promise<void> }) {
+  const [options, setOptions] = useState<EnrollOption[] | null>(null);
+  const [picks, setPicks] = useState<string[]>([]);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    loadEnrollOptions(supabase, entry.child, period).then((list) => { if (!cancelled) setOptions(list); }, () => { if (!cancelled) setOptions([]); });
+    return () => { cancelled = true; };
+  // A reload after enrolling hands over a fresh child row, which loads the shorter list.
+  }, [entry.child, period]);
+
+  async function enroll() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !picks.length) return;
+    setStatus("Enrolling…");
+    const lines: string[] = [];
+    for (const classId of picks) {
+      const title = options?.find((option) => option.id === classId)?.title ?? "the class";
+      const error = await selfEnroll(supabase, period.id, entry.child.id, classId);
+      lines.push(error ? `${title}: ${error}` : `Enrolled in ${title}.`);
+    }
+    setPicks([]);
+    setStatus(lines.join(" "));
+    await onEnrolled();
+  }
+
+  return <section>
+    <p className="card-kicker">Enrollment is open</p>
+    <p className="field-note">
+      {period.title} closes {new Date(period.closes_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}.
+      {period.electives_only ? " Choose electives for " : " Choose classes for "}{entry.child.first_name}. Enrolling is immediate, no approval needed.
+    </p>
+    {options === null ? <p className="portal-empty">Loading classes…</p> : <>
+      <EnrollOptionsList child={entry.child} options={options} picks={picks} onChange={setPicks} />
+      {options.length > 0 && <button className="enroll-confirm" disabled={!picks.length} onClick={enroll}>Enroll {entry.child.first_name}</button>}
+    </>}
+    {status && <p className="admin-form-status" role="status">{status}</p>}
+  </section>;
 }
