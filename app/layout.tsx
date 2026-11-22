@@ -16,6 +16,7 @@ import { THEME_COLORS, THEME_SCRIPT } from "../lib/theme";
 import { COOP_SCRIPT } from "../lib/coop-theme";
 import { SIDENAV_SCRIPT } from "../lib/desktop-nav";
 import ThemeSync from "./theme-sync";
+import PlatformSync from "./platform-sync";
 import CoopThemeSync from "./coop-theme-sync";
 import ErrorReporter from "./error-reporter";
 import SwipeBack from "./swipe-back";
@@ -51,6 +52,10 @@ export const metadata: Metadata = {
   // frosted-glass strip there, which showed as a haze above the header. The
   // page supplies a solid navy strip instead (see platform.css).
   appleWebApp: { capable: true, title: "Veritas Village", statusBarStyle: "black-translucent" },
+  // vinext writes only the newer "mobile-web-app-capable" tag for appleWebApp.capable. Older iOS versions read only
+  // the Apple name, and without it a home-screen icon opens as a browser page if the manifest cannot be fetched
+  // (no data-app, so no bottom bar; issue #111).
+  other: { "apple-mobile-web-app-capable": "yes" },
   icons: {
     icon: [
       { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
@@ -93,6 +98,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <body>
       <ErrorReporter />
       <Toaster />
+      <PlatformSync />
       <ThemeSync />
       <CoopThemeSync />
       <SwipeBack />
