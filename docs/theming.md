@@ -216,3 +216,25 @@ All of it is in `public.coop_settings` (`body_font`, `header_style`, `sidebar_st
 `20261120130000_coop_style`), saved with `admin_save_coop_style`, put back by Reset, and applied before the first
 paint by `COOP_SCRIPT` from the copy on the device. `tests/coop-theme.test.mjs` checks the database's lists match the
 code's, and that every attribute the theme sets has rules in the stylesheet.
+
+## Your own header and sidebar colours
+
+Admin, Appearance, Header and sidebar: besides Plain, Tinted, Ink and Accent, each band can be "Your own colour".
+From the colour typed (`bandFamily` in `lib/coop-theme.ts`):
+
+- the band is that colour;
+- its text, icons and rule are cream or navy, whichever reads better, and must clear 4.5:1;
+- in the dark theme a dark band keeps its colour, and a light band becomes a deep version of the same hue with cream
+  text (a pale band would glare at night).
+
+The four colours are stored as `coop_settings.header_band` / `sidebar_band` and checked again in the database
+(`private.coop_band_problems`, the same rules as `checkBand`). A colour that fails is refused with the reason, and the
+screen offers the nearest shade that works. Switching to another style keeps the colour for later. Admin keeps its
+navy band. On the page they are custom properties (`--coop-header-bg`, `-fg`, `-bg-night`, `-fg-night`, and the same
+for `sidebar`) plus `data-coop-header-tone` / `data-coop-sidebar-tone` (`dark` when the text is cream, which puts
+the logo for dark grounds on it); the rules are in `app/desktop-nav.css`. Highlights in the sidebar darken a dark band
+and lighten a light one, so they only ever add contrast.
+
+Ready-made palettes: fourteen now (Veritas first, then meadow, harbor, plum, teal, ochre, berry, rose, lavender,
+indigo, sky, slate, olive, marigold). Each passes every check; the database's list of palettes members may be offered
+is the same (the test checks).
