@@ -35,7 +35,7 @@ async function handle(req: Request): Promise<Response> {
   const userClient = createClient(supabaseUrl, publishableKey, { global: { headers: { Authorization: authorization } } });
   const { data: { user }, error: userError } = await userClient.auth.getUser();
   if (userError || !user) return json({ error: "Your session has expired. Please sign in again." }, 401);
-  if (await needsMfaStepUp(userClient)) return json({ error: "Complete two-factor verification before continuing." }, 403);
+  if (await needsMfaStepUp(userClient, authorization)) return json({ error: "Complete two-factor verification before continuing." }, 403);
 
   const body = await req.json().catch(() => null) as { confirm?: string; targetUserId?: string; deleteHousehold?: boolean } | null;
   if (body?.confirm !== "DELETE") return json({ error: "Type DELETE to confirm." }, 400);

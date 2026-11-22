@@ -29,7 +29,7 @@ export async function authenticate(req: Request, options: { adminOnly?: boolean 
   ]);
   if (profile?.status !== "active") return { ok: false, response: json({ error: "Your account is not active." }, 403) };
   if (options.adminOnly && !role) return { ok: false, response: json({ error: "Administrator access is required." }, 403) };
-  if (await needsMfaStepUp(userClient)) return { ok: false, response: json({ error: "Complete two-factor verification before continuing." }, 403) };
+  if (await needsMfaStepUp(userClient, authorization)) return { ok: false, response: json({ error: "Complete two-factor verification before continuing." }, 403) };
 
   return { ok: true, caller: { userId: user.id, email: user.email ?? null, admin, isAdmin: Boolean(role) } };
 }

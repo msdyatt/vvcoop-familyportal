@@ -14,3 +14,18 @@ export function personalFeedAudiences(person: FeedPerson): string[] {
   if (person.roles.has("admin") && person.active && !person.isDemo) audiences.push("admins");
   return audiences;
 }
+
+export type FeedProfile = { status?: string | null; is_demo?: boolean | null };
+
+/**
+ * Only an active person's personal feed link works. Removing, suspending or un-approving someone
+ * must cut off their calendar subscription too, the same way row-level security cuts off the app.
+ */
+export function personalFeedAllowed(profile: FeedProfile): boolean {
+  return profile.status === "active";
+}
+
+/** Which world a personal feed reads: demo (reviewer) accounts only ever see demo rows. */
+export function feedIsDemo(profile: FeedProfile): boolean {
+  return profile.is_demo === true;
+}

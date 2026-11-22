@@ -47,7 +47,7 @@ async function handle(req: Request): Promise<Response> {
     adminClient.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
   ]);
   if (profile?.status !== "active" || !role) return json({ error: "Administrator access is required." }, 403);
-  if (await needsMfaStepUp(userClient)) return json({ error: "Complete two-factor verification before continuing." }, 403);
+  if (await needsMfaStepUp(userClient, authorization)) return json({ error: "Complete two-factor verification before continuing." }, 403);
 
   const body = await req.json().catch(() => null) as { familyId?: string } | null;
   const familyId = body?.familyId?.trim();
