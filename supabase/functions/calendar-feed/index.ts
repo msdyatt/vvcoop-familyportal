@@ -5,7 +5,7 @@ import { buildIcs, byDayCode, IcsEvent } from "../_shared/ics.ts";
 import { addDaysDateOnly, DateRange, mergeContiguousRanges } from "../_shared/date-ranges.ts";
 import { logEdgeError } from "../_shared/error-log.ts";
 import { corsHeaders } from "../_shared/http.ts";
-import { personalFeedAudiences } from "../_shared/feed-audiences.ts";
+import { feedIsDemo, personalFeedAllowed, personalFeedAudiences } from "../_shared/feed-audiences.ts";
 
 /**
  * Serves a subscribable calendar feed -- no interactive login, because a
@@ -171,7 +171,7 @@ async function handle(req: Request): Promise<Response> {
   const scope = url.searchParams.get("scope");
 
   if (scope === "public") {
-    const { data } = await admin.from("events").select(EVENT_SELECT).eq("audience", "public").order("starts_at");
+    const { data } = await admin.from("events").select(EVENT_SELECT).eq("audience", "public").eq("is_demo", false).order("starts_at");
     return text(buildIcs(eventsToIcs((data ?? []) as unknown as EventRow[]), { name: "Veritas Village" }));
   }
 
@@ -180,12 +180,12 @@ async function handle(req: Request): Promise<Response> {
     const classToken = url.searchParams.get("token");
     if (!classId) return text("Missing class id.", 400, "text/plain");
     if (!classToken) return text("Missing token.", 400, "text/plain");
-    const { data: klass } = await admin.from("classes").select("id,title,block_id,room_id,school_year_id").eq("id", classId).eq("calendar_token", classToken).eq("active", true).maybeSingle();
+    const { data: klass } = await admin.from("classes").select("id,title,block_id,room_id,school_year_id,is_demo").eq("id", classId).eq("calendar_token", classToken).eq("active", true).maybeSingle();
     if (!klass) return text("That calendar link is no longer valid.", 404, "text/plain");
 
     const [meetings, { data: eventRows }] = await Promise.all([
       classMeetingEvents(admin, klass),
-      admin.from("events").select(EVENT_SELECT).eq("class_id", classId).eq("audience", "class").order("starts_at"),
+      admin.from("events").select(EVENT_SELECT).eq("class_id", classId).eq("audience", "class").eq("is_demo", klass.is_demo === true).order("starts_at"),
     ]);
     const events = eventsToIcs((eventRows ?? []) as unknown as EventRow[]);
     return text(buildIcs([...meetings, ...events], { name: `Veritas Village – ${klass.title}` }));
@@ -195,7 +195,13 @@ async function handle(req: Request): Promise<Response> {
     const token = url.searchParams.get("token");
     if (!token) return text("Missing token.", 400, "text/plain");
     const { data: profile } = await admin.from("profiles").select("id,display_name,email,is_demo,status").eq("calendar_token", token).maybeSingle();
-    if (!profile) return text("That calendar link is no longer valid.", 404, "text/plain");
+    // A removed, suspended or pending person's link stops working (issue #199): the app's own
+    // row-level security would refuse them everything, and this function runs as the service role.
+    if (!profile || !personalFeedAllowed(profile)) return text("That calendar link is no longer valid.", 404, "text/plain");
+    // The service role skips the demo_isolation policies, so every events and classes query below
+    // stays inside the person's own world: reviewer accounts see only demo content and real members
+    // never see it (issue #164).
+    const isDemo = feedIsDemo(profile);
     const personalName = profile.display_name || profile.email || "My";
 
     const [{ data: roleRows }, { data: teachingRows }, { data: memberRows }] = await Promise.all([
@@ -220,17 +226,18 @@ async function handle(req: Request): Promise<Response> {
 
     const [classRows, { data: generalEventRows }] = await Promise.all([
       classIds.length
-        ? admin.from("classes").select("id,title,block_id,room_id,school_year_id").in("id", classIds).eq("active", true)
+        ? admin.from("classes").select("id,title,block_id,room_id,school_year_id").in("id", classIds).eq("active", true).eq("is_demo", isDemo)
         : Promise.resolve({ data: [] as { id: string; title: string; block_id: string | null; room_id: string | null; school_year_id: string | null }[] }),
       admin.from("events").select(EVENT_SELECT + ",audience")
-        .in("audience", personalFeedAudiences({ roles, isDemo: profile.is_demo === true, active: profile.status === "active" }))
+        .in("audience", personalFeedAudiences({ roles, isDemo, active: true }))
+        .eq("is_demo", isDemo)
         .order("starts_at"),
     ]);
 
     const classEventLists = await Promise.all((classRows.data ?? []).map(async (klass) => {
       const [meetings, { data: eventRows }] = await Promise.all([
         classMeetingEvents(admin, klass),
-        admin.from("events").select(EVENT_SELECT).eq("class_id", klass.id).eq("audience", "class").order("starts_at"),
+        admin.from("events").select(EVENT_SELECT).eq("class_id", klass.id).eq("audience", "class").eq("is_demo", isDemo).order("starts_at"),
       ]);
       const events = eventsToIcs((eventRows ?? []) as unknown as EventRow[]);
       return [...meetings, ...events];

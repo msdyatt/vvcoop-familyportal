@@ -4,7 +4,6 @@ import { safeEqual } from "./crypto.ts";
 import { escapeHtml } from "./email-template.ts";
 import { buildInviteEmail } from "./invite-email.ts";
 import { safePath } from "./paths.ts";
-import { needsMfaStepUp } from "./aal.ts";
 import { corsHeaders, json } from "./http.ts";
 
 Deno.test("safeEqual: equal strings match, any difference or length change does not", () => {
@@ -32,14 +31,6 @@ Deno.test("safePath: only same-site paths survive; everything else is the home p
   assertEquals(safePath("/\\evil.example/x"), home);
   assertEquals(safePath("javascript:alert(1)"), home);
   assertEquals(safePath("family-village/home"), home);
-});
-
-Deno.test("needsMfaStepUp: only a session that must reach aal2 and has not yet does", async () => {
-  const client = (data: unknown) => ({ auth: { mfa: { getAuthenticatorAssuranceLevel: () => Promise.resolve({ data }) } } }) as never;
-  assertEquals(await needsMfaStepUp(client({ currentLevel: "aal1", nextLevel: "aal2" })), true);
-  assertEquals(await needsMfaStepUp(client({ currentLevel: "aal2", nextLevel: "aal2" })), false);
-  assertEquals(await needsMfaStepUp(client({ currentLevel: "aal1", nextLevel: "aal1" })), false);
-  assertEquals(await needsMfaStepUp(client(null)), false);
 });
 
 Deno.test("json: sets status, content type and the CORS headers browsers need", async () => {

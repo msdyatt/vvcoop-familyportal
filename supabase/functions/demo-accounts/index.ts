@@ -35,7 +35,7 @@ async function handle(req: Request): Promise<Response> {
     admin.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
   ]);
   if (profile?.status !== "active" || !role || profile?.is_demo) return json({ error: "Administrator access is required." }, 403);
-  if (await needsMfaStepUp(userClient)) return json({ error: "Complete two-factor verification before continuing." }, 403);
+  if (await needsMfaStepUp(userClient, authorization)) return json({ error: "Complete two-factor verification before continuing." }, 403);
   // Reviewer accounts live on the Integrations screen and create sign-ins, so they are board-only.
   if (!(await hasAdminPermission(admin, user.id, "integrations"))) return json({ error: permissionRefusal("integrations") }, 403);
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
-import { timeAgo } from "../notification-bell";
+import { myUserId, timeAgo } from "../notification-bell";
 import UrgentBanner from "../urgent-banner";
 import { goTo } from "../../../lib/portal-chrome";
 
@@ -20,7 +20,7 @@ export default function NotificationsApp() {
     if (!supabase) { window.location.assign("/family-village"); return; }
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) { window.location.assign("/family-village"); return; }
-    const { data } = await supabase.from("notifications").select("id,kind,title,body,link_path,read_at,created_at").order("created_at", { ascending: false }).limit(50);
+    const { data } = await supabase.from("notifications").select("id,kind,title,body,link_path,read_at,created_at").eq("recipient_user_id", auth.user.id).order("created_at", { ascending: false }).limit(50);
     setItems((data ?? []) as Notification[]);
   }
 
@@ -30,7 +30,8 @@ export default function NotificationsApp() {
   async function open(item: Notification) {
     const supabase = getSupabaseBrowserClient();
     // Awaited: the navigation below can cancel a request still in flight.
-    if (!item.read_at && supabase) await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", item.id);
+    const userId = supabase ? await myUserId(supabase) : null;
+    if (!item.read_at && supabase && userId) await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", item.id).eq("recipient_user_id", userId);
     if (item.link_path) goTo(item.link_path);
     else setItems((current) => current?.map((row) => (row.id === item.id ? { ...row, read_at: row.read_at ?? new Date().toISOString() } : row)) ?? null);
   }
@@ -39,7 +40,9 @@ export default function NotificationsApp() {
     const supabase = getSupabaseBrowserClient();
     const ids = (items ?? []).filter((item) => !item.read_at).map((item) => item.id);
     if (!supabase || !ids.length) return;
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
+    const userId = await myUserId(supabase);
+    if (!userId) return;
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids).eq("recipient_user_id", userId);
     setItems((current) => current?.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })) ?? null);
   }
 
