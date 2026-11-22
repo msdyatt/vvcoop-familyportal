@@ -8,6 +8,7 @@ import "./appearance.css";
 import "./class-pages.css";
 import "./desktop-nav.css";
 import "./page-layout.css";
+import "./children.css";
 import "./records-vault.css";
 import "./teaching-commitment.css";
 import "./messages-desktop.css";

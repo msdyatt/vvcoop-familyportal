@@ -3,11 +3,13 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "../../../lib/supabase";
 import PageSkeleton from "../page-skeleton";
-import { getSignedFileUrls } from "../../../lib/storage";
 import DocumentViewer from "../document-viewer";
-import ChildDetail from "../child-detail";
-import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
+import { useChildren } from "../children/use-children";
+import ChildCard from "../children/child-card";
+import ChildrenSections from "../children/children-page";
+import ChildEditor from "../children/child-editor";
+import EnrollFlow from "../children/enroll-flow";
 import PortalPage from "../portal-page";
 import { VIEW_HEADERS, type PortalView } from "../../../lib/portal-chrome";
 import RichText, { stripRichText } from "../../../lib/rich-text";
@@ -28,7 +30,6 @@ type PortalData = {
   documents: { id: string; title: string; kind: string; signature_status: string | null; storage_path: string | null }[];
   compliance: ComplianceItem[];
   roles: string[];
-  enrollmentPeriod: { title: string; closesAt: string } | null;
   completions: { event_id: string; child_id: string }[];
 };
 
@@ -57,12 +58,15 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
   const [state, setState] = useState<PortalState>(() => isSupabaseConfigured() ? "loading" : "error");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [portal, setPortal] = useState<PortalData | null>(null);
-  const [openChildId, setOpenChildId] = useState<string | null>(null);
+  // Children: Today's cards and the Children page share one load (children/use-children.ts). Other pages skip it.
+  const kids = useChildren(onToday || onChildrenPage ? (portal?.children ?? []).map((child) => child.id) : []);
+  const [editChildId, setEditChildId] = useState<string | null>(null);
+  /** The Enroll step, open with this child first ("" for the whole family), or null when closed. */
+  const [enrollFirst, setEnrollFirst] = useState<string | null>(null);
   const postAttachments = usePostAttachments((portal?.posts ?? []).map((post) => post.id));
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const [openDocumentId, setOpenDocumentId] = useState<string | null>(null);
-  const [avatarUrls, setAvatarUrls] = useState<Map<string, string>>(new Map());
   const [, setUserId] = useState<string | null>(null);
 
   async function load() {
@@ -120,22 +124,13 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
       ? await supabase.from("event_completions").select("event_id,child_id").in("event_id", preworkIds).in("child_id", safeChildIds)
       : { data: [] };
 
-    const nowIso = new Date().toISOString();
-    const { data: periodRows } = await supabase.from("enrollment_periods")
-      .select("title,closes_at").eq("active", true).lte("opens_at", nowIso).gte("closes_at", nowIso).limit(1);
-    const period = (periodRows ?? [])[0];
-
     setPortal({
       familyId: safeFamilyIds[0] ?? "", children: children.data ?? [], enrollments: enrollmentResult.data ?? [], classes: classes.data ?? [], posts: posts.data ?? [],
       events: events.data ?? [], documents: documents.data ?? [], compliance: toComplianceItems(compliance.data),
       roles: (roles.data ?? []).map((item) => item.role),
-      enrollmentPeriod: period ? { title: period.title, closesAt: period.closes_at } : null,
       completions: completionRows ?? [],
     } as PortalData);
     setState("active");
-
-    const avatarPaths = (children.data ?? []).map((row) => row.avatar_path).filter((path): path is string => !!path);
-    if (avatarPaths.length) setAvatarUrls(await getSignedFileUrls(supabase, avatarPaths));
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
@@ -183,13 +178,13 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
 
   return <PortalPage className="live-portal" current="home" roles={portal?.roles ?? []} title={VIEW_HEADERS[view].title} subtitle={VIEW_HEADERS[view].subtitle}>
     {view === "home" && <ComplianceBanner items={portal?.compliance ?? []} />}
-    {(view === "home" || view === "children") && portal?.enrollmentPeriod && <aside className="compliance-banner" role="status">
+    {(onToday || onChildrenPage) && kids.period && kids.children.length > 0 && <aside className="compliance-banner" role="status">
       <span className="compliance-banner-count">✓</span>
       <div>
         <b>Enrollment is open</b>
-        <span>{portal.enrollmentPeriod.title} closes {new Date(portal.enrollmentPeriod.closesAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} — open a child below to choose classes.</span>
+        <span>{kids.period.title} closes {new Date(kids.period.closes_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}. Choose classes for each child in a few steps.</span>
       </div>
-      <a href="/family-village/children">Choose classes →</a>
+      <button type="button" className="enroll-banner-button" onClick={() => setEnrollFirst("")}>Choose classes</button>
     </aside>}
     {/* Today: what is coming, what the children need, then the family and the news beside it. The full month
         calendar lives on the Calendar page (issue #108: Today was too calendar-heavy). */}
@@ -211,30 +206,26 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
             </button></li>;
           })}</ol> : empty("Nothing on the co-op calendar yet. Dates will appear here as they are added.")}
         </section>
-        <section className="portal-module today-classes"><p className="eyebrow">Learning</p><h2>In your children&rsquo;s classes</h2>{classDates.length
-        ? <ol className="portal-list class-event-list">{classDates.map(event => {
-            const childIds = (portal?.enrollments ?? []).filter((entry) => entry.class_id === event.class_id).map((entry) => entry.child_id);
-            const completedIds = new Set((portal?.completions ?? []).filter((entry) => entry.event_id === event.id).map((entry) => entry.child_id));
-            const allDone = childIds.length > 0 && childIds.every((id) => completedIds.has(id));
-            return <li key={event.id}>
-              <button className="class-event-open" onClick={() => setOpenEventId(event.id)}><time>{new Date(event.starts_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</time><span><b>{event.title}</b><small>{[className(event.class_id), event.location].filter(Boolean).join(" · ")}</small></span></button>
-              {event.requires_prework && <div className="event-completion-group">
-                {childIds.map((childId) => { const child = portal?.children.find((row) => row.id === childId); const done = completedIds.has(childId); return <label key={childId} className={done ? "done" : ""}><input type="checkbox" checked={done} onChange={() => setEventCompletion(event.id, [childId], !done)} />{child?.first_name ?? "Student"} {done ? "ready" : "assignment"}</label>; })}
-                {childIds.length > 1 && <button onClick={() => setEventCompletion(event.id, childIds, !allDone)}>{allDone ? "Clear all" : "Mark all ready"}</button>}
-              </div>}
-            </li>;
-          })}</ol>
-        : empty(portal?.classes.length ? "Nothing scheduled in your children's classes yet." : "Classes will appear after enrollment is entered.")}</section>
+        {/* Each child's next co-op day, with assignments to tick, on the card itself (no pop-up). The class dates
+            list that used to sit here repeated those ticks; it is on each child's section of the Children page now. */}
+        <section id="my-children" className="portal-module portal-module-wide today-children"><p className="eyebrow">Your family</p>
+          <div className="module-head"><h2>Children</h2>{(portal?.children.length ?? 0) > 0 && <a href="/family-village/children">Classes and details →</a>}</div>
+          {!portal?.children.length
+            ? empty("Children will appear here after an administrator connects this account to your household.")
+            : kids.loading && !kids.children.length ? empty("Loading…")
+            : kids.error ? empty(kids.error)
+            : <div className="child-cards">{kids.children.map((entry) => <ChildCard key={entry.child.id} entry={entry} canEnroll={!!kids.period} onToggle={kids.toggleCompletion} onEnroll={setEnrollFirst} />)}</div>}
+        </section>
       </div>
       <div className="today-side">
-        <section id="my-children" className="portal-module portal-module-wide today-children"><p className="eyebrow">Your family</p><h2>Children</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
-        {onChildrenPage ? portal && <AddChildForm familyId={portal.familyId} onAdded={load} /> : <a className="module-more" href="/family-village/children">Profiles and enrollment →</a>}
-      </section>
         <section className="portal-module today-news" id="news"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{(onToday ? portal.posts.slice(0, 3) : portal.posts).map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}{onToday && (portal?.posts.length ?? 0) > 0 && <a className="module-more" href="/family-village/news">All news →</a>}</section>
       </div>
     </div> : <div className="portal-grid portal-single">
-      {view === "children" && <section id="my-children" className="portal-module portal-module-wide today-children"><p className="eyebrow">Your family</p><h2>Children</h2>{portal?.children.length ? <div className="portal-people">{portal.children.map(child => <div key={child.id} className="person-card clickable" role="button" tabIndex={0} onClick={() => setOpenChildId(child.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setOpenChildId(child.id); } }}><Avatar url={child.avatar_path ? avatarUrls.get(child.avatar_path) ?? null : null} label={child.first_name} /><h3>{child.first_name}{child.last_initial ? ` ${child.last_initial}.` : ""}</h3>{portal.enrollmentPeriod && <small className="enroll-dot">Enroll</small>}</div>)}</div> : empty("Children will appear here after an administrator connects this account to your household.")}
-        {onChildrenPage ? portal && <AddChildForm familyId={portal.familyId} onAdded={load} /> : <a className="module-more" href="/family-village/children">Profiles and enrollment →</a>}
+      {view === "children" && <section id="my-children" className="portal-module portal-module-wide today-children children-page"><p className="eyebrow">Your family</p><h2>Children</h2>
+        {portal?.children.length
+          ? <ChildrenSections state={kids} onEdit={setEditChildId} onEnroll={setEnrollFirst} />
+          : empty("Children will appear here after an administrator connects this account to your household.")}
+        {portal && <AddChildForm familyId={portal.familyId} onAdded={load} />}
       </section>}
       {view === "news" && <section className="portal-module today-news" id="news"><p className="eyebrow">From the co-op</p><h2>News & notices</h2>{portal?.posts.length ? <ol className="portal-list portal-news clickable-list">{(onToday ? portal.posts.slice(0, 3) : portal.posts).map(post => { const excerpt = stripRichText(post.body); return <li key={post.id}><div role="button" tabIndex={0} onClick={() => setOpenPostId(post.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenPostId(post.id); } }} style={{ display: "contents" }}><PostThumbnail attachments={postAttachments[post.id] ?? []} /><div><b>{post.title}</b><span>{excerpt.length > 130 ? `${excerpt.slice(0,130)}…` : excerpt}</span></div></div></li>; })}</ol> : empty("News from the co-op will appear here when it is published.")}{onToday && (portal?.posts.length ?? 0) > 0 && <a className="module-more" href="/family-village/news">All news →</a>}</section>}
       {view === "classes" && <section className="portal-module today-classes"><p className="eyebrow">Learning</p><h2>In your children&rsquo;s classes</h2>{classDates.length
@@ -265,7 +256,11 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
       <a href="/terms">Terms &amp; Conditions</a>
     </footer>
 
-    {openChildId && <ChildDetail childId={openChildId} onClose={() => setOpenChildId(null)} />}
+    {editChildId && (() => {
+      const entry = kids.children.find((item) => item.child.id === editChildId);
+      return entry ? <ChildEditor entry={entry} onClose={() => setEditChildId(null)} onSaved={kids.reload} /> : null;
+    })()}
+    {enrollFirst !== null && kids.period && <EnrollFlow entries={kids.children} period={kids.period} firstChildId={enrollFirst || null} onClose={() => setEnrollFirst(null)} onEnrolled={kids.reload} />}
     {openPost && <DetailModal title={openPost.title} onClose={() => setOpenPostId(null)}>
       <p className="portal-empty compliance-note">{openPost.published_at ? new Date(openPost.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""} · {openPost.audience}</p>
       <RichText html={openPost.body} className="prose-body rich-text" />
