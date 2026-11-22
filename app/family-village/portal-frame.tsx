@@ -5,6 +5,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "./app-header";
 import { nativeFrame } from "../../lib/native-frame";
 import { chromeForPath, clientHref, isFramedPath, setPortalMover, type ChromePage } from "../../lib/portal-chrome";
+import { APP_VERSION_PATH, isOutOfDate } from "../../lib/build-id";
+
+/** How often an open tab asks whether a newer build is live (also when it comes back into view, and after a move). */
+const VERSION_CHECK_MS = 60_000;
 
 type Register = (page: ChromePage) => () => void;
 
@@ -60,7 +64,28 @@ export default function PortalFrame({ children }: { children: React.ReactNode })
     if (pageKey !== loc) setPageKey(loc);
   }
 
+  // Moving in place keeps this tab's code and styles, so after a deploy it would carry on with the old ones until
+  // someone reloaded. Ask now and then whether a newer build is live; once one is, the next move loads the page fresh.
+  const outOfDate = useRef(false);
+  const lastCheck = useRef(0);
+  const checkVersion = useCallback(async () => {
+    if (outOfDate.current || Date.now() - lastCheck.current < VERSION_CHECK_MS) return;
+    lastCheck.current = Date.now();
+    try {
+      const response = await fetch(APP_VERSION_PATH, { cache: "no-store", credentials: "same-origin" });
+      if (response.ok && isOutOfDate(await response.json())) outOfDate.current = true;
+    } catch { /* offline or blocked: carry on in place */ }
+  }, []);
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") void checkVersion(); };
+    const timer = window.setInterval(() => void checkVersion(), VERSION_CHECK_MS * 5);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", onVisible); };
+  }, [checkVersion]);
+
   const move = useCallback((href: string) => {
+    if (outOfDate.current) { window.location.assign(href); return; }
     const url = new URL(href, window.location.origin);
     const target = locKey(url.pathname, url.search);
     if (target === locKey(window.location.pathname, window.location.search) && !url.hash) {
@@ -104,10 +129,11 @@ export default function PortalFrame({ children }: { children: React.ReactNode })
   const firstLoc = useRef(loc);
   useEffect(() => {
     window.dispatchEvent(new Event("vv-locationchange"));
+    void checkVersion();
     if (loc === firstLoc.current) return;
     const frame = window.requestAnimationFrame(() => setAnnounce(document.querySelector(".app-header h1")?.textContent || document.title));
     return () => window.cancelAnimationFrame(frame);
-  }, [loc]);
+  }, [loc, checkVersion]);
 
   const content = <Fragment key={`${pageKey}#${again}`}>{children}</Fragment>;
   if (!framed) return <PortalFrameContext.Provider value={null}>{content}</PortalFrameContext.Provider>;

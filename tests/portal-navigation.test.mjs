@@ -14,6 +14,9 @@ const source = await readFile(new URL("../lib/portal-chrome.ts", import.meta.url
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
 await writeFile(path.join(dir, "portal-chrome.mjs"), outputText);
 const chrome = await import(pathToFileURL(path.join(dir, "portal-chrome.mjs")).href);
+const buildSource = await readFile(new URL("../lib/build-id.ts", import.meta.url), "utf8");
+await writeFile(path.join(dir, "build-id.mjs"), ts.transpileModule(buildSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText);
+const build = await import(pathToFileURL(path.join(dir, "build-id.mjs")).href);
 
 const here = { origin: "https://family.example.org", pathname: "/family-village/messages", search: "" };
 const click = (href, extra = {}) => ({
@@ -73,7 +76,8 @@ test("portal pages do not send the browser to another portal page the hard way",
   // window.location.assign/href to a portal page reloads the whole document and drops the header, sidebar and
   // bell. Use goTo() from lib/portal-chrome.ts, or a plain <a href> (the frame takes those over). Signing in and
   // signing out are full loads on purpose: they start clean, with nothing from the last person held in memory.
-  const signIn = new Set(["family-village/sign-in-panel.tsx", "family-village/accept-invite/set-password.tsx"]);
+  // The frame itself loads fresh on purpose once a newer build is live (lib/build-id.ts).
+  const signIn = new Set(["family-village/sign-in-panel.tsx", "family-village/accept-invite/set-password.tsx", "family-village/portal-frame.tsx"]);
   const root = new URL("../app/", import.meta.url);
   const files = (await readdir(root, { recursive: true })).filter((file) => /\.(tsx|ts)$/.test(file));
   const allowed = /location\.(assign|replace)\("\/family-village(\?deleted=1)?"\)|location\.href = "\/family-village"|location\.replace\("\/family-village\/documents"\)/;
@@ -102,4 +106,21 @@ test("the portal pages draw their <main> through PortalPage, so the header is no
     if (/<AppShell\b/.test(text) && !["portal-frame.tsx", "portal-page.tsx"].includes(file)) drawn.push(`${file} draws <AppShell>`);
   }
   assert.deepEqual(drawn, []);
+});
+
+test("a tab left open across a deploy loads fresh on its next move, and only then", () => {
+  assert.equal(build.isOutOfDate({ build: "bbb" }, "aaa"), true);
+  assert.equal(build.isOutOfDate({ build: "aaa" }, "aaa"), false);
+  // Unsure is never out of date: an error page, the password gate's HTML parsed as nothing, a test build.
+  for (const answer of [null, "aaa", {}, { build: "" }, { build: "unknown" }, { build: 7 }]) {
+    assert.equal(build.isOutOfDate(answer, "aaa"), false, JSON.stringify(answer));
+  }
+  assert.equal(build.isOutOfDate({ build: "bbb" }, "unknown"), false);
+  assert.equal(build.BUILD_ID, "unknown", "outside a Vite build there is no build name");
+});
+
+test("the Worker answers /app-version ahead of the password gate", async () => {
+  const worker = await readFile(new URL("../worker/index.ts", import.meta.url), "utf8");
+  const answer = worker.indexOf("url.pathname === APP_VERSION_PATH");
+  assert.ok(answer > 0 && answer < worker.indexOf("await guardRequest(request, env)"));
 });

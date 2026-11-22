@@ -6,6 +6,7 @@ import { httpsRedirect, withSecurityHeaders } from "./security-headers";
 import { CALENDAR_FEED_PATH, handleCalendarFeed, type CalendarFeedEnv } from "./calendar-feed";
 import { MANIFEST_PATH, handleManifest } from "./manifest";
 import { supabaseConnection } from "../lib/supabase";
+import { APP_VERSION_PATH, BUILD_ID } from "../lib/build-id";
 
 // Minimal shape of the Workers runtime's Fetcher binding -- just enough to
 // type-check this file's own use of it (ASSETS.fetch(...)), same call as
@@ -78,6 +79,14 @@ const worker = {
     // gate: browsers fetch a manifest without cookies, and it says nothing the sign-in page does not.
     if (url.pathname === MANIFEST_PATH && request.method === "GET") {
       return withSecurityHeaders(await handleManifest(supabaseConnection()));
+    }
+
+    // Which build is live, so a portal tab left open across a deploy knows to load fresh (lib/build-id.ts). Ahead of
+    // the gate: it is only a commit name, and a tab whose gate cookie lapsed should still learn it is out of date.
+    if (url.pathname === APP_VERSION_PATH && request.method === "GET") {
+      return withSecurityHeaders(new Response(JSON.stringify({ build: BUILD_ID }), {
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+      }));
     }
 
     const gated = await guardRequest(request, env);
