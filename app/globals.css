@@ -11535,6 +11535,12 @@ button.sign-big.compact, a.sign-big.compact { min-height:44px; padding:9px 18px;
 
 .app-header { view-transition-name:app-header; }
 .app-tabbar { view-transition-name:app-tabbar; }
+/* view-transition-name makes the header its own stacking context, which traps
+   the bell, account and menu dropdowns inside it: with no z-index of its own
+   the header painted under later content that forms a layer (a child card
+   lifting on hover, any positioned card), so the dropdowns showed behind the
+   page. Lift the whole header above the page content, below modals (50+). */
+.app-header { position:relative; z-index:40; }
 
 ::view-transition-old(root),::view-transition-new(root) {
   animation-duration:.14s;
