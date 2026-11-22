@@ -78,10 +78,12 @@ html:not([data-app]):not([data-frame]) main:has(> .side-nav-shell) .workspace-gr
   html[data-sidenav="collapsed"]:not([data-app]) .side-nav-admin .side-nav-brand .side-nav-mark.sn-day,
   html[data-sidenav="collapsed"][data-coop-sidebar="ink"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-day,
   html[data-sidenav="collapsed"][data-coop-sidebar="accent"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-day,
+  html[data-sidenav="collapsed"][data-coop-sidebar-tone="dark"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-day,
   html[data-sidenav="collapsed"]:not([data-app]) .side-nav .side-nav-brand .side-nav-lockup.sn-night { display:none; }
   html[data-sidenav="collapsed"]:not([data-app]) .side-nav-admin .side-nav-brand .side-nav-mark.sn-night,
   html[data-sidenav="collapsed"][data-coop-sidebar="ink"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-night,
-  html[data-sidenav="collapsed"][data-coop-sidebar="accent"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-night { display:block; }
+  html[data-sidenav="collapsed"][data-coop-sidebar="accent"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-night,
+  html[data-sidenav="collapsed"][data-coop-sidebar-tone="dark"]:not([data-app]) .side-nav .side-nav-brand .side-nav-mark.sn-night { display:block; }
   html[data-sidenav="collapsed"] .side-nav-list { margin-top:14px; }
   html[data-sidenav="collapsed"] .side-nav-item {
     flex-direction:column;
@@ -190,10 +192,12 @@ html[data-coop-sidebar="accent"] .side-nav:not(.side-nav-admin) {
 .side-nav .sn-night { display:none; }
 .side-nav-admin .sn-day,
 html[data-coop-sidebar="ink"] .side-nav .sn-day,
-html[data-coop-sidebar="accent"] .side-nav .sn-day { display:none; }
+html[data-coop-sidebar="accent"] .side-nav .sn-day,
+html[data-coop-sidebar-tone="dark"] .side-nav:not(.side-nav-admin) .sn-day { display:none; }
 .side-nav-admin .side-nav-lockup.sn-night,
 html[data-coop-sidebar="ink"] .side-nav .side-nav-lockup.sn-night,
-html[data-coop-sidebar="accent"] .side-nav .side-nav-lockup.sn-night { display:block; }
+html[data-coop-sidebar="accent"] .side-nav .side-nav-lockup.sn-night,
+html[data-coop-sidebar-tone="dark"] .side-nav:not(.side-nav-admin) .side-nav-lockup.sn-night { display:block; }
 
 /* On the accent band the light logo's own accent lettering would sink into the background, and the logo is never
    recoloured: it sits on a small navy plate instead, the ground it was drawn for. */
@@ -230,9 +234,79 @@ html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:no
 }
 .app-header .header-logo-night { display:none; }
 html:not([data-app]):not([data-frame])[data-coop-header="ink"] .app-header:not(.app-header-admin) .app-header-lockup:not(.header-logo-night),
-html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:not(.app-header-admin) .app-header-lockup:not(.header-logo-night) { display:none; }
+html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:not(.app-header-admin) .app-header-lockup:not(.header-logo-night),
+html:not([data-app]):not([data-frame])[data-coop-header-tone="dark"] .app-header:not(.app-header-admin) .app-header-lockup:not(.header-logo-night) { display:none; }
 html:not([data-app]):not([data-frame])[data-coop-header="ink"] .app-header:not(.app-header-admin) .header-logo-night,
-html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:not(.app-header-admin) .header-logo-night { display:block; }
+html:not([data-app]):not([data-frame])[data-coop-header="accent"] .app-header:not(.app-header-admin) .header-logo-night,
+html:not([data-app]):not([data-frame])[data-coop-header-tone="dark"] .app-header:not(.app-header-admin) .header-logo-night { display:block; }
+
+/* ---------- Your own colour (Admin > Appearance; lib/coop-theme.ts bandFamily) ----------
+   The colours come from --coop-header-* and --coop-sidebar-*, set on <html> with the rest of the theme. The text is
+   cream or navy, checked at 4.5:1 before saving; in the dark theme the band uses its deep night version with cream.
+   Highlights darken a dark band and lighten a light one, so they only ever add contrast. */
+html:not([data-app]):not([data-frame])[data-coop-header="custom"] .app-header:not(.app-header-admin) {
+  --portal-band-bg:var(--coop-header-bg);
+  --portal-band-fg:var(--coop-header-fg);
+  --portal-band-muted:var(--coop-header-fg);
+  --portal-band-rule:var(--coop-header-fg);
+}
+html[data-coop-sidebar="custom"] .side-nav:not(.side-nav-admin) {
+  --sn-bg:var(--coop-sidebar-bg);
+  --sn-fg:var(--coop-sidebar-fg);
+  --sn-muted:var(--coop-sidebar-fg);
+  --sn-mark:var(--coop-sidebar-fg);
+  --sn-on-ink:var(--coop-sidebar-fg);
+  --sn-badge:var(--coop-sidebar-fg);
+  --sn-badge-ink:var(--coop-sidebar-bg);
+}
+html[data-coop-sidebar-tone="dark"] .side-nav:not(.side-nav-admin) {
+  --sn-line:rgba(var(--cream-rgb),.3);
+  --sn-hover:rgba(2,10,16,.12);
+  --sn-on:rgba(2,10,16,.24);
+}
+html[data-coop-sidebar-tone="light"] .side-nav:not(.side-nav-admin) {
+  --sn-line:rgba(var(--navy-rgb),.22);
+  --sn-hover:rgba(255,255,255,.25);
+  --sn-on:rgba(255,255,255,.45);
+}
+html[data-theme="dark"]:not([data-app]):not([data-frame])[data-coop-header="custom"] .app-header:not(.app-header-admin) {
+  --portal-band-bg:var(--coop-header-bg-night);
+  --portal-band-fg:var(--coop-header-fg-night);
+  --portal-band-muted:var(--coop-header-fg-night);
+  --portal-band-rule:var(--coop-header-fg-night);
+}
+html[data-theme="dark"][data-coop-sidebar="custom"] .side-nav:not(.side-nav-admin) {
+  --sn-bg:var(--coop-sidebar-bg-night);
+  --sn-fg:var(--coop-sidebar-fg-night);
+  --sn-muted:var(--coop-sidebar-fg-night);
+  --sn-mark:var(--coop-sidebar-fg-night);
+  --sn-on-ink:var(--coop-sidebar-fg-night);
+  --sn-badge:var(--coop-sidebar-fg-night);
+  --sn-badge-ink:var(--coop-sidebar-bg-night);
+  --sn-line:rgba(var(--cream-rgb),.3);
+  --sn-hover:rgba(2,10,16,.12);
+  --sn-on:rgba(2,10,16,.24);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]):not([data-app]):not([data-frame])[data-coop-header="custom"] .app-header:not(.app-header-admin) {
+    --portal-band-bg:var(--coop-header-bg-night);
+    --portal-band-fg:var(--coop-header-fg-night);
+    --portal-band-muted:var(--coop-header-fg-night);
+    --portal-band-rule:var(--coop-header-fg-night);
+  }
+  html:not([data-theme])[data-coop-sidebar="custom"] .side-nav:not(.side-nav-admin) {
+    --sn-bg:var(--coop-sidebar-bg-night);
+    --sn-fg:var(--coop-sidebar-fg-night);
+    --sn-muted:var(--coop-sidebar-fg-night);
+    --sn-mark:var(--coop-sidebar-fg-night);
+    --sn-on-ink:var(--coop-sidebar-fg-night);
+    --sn-badge:var(--coop-sidebar-fg-night);
+    --sn-badge-ink:var(--coop-sidebar-bg-night);
+    --sn-line:rgba(var(--cream-rgb),.3);
+    --sn-hover:rgba(2,10,16,.12);
+    --sn-on:rgba(2,10,16,.24);
+  }
+}
 
 /* ---------- The small touches (Admin > Appearance) ---------- */
 html[data-coop-greeting="off"] .side-nav-hello,

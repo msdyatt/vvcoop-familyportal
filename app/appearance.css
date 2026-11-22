@@ -292,3 +292,12 @@ html[data-text-size="large"] { --text-scale:1.15; }
 .appearance-previews { grid-template-columns:minmax(0,1fr); }
 .appearance-card .appearance-toggles input[type="checkbox"] { width:20px; height:20px; min-height:0; margin:1px 0 0; padding:0; grid-row:1 / span 2; accent-color:var(--action); }
 .appearance-card .appearance-toggles label { row-gap:2px; }
+
+/* ---- Your own header and sidebar colours (Admin, Appearance) ------------------------------------------------------- */
+.appearance [data-band="custom"][data-for="header"] { background:var(--coop-header-bg, var(--surface)); color:var(--coop-header-fg, var(--text)); }
+.appearance [data-band="custom"][data-for="sidebar"] { background:var(--coop-sidebar-bg, var(--surface)); color:var(--coop-sidebar-fg, var(--text)); }
+.appearance .theme-preview-dark [data-band="custom"][data-for="header"] { background:var(--coop-header-bg-night); color:var(--coop-header-fg-night); }
+.appearance .theme-preview-dark [data-band="custom"][data-for="sidebar"] { background:var(--coop-sidebar-bg-night); color:var(--coop-sidebar-fg-night); }
+.appearance-preview-header[data-band="custom"] .appearance-preview-rule { background:currentColor; }
+.appearance-band-colour { margin-top:10px; }
+.appearance-chip-swatch { display:inline-block; width:12px; height:12px; vertical-align:-1px; border-radius:50%; border:1px solid rgba(var(--fg-rgb),.25); }

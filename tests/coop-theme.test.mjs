@@ -60,7 +60,8 @@ test("the head script applies an accent whole or not at all, and only safe fonts
 });
 
 test("themeVars only names properties the stylesheet reads", async () => {
-  const css = (await readFile(new URL("../app/globals.css", import.meta.url), "utf8")) + (await readFile(new URL("../app/theme.css", import.meta.url), "utf8"));
+  let css = "";
+  for (const f of ["globals.css", "theme.css", "desktop-nav.css"]) css += await readFile(new URL(`../app/${f}`, import.meta.url), "utf8");
   for (const name of coop.THEME_VAR_NAMES) assert.ok(css.includes(`var(${name})`), `${name} is used somewhere`);
 });
 
@@ -130,10 +131,13 @@ test("a cached theme keeps the co-op's list of personal palettes, without unknow
 });
 
 test("the database offers exactly the ready-made palettes", async () => {
-  const sql = await readFile(new URL("../supabase/migrations/20261120100000_personal_palettes.sql", import.meta.url), "utf8");
+  // The newest definition of the list: supabase/migrations/20261122090000_custom_bands.sql.
+  const sql = await readFile(new URL("../supabase/migrations/20261122090000_custom_bands.sql", import.meta.url), "utf8");
   const ids = coop.PALETTES.map((p) => p.id);
-  assert.ok(sql.includes(`default '{${ids.join(",")}}'`), "the column default");
-  assert.equal(sql.split(`array['${ids.join("', '")}']`).length - 1, 2, "the column check and the function's list");
+  const lists = [...sql.matchAll(/array\[\s*('[a-z-]+'(?:,\s*'[a-z-]+')*)\]/g)].map((m) => [...m[1].matchAll(/'([a-z-]+)'/g)].map((x) => x[1]));
+  const paletteLists = lists.filter((l) => l.includes("veritas"));
+  assert.equal(paletteLists.length, 2, "the column check and the function's list");
+  for (const l of paletteLists) assert.deepEqual(l, ids);
 });
 
 // ---- Seasonal logos (part 3) -----------------------------------------------------------------------------------------
@@ -199,13 +203,15 @@ test("a variant replaces only the slots it has, with its own shape; the head scr
 
 const styleSql = await readFile(new URL("../supabase/migrations/20261120130000_coop_style.sql", import.meta.url), "utf8");
 /** The ids in an SQL list like ('a', 'b', ...), wherever it is found after `marker`. */
-function sqlList(marker, from = 0) {
-  const at = styleSql.indexOf(marker, from);
+function sqlList(marker, sql = styleSql) {
+  const at = sql.indexOf(marker);
   assert.ok(at >= 0, `${marker} is in the migration`);
-  const open = styleSql.indexOf("(", at + marker.length - 1);
-  const close = styleSql.indexOf(")", open);
-  return [...styleSql.slice(open + 1, close).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+  const open = sql.indexOf("(", at + marker.length - 1);
+  const close = sql.indexOf(")", open);
+  return [...sql.slice(open + 1, close).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
 }
+/** The newest definitions of the band styles and of admin_save_coop_style. */
+const bandsSql = await readFile(new URL("../supabase/migrations/20261122090000_custom_bands.sql", import.meta.url), "utf8");
 
 test("the database allows exactly the fonts, styles and touches the page knows", () => {
   const heading = coop.HEADING_FONTS.map((f) => f.id);
@@ -213,10 +219,12 @@ test("the database allows exactly the fonts, styles and touches the page knows",
   assert.deepEqual(sqlList("if coalesce(p_heading_font, '') not in ("), heading, "admin_save_coop_settings");
   const body = coop.BODY_FONTS.map((f) => f.id);
   assert.deepEqual(sqlList("check (body_font in ("), body, "the table's text font check");
-  assert.deepEqual(sqlList("if coalesce(p_body_font, '') not in ("), body, "admin_save_coop_style");
+  assert.deepEqual(sqlList("if coalesce(p_body_font, '') not in (", bandsSql), body, "admin_save_coop_style");
   const bands = coop.BAND_STYLES.map((b) => b.id);
-  assert.deepEqual(sqlList("check (header_style in ("), bands);
-  assert.deepEqual(sqlList("check (sidebar_style in ("), bands);
+  assert.deepEqual(sqlList("check (header_style in (", bandsSql), bands);
+  assert.deepEqual(sqlList("check (sidebar_style in (", bandsSql), bands);
+  assert.deepEqual(sqlList("if coalesce(p_header_style, '') not in (", bandsSql), bands);
+  assert.deepEqual(sqlList("if coalesce(p_sidebar_style, '') not in (", bandsSql), bands);
   assert.deepEqual(sqlList("whimsy->>'season' in ("), [...coop.WHIMSY_SEASONS]);
   assert.deepEqual(sqlList("whimsy->>'marker' in ("), [...coop.WHIMSY_MARKERS]);
   // The database's default touches are the page's.
@@ -283,4 +291,64 @@ test("every dataset key the theme sets is one the stylesheet reads, and every st
     assert.ok(css.includes(`[data-coop-header="${b.id}"] .app-header:not(.app-header-admin)`), `header style ${b.id}`);
   }
   for (const m of coop.WHIMSY_MARKERS.filter((x) => x !== "diamond")) assert.ok(css.includes(`[data-coop-marker="${m}"]`), `marker ${m}`);
+});
+
+// ---- Your own header and sidebar colours -----------------------------------------------------------------------------
+
+test("a band of any colour, made usable, has readable text by day and by night", () => {
+  let tried = 0;
+  const bad = [];
+  for (let hue = 0; hue < 360; hue += 20) {
+    for (const [l, c] of [[0.25, 0.05], [0.4, 0.12], [0.55, 0.15], [0.7, 0.1], [0.85, 0.06], [0.95, 0.02]]) {
+      const base = coop.nearestUsableBand(coop.oklchToHex(l, c, (hue * Math.PI) / 180));
+      if (!base) { bad.push(`no usable shade near ${l}/${c}/${hue}`); continue; }
+      tried++;
+      const band = coop.bandFamily(base);
+      const problems = coop.checkBand(band);
+      if (problems.length) bad.push(`${base}: ${problems.join(" / ")}`);
+      if (coop.contrast(band.fg, band.bg) < 4.5 || coop.contrast(band.fg_night, band.bg_night) < 4.5) bad.push(`${base}: contrast`);
+      if (coop.contrast(band.bg_night, "#faf7f1") < 4.5) bad.push(`${base}: night band is not dark`);
+    }
+  }
+  assert.ok(tried >= 100, `only ${tried} colours`);
+  assert.deepEqual(bad, []);
+});
+
+test("the text on a band is the better of cream and navy; a band the text cannot be read on is refused", () => {
+  assert.equal(coop.bandFamily("#2e6b4f").fg, "#faf7f1");
+  assert.equal(coop.bandFamily("#f2d6a0").fg, "#0b2a3d");
+  assert.equal(coop.bandFamily("#2e6b4f").bg_night, "#2e6b4f", "a dark band keeps its colour at night");
+  assert.notEqual(coop.bandFamily("#f2d6a0").bg_night, "#f2d6a0", "a light one gets a deep version");
+  assert.deepEqual(coop.checkBand(coop.bandFamily("#7a7a7a")), ["Text would be hard to read on this colour (4.01:1, needs 4.5:1). Choose a lighter or darker shade."]);
+  assert.deepEqual(coop.checkBand({ bg: "#2e6b4f", fg: "#ffff00", bg_night: "#2e6b4f", fg_night: "#faf7f1" }), ["The text on it has to be cream or navy."]);
+  assert.deepEqual(coop.checkBand(null), ["Choose a colour."]);
+});
+
+test("a cached theme with your own colour: wrong or missing colours fall back to Plain", () => {
+  const band = coop.bandFamily("#2e6b4f");
+  const ok = coop.parseTheme({ v: 1, header: "custom", headerBand: band, sidebar: "custom", sidebarBand: coop.bandFamily("#7a7a7a") });
+  assert.equal(ok.header, "custom");
+  assert.deepEqual(ok.headerBand, band);
+  assert.equal(ok.sidebar, "plain", "a failing band is not worn");
+  assert.equal(coop.parseTheme({ v: 1, header: "custom" }).header, "plain", "nor a missing one");
+});
+
+test("the head script dresses your own bands exactly as the page does", () => {
+  const theme = coop.parseTheme({ v: 1, header: "custom", headerBand: coop.bandFamily("#2e6b4f"), sidebar: "custom", sidebarBand: coop.bandFamily("#f2d6a0") });
+  const dataset = {};
+  assert.deepEqual(runScript(theme, { dataset }), coop.themeVars(theme));
+  const expected = coop.themeDataset(theme);
+  for (const key of ["coopHeader", "coopSidebar", "coopHeaderTone", "coopSidebarTone"]) assert.equal(dataset[key], expected[key], key);
+  assert.equal(dataset.coopHeaderTone, "dark");
+  assert.equal(dataset.coopSidebarTone, "light");
+  const plain = coop.parseTheme({ v: 1, header: "ink", headerBand: coop.bandFamily("#2e6b4f") });
+  assert.equal(coop.themeVars(plain)["--coop-header-bg"], undefined, "a saved colour is not worn while another style is chosen");
+  assert.equal(coop.themeDataset(plain).coopHeaderTone, undefined);
+});
+
+test("the database checks a band with the same rules", () => {
+  assert.match(bandsSql, /p_band ->> 'fg' not in \('#faf7f1', '#0b2a3d'\)/);
+  assert.deepEqual(Object.values(coop.BAND_INKS), ["#faf7f1", "#0b2a3d"]);
+  assert.match(bandsSql, /v_day \+ 1e-9 < 4\.5/);
+  assert.match(bandsSql, /v_night \+ 1e-9 < 4\.5/);
 });

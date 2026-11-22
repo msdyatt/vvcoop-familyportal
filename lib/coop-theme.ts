@@ -275,6 +275,14 @@ export const PALETTES: Palette[] = [
   { id: "plum", label: "Plum", tokens: generateAccent("#a0629f") },
   { id: "teal", label: "Teal", tokens: generateAccent("#2f8c86") },
   { id: "ochre", label: "Ochre", tokens: generateAccent("#b07f2c") },
+  { id: "berry", label: "Berry", tokens: generateAccent("#bc5578") },
+  { id: "rose", label: "Rose", tokens: generateAccent("#c06a7a") },
+  { id: "lavender", label: "Lavender", tokens: generateAccent("#8a72b8") },
+  { id: "indigo", label: "Indigo", tokens: generateAccent("#6071ca") },
+  { id: "sky", label: "Sky blue", tokens: generateAccent("#3a8ec2") },
+  { id: "slate", label: "Slate", tokens: generateAccent("#607b8d") },
+  { id: "olive", label: "Olive", tokens: generateAccent("#7f8a33") },
+  { id: "marigold", label: "Marigold", tokens: generateAccent("#ba8412") },
 ];
 
 export const DEFAULT_PALETTE_ID = "veritas";
@@ -357,8 +365,59 @@ export const BAND_STYLES = [
   { id: "tint", label: "Tinted", hint: "A soft wash of the accent colour" },
   { id: "ink", label: "Ink", hint: "The deep navy band, like Admin" },
   { id: "accent", label: "Accent", hint: "The accent colour, deep and bold" },
+  { id: "custom", label: "Your own colour", hint: "Any colour; the text on it is picked and checked" },
 ] as const;
 export type BandStyle = (typeof BAND_STYLES)[number]["id"];
+
+// ---- Your own header and sidebar colours ---------------------------------------------------------------------------
+// A band of any colour. Its text is cream or navy, whichever reads better, and must clear 4.5:1. In the dark theme a
+// light band would glare, so it gets a deep version of the same hue with cream text. Generated here, stored with the
+// settings (coop_settings.header_band / sidebar_band) and checked again in the database (private.coop_band_problems).
+
+export const BAND_KEYS = ["bg", "fg", "bg_night", "fg_night"] as const;
+export type BandTokens = Record<(typeof BAND_KEYS)[number], string>;
+export const BAND_INKS = { cream: "#faf7f1", navy: "#0b2a3d" } as const;
+
+/** The band for a chosen colour: the colour itself, the better of cream and navy on it, and the night version. */
+export function bandFamily(base: string): BandTokens {
+  const { c, h } = hexToOklch(base);
+  const fg = contrast(base, BAND_INKS.cream) >= contrast(base, BAND_INKS.navy) ? BAND_INKS.cream : BAND_INKS.navy;
+  const bg_night = fg === BAND_INKS.cream && contrast(base, BAND_INKS.cream) >= 4.6
+    ? base
+    : nearestLightness(h, Math.min(c, 0.12), 0.34, (x) => contrast(x, BAND_INKS.cream) >= 7) ?? "#1d2a33";
+  return { bg: base, fg, bg_night, fg_night: BAND_INKS.cream };
+}
+
+/** Why a band cannot be used, in plain words; empty when it can. Mirrors private.coop_band_problems. */
+export function checkBand(t: Partial<Record<string, unknown>> | null | undefined): string[] {
+  if (!t || !BAND_KEYS.every((k) => isHex(t[k]))) return ["Choose a colour."];
+  const b = t as BandTokens;
+  const out: string[] = [];
+  if (b.fg !== BAND_INKS.cream && b.fg !== BAND_INKS.navy) out.push("The text on it has to be cream or navy.");
+  if (b.fg_night !== BAND_INKS.cream) out.push("The text on it in the dark theme has to be cream.");
+  const day = contrast(b.fg, b.bg), night = contrast(b.fg_night, b.bg_night);
+  if (day + 1e-9 < 4.5) out.push(`Text would be hard to read on this colour (${fmt(day)}:1, needs 4.5:1). Choose a lighter or darker shade.`);
+  if (night + 1e-9 < 4.5) out.push(`Text would be hard to read on it in the dark theme (${fmt(night)}:1, needs 4.5:1).`);
+  return out;
+}
+
+/** The shade of this hue nearest in lightness to `base` whose band passes; null if none. */
+export function nearestUsableBand(base: string): string | null {
+  const { l, c, h } = hexToOklch(base);
+  return nearestLightness(h, c, l, (x) => Math.max(contrast(x, BAND_INKS.cream), contrast(x, BAND_INKS.navy)) >= 4.6 && checkBand(bandFamily(x)).length === 0);
+}
+
+export function parseBand(value: unknown): BandTokens | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (checkBand(v).length) return null;
+  return Object.fromEntries(BAND_KEYS.map((k) => [k, v[k] as string])) as BandTokens;
+}
+
+/** "dark" when the band carries cream text (the logo for dark grounds goes on it), else "light". */
+export function bandTone(band: BandTokens): "dark" | "light" {
+  return band.fg === BAND_INKS.cream ? "dark" : "light";
+}
 
 export function isBandStyle(value: unknown): value is BandStyle {
   return BAND_STYLES.some((b) => b.id === value);
@@ -436,6 +495,9 @@ export type CoopTheme = {
   bodyFont: BodyFontId;
   header: BandStyle;
   sidebar: BandStyle;
+  /** The colours of "Your own colour" for each band (null until one is chosen). */
+  headerBand: BandTokens | null;
+  sidebarBand: BandTokens | null;
   whimsy: Whimsy;
   logos: Partial<Record<LogoSlot, string>>;
   /** The light lockup's width / height, so a co-op's own logo keeps its shape. */
@@ -455,7 +517,7 @@ export const DEFAULT_TIME_ZONE = "America/Chicago";
 
 export const DEFAULT_THEME: CoopTheme = {
   v: 1, name: DEFAULT_COOP_NAME, paletteId: DEFAULT_PALETTE_ID, accent: VERITAS_ACCENT, font: DEFAULT_HEADING_FONT,
-  bodyFont: DEFAULT_BODY_FONT, header: "plain", sidebar: "plain", whimsy: DEFAULT_WHIMSY,
+  bodyFont: DEFAULT_BODY_FONT, header: "plain", sidebar: "plain", headerBand: null, sidebarBand: null, whimsy: DEFAULT_WHIMSY,
   logos: {}, ratio: null, supportEmail: null, supportPhone: null, personalPalettes: DEFAULT_PERSONAL_PALETTES,
   seasonal: [], timeZone: DEFAULT_TIME_ZONE,
 };
@@ -540,6 +602,13 @@ export function themeVars(theme: CoopTheme, today: string = coopToday(theme.time
   for (const key of ACCENT_KEYS) vars[ACCENT_VARS[key]] = theme.accent[key];
   vars["--serif"] = HEADING_FONTS.find((f) => f.id === theme.font)?.stack ?? HEADING_FONTS[0].stack;
   vars["--sans"] = BODY_FONTS.find((f) => f.id === theme.bodyFont)?.stack ?? BODY_FONTS[0].stack;
+  for (const [which, band] of [["header", theme.header === "custom" ? theme.headerBand : null], ["sidebar", theme.sidebar === "custom" ? theme.sidebarBand : null]] as const) {
+    if (!band) continue;
+    vars[`--coop-${which}-bg`] = band.bg;
+    vars[`--coop-${which}-fg`] = band.fg;
+    vars[`--coop-${which}-bg-night`] = band.bg_night;
+    vars[`--coop-${which}-fg-night`] = band.fg_night;
+  }
   const season = activeVariant(theme.seasonal, today);
   const logos = { ...theme.logos, ...(season?.logos ?? {}) };
   for (const slot of LOGO_SLOTS) {
@@ -558,6 +627,8 @@ export function themeVars(theme: CoopTheme, today: string = coopToday(theme.time
 export function themeDataset(theme: CoopTheme): Record<string, string> {
   const w = theme.whimsy;
   const data: Record<string, string> = { coopHeader: theme.header, coopSidebar: theme.sidebar, coopMarker: w.marker };
+  if (theme.header === "custom" && theme.headerBand) data.coopHeaderTone = bandTone(theme.headerBand);
+  if (theme.sidebar === "custom" && theme.sidebarBand) data.coopSidebarTone = bandTone(theme.sidebarBand);
   if (!w.greeting) data.coopGreeting = "off";
   if (!w.village) data.coopVillage = "off";
   if (!w.quill) data.coopQuill = "off";
@@ -566,10 +637,12 @@ export function themeDataset(theme: CoopTheme): Record<string, string> {
 }
 
 /** Every dataset key themeDataset may set, so a change of theme can clear what the new one leaves out. */
-export const THEME_DATASET_KEYS = ["coopHeader", "coopSidebar", "coopMarker", "coopGreeting", "coopVillage", "coopQuill", "coopMotion"];
+export const THEME_DATASET_KEYS = ["coopHeader", "coopSidebar", "coopHeaderTone", "coopSidebarTone", "coopMarker", "coopGreeting", "coopVillage", "coopQuill", "coopMotion"];
 
 /** Every custom property a theme may set, so a change of theme can clear what the new one leaves out. */
-export const THEME_VAR_NAMES = [...ACCENT_KEYS.map((k) => ACCENT_VARS[k]), "--serif", "--sans", ...LOGO_SLOTS.map((s) => LOGO_VARS[s]), "--coop-lockup-ratio"];
+export const THEME_VAR_NAMES = [...ACCENT_KEYS.map((k) => ACCENT_VARS[k]), "--serif", "--sans",
+  ...["header", "sidebar"].flatMap((w) => [`--coop-${w}-bg`, `--coop-${w}-fg`, `--coop-${w}-bg-night`, `--coop-${w}-fg-night`]),
+  ...LOGO_SLOTS.map((s) => LOGO_VARS[s]), "--coop-lockup-ratio"];
 
 /**
  * Reads a cached or fetched theme defensively: anything malformed falls back to the default, and an accent is
@@ -594,8 +667,11 @@ export function parseTheme(value: unknown): CoopTheme {
     accent,
     font: isHeadingFont(t.font) ? t.font : DEFAULT_HEADING_FONT,
     bodyFont: isBodyFont(t.bodyFont) ? t.bodyFont : DEFAULT_BODY_FONT,
-    header: isBandStyle(t.header) ? t.header : "plain",
-    sidebar: isBandStyle(t.sidebar) ? t.sidebar : "plain",
+    // "Your own colour" without a sound colour set falls back to Plain.
+    header: isBandStyle(t.header) && (t.header !== "custom" || parseBand(t.headerBand)) ? t.header : "plain",
+    sidebar: isBandStyle(t.sidebar) && (t.sidebar !== "custom" || parseBand(t.sidebarBand)) ? t.sidebar : "plain",
+    headerBand: parseBand(t.headerBand),
+    sidebarBand: parseBand(t.sidebarBand),
     whimsy: parseWhimsy(t.whimsy),
     logos,
     ratio,
@@ -643,7 +719,8 @@ export function themeFromRow(row: Record<string, unknown> | null | undefined, pu
   }
   return parseTheme({
     name: row.name, paletteId: row.palette_id, accent: row.accent, font: row.heading_font,
-    bodyFont: row.body_font, header: row.header_style, sidebar: row.sidebar_style, whimsy: row.whimsy, logos,
+    bodyFont: row.body_font, header: row.header_style, sidebar: row.sidebar_style,
+    headerBand: row.header_band, sidebarBand: row.sidebar_band, whimsy: row.whimsy, logos,
     ratio: typeof row.logo_ratio === "number" ? row.logo_ratio : row.logo_ratio == null ? null : Number(row.logo_ratio),
     supportEmail: row.support_email, supportPhone: row.support_phone,
     personalPalettes: Array.isArray(row.personal_palettes) ? row.personal_palettes : undefined,
@@ -673,7 +750,12 @@ if(typeof t.font==='string'&&fonts.hasOwnProperty(t.font))s.setProperty('--serif
 var bodies=${JSON.stringify(Object.fromEntries(BODY_FONTS.map((f) => [f.id, f.stack])))};
 if(typeof t.bodyFont==='string'&&bodies.hasOwnProperty(t.bodyFont))s.setProperty('--sans',bodies[t.bodyFont]);
 var d=document.documentElement.dataset,bands=${JSON.stringify(BAND_STYLES.map((b) => b.id))},marks=${JSON.stringify(WHIMSY_MARKERS)},w=t.whimsy||{};
-if(bands.indexOf(t.header)>=0)d.coopHeader=t.header;if(bands.indexOf(t.sidebar)>=0)d.coopSidebar=t.sidebar;
+var BK=${JSON.stringify(BAND_KEYS)},INK=${JSON.stringify(Object.values(BAND_INKS))};
+function band(b){if(!b)return null;for(var j=0;j<BK.length;j++)if(typeof b[BK[j]]!=='string'||!hex.test(b[BK[j]]))return null;return INK.indexOf(b.fg)>=0&&b.fg_night===INK[0]?b:null}
+var ws=[['header','coopHeader','coopHeaderTone',t.headerBand],['sidebar','coopSidebar','coopSidebarTone',t.sidebarBand]];
+for(i=0;i<ws.length;i++){var st=t[ws[i][0]],bb=band(ws[i][3]);if(bands.indexOf(st)<0)continue;if(st==='custom'){if(!bb)continue;
+s.setProperty('--coop-'+ws[i][0]+'-bg',bb.bg);s.setProperty('--coop-'+ws[i][0]+'-fg',bb.fg);s.setProperty('--coop-'+ws[i][0]+'-bg-night',bb.bg_night);s.setProperty('--coop-'+ws[i][0]+'-fg-night',bb.fg_night);
+d[ws[i][2]]=bb.fg===INK[0]?'dark':'light'}d[ws[i][1]]=st}
 if(marks.indexOf(w.marker)>=0)d.coopMarker=w.marker;
 if(w.greeting===false)d.coopGreeting='off';if(w.village===false)d.coopVillage='off';if(w.quill===false)d.coopQuill='off';if(w.motion===false)d.coopMotion='off';
 var re=${LOGO_URL_RE.toString()},slots=${JSON.stringify(LOGO_VARS)},L={},B=t.logos||{},ratio=t.ratio,season=null,k;

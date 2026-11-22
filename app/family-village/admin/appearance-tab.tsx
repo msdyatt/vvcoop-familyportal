@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import {
   BAND_STYLES, BODY_FONTS, CUSTOM_PALETTE_ID, DEFAULT_THEME, DEFAULT_WHIMSY, HEADING_FONTS, LOGO_BUCKET, LOGO_SLOTS, LOGO_TYPES, LOGO_VARS, PALETTES,
-  WHIMSY_MARKERS, checkAccent, generateAccent, isBandStyle, isBodyFont, isHeadingFont, nearestUsableAccent, normalizeHex, paletteById, parseWhimsy, themeVars,
-  type AccentTokens, type BandStyle, type BodyFontId, type CoopTheme, type HeadingFontId, type LogoSlot, type Whimsy, type WhimsyMarker, type WhimsySeason,
+  WHIMSY_MARKERS, bandFamily, bandTone, checkAccent, checkBand, generateAccent, nearestUsableBand, parseBand, isBandStyle, isBodyFont, isHeadingFont, nearestUsableAccent, normalizeHex, paletteById, parseWhimsy, themeVars,
+  type AccentTokens, type BandStyle, type BandTokens, type BodyFontId, type CoopTheme, type HeadingFontId, type LogoSlot, type Whimsy, type WhimsyMarker, type WhimsySeason,
 } from "../../../lib/coop-theme";
 import { COOP_SETTINGS_COLUMNS, brandFileUrl, fetchCoopTheme, setCoopTheme } from "../../../lib/coop-settings";
 import { logoProblem } from "../../../lib/logo-files";
@@ -20,6 +20,7 @@ import SeasonalLogosCard from "./seasonal-logos-card";
 type Row = {
   name: string; palette_id: string; accent: AccentTokens; heading_font: string;
   body_font: string | null; header_style: string | null; sidebar_style: string | null; whimsy: unknown;
+  header_band: unknown; sidebar_band: unknown;
   logo_light_path: string | null; logo_dark_path: string | null; mark_light_path: string | null; mark_dark_path: string | null;
   logo_ratio: number | null; support_email: string | null; support_phone: string | null;
   personal_palettes: string[] | null;
@@ -47,6 +48,9 @@ export default function AppearanceTab() {
   const [bodyFont, setBodyFont] = useState<BodyFontId>("inter");
   const [header, setHeader] = useState<BandStyle>("plain");
   const [sidebar, setSidebar] = useState<BandStyle>("plain");
+  // "Your own colour" for each band, as typed (the rest of its colours are worked out from it).
+  const [headerHex, setHeaderHex] = useState("#2e6b4f");
+  const [sidebarHex, setSidebarHex] = useState("#2e6b4f");
   const [whimsy, setWhimsy] = useState<Whimsy>(DEFAULT_WHIMSY);
   const [logos, setLogos] = useState<Record<LogoSlot, LogoDraft>>({ logo_light: { kind: "keep" }, logo_dark: { kind: "keep" }, mark_light: { kind: "keep" }, mark_dark: { kind: "keep" } });
   const [logoErrors, setLogoErrors] = useState<Partial<Record<LogoSlot, string>>>({});
@@ -71,6 +75,8 @@ export default function AppearanceTab() {
     setBodyFont(isBodyFont(r.body_font) ? r.body_font : "inter");
     setHeader(isBandStyle(r.header_style) ? r.header_style : "plain");
     setSidebar(isBandStyle(r.sidebar_style) ? r.sidebar_style : "plain");
+    setHeaderHex(parseBand(r.header_band)?.bg ?? "#2e6b4f");
+    setSidebarHex(parseBand(r.sidebar_band)?.bg ?? "#2e6b4f");
     setWhimsy(parseWhimsy(r.whimsy));
     setLogos({ logo_light: { kind: "keep" }, logo_dark: { kind: "keep" }, mark_light: { kind: "keep" }, mark_dark: { kind: "keep" } });
     setLogoErrors({});
@@ -88,6 +94,13 @@ export default function AppearanceTab() {
   }, [paletteId, customBase, row]);
   const problems = accent ? checkAccent(accent) : [];
   const nearest = paletteId === CUSTOM_PALETTE_ID && customBase && problems.length ? nearestUsableAccent(customBase) : null;
+  const headerBase = normalizeHex(headerHex), sidebarBase = normalizeHex(sidebarHex);
+  const headerBand: BandTokens | null = useMemo(() => (headerBase ? bandFamily(headerBase) : null), [headerBase]);
+  const sidebarBand: BandTokens | null = useMemo(() => (sidebarBase ? bandFamily(sidebarBase) : null), [sidebarBase]);
+  const bandProblems = (style: BandStyle, band: BandTokens | null) => (style !== "custom" ? [] : band ? checkBand(band) : ["Type a colour as six hex digits, like #2e6b4f."]);
+  const headerProblems = bandProblems(header, headerBand), sidebarProblems = bandProblems(sidebar, sidebarBand);
+  /** What is stored for a band: the typed colour when it passes, else whatever was saved before. */
+  const storedBand = (band: BandTokens | null, saved: unknown) => (band && checkBand(band).length === 0 ? band : parseBand(saved));
 
   /** The theme as it would look after Save, with the staged logos. */
   const draft: CoopTheme | null = useMemo(() => {
@@ -102,8 +115,14 @@ export default function AppearanceTab() {
     }
     const lightLogo = logos.logo_light;
     const ratio = lightLogo.kind === "new" ? lightLogo.ratio : lightLogo.kind === "clear" ? null : row.logo_ratio;
-    return { ...DEFAULT_THEME, name: name.trim() || row.name, paletteId, accent, font, bodyFont, header, sidebar, whimsy, logos: current, ratio };
-  }, [row, accent, logos, name, paletteId, font, bodyFont, header, sidebar, whimsy]);
+    const okBand = (b: BandTokens | null) => (b && checkBand(b).length === 0 ? b : null);
+    return {
+      ...DEFAULT_THEME, name: name.trim() || row.name, paletteId, accent, font, bodyFont, whimsy, logos: current, ratio,
+      // A band whose colour does not pass is previewed as Plain, which is what the page would fall back to.
+      header: header === "custom" && !okBand(headerBand) ? "plain" : header, headerBand: okBand(headerBand),
+      sidebar: sidebar === "custom" && !okBand(sidebarBand) ? "plain" : sidebar, sidebarBand: okBand(sidebarBand),
+    };
+  }, [row, accent, logos, name, paletteId, font, bodyFont, header, sidebar, headerBand, sidebarBand, whimsy]);
 
   async function pickLogo(slot: LogoSlot, file: File | undefined) {
     if (!file) return;
@@ -123,6 +142,7 @@ export default function AppearanceTab() {
     if (!supabase || !row || !accent) return;
     if (problems.length) { setStatus("This palette cannot be saved yet: fix the contrast problems listed under it."); return; }
     if (!name.trim()) { setStatus("Give the co-op a name."); return; }
+    if (headerProblems.length || sidebarProblems.length) { setStatus("A header or sidebar colour cannot be saved yet: see the note under it."); return; }
     setBusy(true);
     setStatus("Saving…");
     try {
@@ -149,6 +169,7 @@ export default function AppearanceTab() {
       if (error) throw new Error(error.message);
       const { error: styleError } = await supabase.rpc("admin_save_coop_style", {
         p_body_font: bodyFont, p_header_style: header, p_sidebar_style: sidebar, p_whimsy: whimsy,
+        p_header_band: storedBand(headerBand, row.header_band), p_sidebar_band: storedBand(sidebarBand, row.sidebar_band),
       });
       if (styleError) throw new Error(styleError.message);
       const personalNow = PALETTES.map((p) => p.id).filter((id) => personal.includes(id));
@@ -253,9 +274,11 @@ export default function AppearanceTab() {
 
       <section className="appearance-card">
         <p className="card-kicker">Header and sidebar</p>
-        <p className="field-note">Each style only uses colour pairs that are already checked for contrast, so the text stays easy to read in Light and Dark. Admin keeps its navy band.</p>
-        <BandPicker label="Header" value={header} onChange={setHeader} disabled={busy} swatchStyle={draft ? themeVarsStyle(draft) : undefined} />
-        <BandPicker label="Sidebar" value={sidebar} onChange={setSidebar} disabled={busy} swatchStyle={draft ? themeVarsStyle(draft) : undefined} />
+        <p className="field-note">The ready styles only use colour pairs that are already checked. With your own colour, the text on it is cream or navy, whichever reads better, and it is checked before saving; in the dark theme a light colour becomes a deep version of itself. Admin keeps its navy band.</p>
+        <BandPicker which="header" label="Header" value={header} onChange={setHeader} disabled={busy} swatchStyle={draft ? themeVarsStyle(draft) : undefined}
+          hex={headerHex} setHex={setHeaderHex} band={headerBand} problems={headerProblems} />
+        <BandPicker which="sidebar" label="Sidebar" value={sidebar} onChange={setSidebar} disabled={busy} swatchStyle={draft ? themeVarsStyle(draft) : undefined}
+          hex={sidebarHex} setHex={setSidebarHex} band={sidebarBand} problems={sidebarProblems} />
       </section>
 
       <section className="appearance-card">
@@ -323,7 +346,7 @@ export default function AppearanceTab() {
         <Preview theme={draft} mode="dark" />
       </div>}
       <div className="appearance-actions">
-        <button type="button" onClick={save} disabled={busy || !accent || problems.length > 0}>{busy ? "Working…" : "Save appearance"}</button>
+        <button type="button" onClick={save} disabled={busy || !accent || problems.length > 0 || headerProblems.length > 0 || sidebarProblems.length > 0}>{busy ? "Working…" : "Save appearance"}</button>
         {!confirmReset
           ? <button type="button" className="ghost" disabled={busy} onClick={() => setConfirmReset(true)}>Reset to default</button>
           : <span className="appearance-confirm">Go back to the Veritas palette, fonts, styles, small touches and logos?
@@ -363,18 +386,34 @@ function FontPicker({ id, label, fonts, value, onChange, sample, disabled, large
   </div>;
 }
 
-/** The four band styles as small swatches, for the header or the sidebar. */
-function BandPicker({ label, value, onChange, disabled, swatchStyle }: { label: string; value: BandStyle; onChange: (b: BandStyle) => void; disabled: boolean; swatchStyle?: CSSProperties }) {
+/** The band styles as small swatches, for the header or the sidebar, with a colour picker for "Your own colour". */
+function BandPicker({ which, label, value, onChange, disabled, swatchStyle, hex, setHex, band, problems }: {
+  which: "header" | "sidebar"; label: string; value: BandStyle; onChange: (b: BandStyle) => void; disabled: boolean; swatchStyle?: CSSProperties;
+  hex: string; setHex: (h: string) => void; band: BandTokens | null; problems: string[];
+}) {
+  // The "Your own colour" swatch shows the typed colour even before that style is chosen.
+  const own = band ? { [`--coop-${which}-bg`]: band.bg, [`--coop-${which}-fg`]: band.fg } as CSSProperties : {};
+  const base = normalizeHex(hex);
+  const nearest = value === "custom" && base && problems.length ? nearestUsableBand(base) : null;
   return <fieldset className="appearance-bands">
     <legend>{label}</legend>
     <div role="radiogroup" aria-label={`${label} style`}>
       {BAND_STYLES.map((b) => <button type="button" key={b.id} role="radio" aria-checked={value === b.id} disabled={disabled}
         className="appearance-band" onClick={() => onChange(b.id)}>
         {/* The swatch wears the draft palette in the light roles, so it shows what Save would give. */}
-        <span className="appearance-band-swatch theme-preview-light" data-band={b.id} style={swatchStyle} aria-hidden="true"><span>Aa</span></span>
+        <span className="appearance-band-swatch theme-preview-light" data-band={b.id} data-for={which} style={{ ...swatchStyle, ...own }} aria-hidden="true"><span>Aa</span></span>
         <span><b>{b.label}</b><small>{b.hint}</small></span>
       </button>)}
     </div>
+    {value === "custom" && <div className="appearance-custom appearance-band-colour">
+      <label>Colour<input type="color" value={base ?? "#2e6b4f"} onChange={(e) => setHex(e.target.value)} disabled={disabled} /></label>
+      <label>Hex<input value={hex} onChange={(e) => setHex(e.target.value)} placeholder="#2e6b4f" spellCheck={false} disabled={disabled} /></label>
+      {band && problems.length === 0 && <p className="field-note">Text on it: {band.fg === "#faf7f1" ? "cream" : "navy"}. In the dark theme: <span className="appearance-chip-swatch" style={{ background: band.bg_night }} aria-hidden="true" /> {band.bg_night} with cream text.</p>}
+      {problems.length > 0 && <div className="appearance-problems" role="alert">
+        <ul>{problems.map((p) => <li key={p}>{p}</li>)}</ul>
+        {nearest && <button type="button" className="ghost" onClick={() => setHex(nearest)}>Use the nearest shade that works ({nearest})</button>}
+      </div>}
+    </div>}
   </fieldset>;
 }
 
@@ -392,19 +431,19 @@ function themeVarsStyle(theme: CoopTheme): CSSProperties {
 
 /** A small, representative screen in one theme: the header, a card with accent text, a button and a band. */
 function Preview({ theme, mode }: { theme: CoopTheme; mode: "light" | "dark" }) {
-  const darkBand = (b: BandStyle) => mode === "dark" || b === "ink" || b === "accent";
+  const darkBand = (b: BandStyle, band: BandTokens | null) => mode === "dark" || b === "ink" || b === "accent" || (b === "custom" && band !== null && bandTone(band) === "dark");
   return <figure className={`appearance-preview theme-preview-${mode}`} style={themeVarsStyle(theme)}>
     <figcaption>{mode === "light" ? "Light" : "Dark"}</figcaption>
     <div className="appearance-preview-shell">
-    <div className="appearance-preview-side" data-band={theme.sidebar} aria-hidden="true">
-      <span className={`coop-logo mark ${darkBand(theme.sidebar) ? "on-dark" : "on-light"}`} />
+    <div className="appearance-preview-side" data-band={theme.sidebar} data-for="sidebar" aria-hidden="true">
+      <span className={`coop-logo mark ${darkBand(theme.sidebar, theme.sidebarBand) ? "on-dark" : "on-light"}`} />
       <span className="appearance-preview-nav on"><span className="appearance-preview-marker" data-marker={theme.whimsy.marker} />Today</span>
       <span className="appearance-preview-nav">Messages</span>
       <span className="appearance-preview-nav">Classes</span>
     </div>
     <div className="appearance-preview-main">
-    <div className="appearance-preview-header" data-band={theme.header}>
-      <span className={`coop-logo lockup ${darkBand(theme.header) ? "on-dark" : "on-light"}`} aria-hidden="true" />
+    <div className="appearance-preview-header" data-band={theme.header} data-for="header">
+      <span className={`coop-logo lockup ${darkBand(theme.header, theme.headerBand) ? "on-dark" : "on-light"}`} aria-hidden="true" />
       <span className="appearance-preview-rule" aria-hidden="true" />
     </div>
     <div className="appearance-preview-body">

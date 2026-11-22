@@ -26,20 +26,20 @@ reset role;
 -- ---- who may save ------------------------------------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
 set local role authenticated;
-select throws_ok($$select public.admin_save_coop_style('lexend', 'ink', 'ink', '{}'::jsonb)$$,
+select throws_ok($$select public.admin_save_coop_style('lexend', 'ink', 'ink', '{}'::jsonb, null, null)$$,
   '42501', 'Administrator access is required.', 'a parent cannot change the style');
 select throws_ok($$update public.coop_settings set header_style = 'ink'$$, '42501', null, 'nor write the table');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000d1","role":"authenticated"}', true);
 set local role authenticated;
-select throws_ok($$select public.admin_save_coop_style('lexend', 'ink', 'ink', '{}'::jsonb)$$,
+select throws_ok($$select public.admin_save_coop_style('lexend', 'ink', 'ink', '{}'::jsonb, null, null)$$,
   '42501', 'Administrator access is required.', 'nor can a reviewer administrator');
 reset role;
 
 -- ---- saving -------------------------------------------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-select lives_ok($$select public.admin_save_coop_style('atkinson', 'ink', 'tint', '{"season":"winter","marker":"star","quill":false}'::jsonb)$$,
+select lives_ok($$select public.admin_save_coop_style('atkinson', 'ink', 'tint', '{"season":"winter","marker":"star","quill":false}'::jsonb, null, null)$$,
   'an administrator saves a text font, styles and some small touches');
 select is((select body_font from public.coop_settings), 'atkinson', 'the text font is kept');
 select is((select header_style || '/' || sidebar_style from public.coop_settings), 'ink/tint', 'and the header and sidebar styles');
@@ -48,17 +48,17 @@ select is((select whimsy from public.coop_settings),
   'touches left out keep their defaults');
 select is((select count(*)::int from public.audit_log where action = 'coop_style_updated'), 1, 'the change is in the audit log');
 
-select throws_ok($$select public.admin_save_coop_style('comic-sans', 'plain', 'plain', '{}'::jsonb)$$,
+select throws_ok($$select public.admin_save_coop_style('comic-sans', 'plain', 'plain', '{}'::jsonb, null, null)$$,
   'P0001', 'Choose a text font from the list.', 'a text font that is not on the list is refused');
-select throws_ok($$select public.admin_save_coop_style('inter', 'rainbow', 'plain', '{}'::jsonb)$$,
+select throws_ok($$select public.admin_save_coop_style('inter', 'rainbow', 'plain', '{}'::jsonb, null, null)$$,
   'P0001', 'Choose a header style from the list.', 'so is an unknown header style');
-select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'neon', '{}'::jsonb)$$,
+select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'neon', '{}'::jsonb, null, null)$$,
   'P0001', 'Choose a sidebar style from the list.', 'and an unknown sidebar style');
-select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'plain', '{"confetti":true}'::jsonb)$$,
+select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'plain', '{"confetti":true}'::jsonb, null, null)$$,
   'P0001', 'Unknown small touch.', 'a small touch that does not exist is refused');
-select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'plain', '{"marker":"skull"}'::jsonb)$$,
+select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'plain', '{"marker":"skull"}'::jsonb, null, null)$$,
   'P0001', 'One of the small touches has a value that is not on the list.', 'so is a marker shape that is not on the list');
-select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'plain', '{"village":"yes"}'::jsonb)$$,
+select throws_ok($$select public.admin_save_coop_style('inter', 'plain', 'plain', '{"village":"yes"}'::jsonb, null, null)$$,
   'P0001', 'One of the small touches has a value that is not on the list.', 'and an on/off touch that is not true or false');
 
 -- The longer heading font list. (The Veritas palette is written out: a signed-in caller may not run private.default_coop_accent.)
