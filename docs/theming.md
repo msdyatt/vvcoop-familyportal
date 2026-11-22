@@ -263,3 +263,13 @@ over custom colours from twelve hues to confirm it. A custom ink that is too lig
 shade that works; page tints and dark themes are generated within the rule, so they always pass.
 
 Not themed: the iPhone app's native bars and screens keep their navy and cream (they take the accent only).
+
+## Ready-made looks
+
+Admin, Appearance opens with "Ready-made looks" (`lib/coop-looks.ts`): Veritas classic, Storybook village, Lantern
+hour, Garden path, Harbor, Berry and blush, Midnight scholar, Clean and modern, Lakeside. A look fills in the whole
+draft (palette, heading and text fonts, header and sidebar with any custom colour, ink, page, dark theme and the
+small touches) for the admin to adjust; the name, contact, logos and seasonal logos stay, and nothing is saved until
+Save. A look is not stored: what is saved is the settings it filled in. Every look is built only from choices that
+pass on their own, and `tests/theme-contrast.test.mjs` runs each through the full pair list in both themes. To add
+one, add it to `LOOKS`; the test checks its ids exist and that it passes.

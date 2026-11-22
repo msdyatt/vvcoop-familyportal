@@ -24,6 +24,12 @@ const coopDir = await mkdtemp(path.join(tmpdir(), "coop-theme-"));
   await writeFile(path.join(coopDir, "coop-theme.mjs"), outputText);
 }
 const coop = await import(pathToFileURL(path.join(coopDir, "coop-theme.mjs")).href);
+{
+  const source = readFileSync(new URL("../lib/coop-looks.ts", import.meta.url), "utf8");
+  const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
+  await writeFile(path.join(coopDir, "coop-looks.mjs"), outputText.replaceAll('"./coop-theme"', '"./coop-theme.mjs"'));
+}
+const looks = await import(pathToFileURL(path.join(coopDir, "coop-looks.mjs")).href);
 
 const strip = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "");
 const css = strip(readFileSync(new URL("../app/globals.css", import.meta.url), "utf8"));   // the roles, for the light theme
@@ -357,4 +363,30 @@ test("an ink, page or dark theme outside the rule is refused in plain words", ()
   assert.match(coop.checkInk("#2f6b8a")[0], /too light for text and buttons/);
   assert.match(coop.checkGround({ ...coop.VERITAS_GROUND, panel: "#cfd4cc" })[0], /panel colour is too dark/);
   assert.match(coop.checkNight({ ...coop.VERITAS_NIGHT, band: "#2b6a8f" })[0], /band colour is too light/);
+});
+
+// ---- Ready-made looks (lib/coop-looks.ts) ----------------------------------------------------------------------------
+
+for (const look of looks.LOOKS) {
+  test(`the "${look.label}" look is made of known choices that pass, and every token pair holds in both themes`, () => {
+    const t = looks.lookTheme(look);
+    assert.ok(coop.paletteById(look.paletteId), "a ready-made palette");
+    assert.ok(coop.isHeadingFont(look.font) && coop.isBodyFont(look.bodyFont), "listed fonts");
+    assert.ok(coop.isBandStyle(look.header) && coop.isBandStyle(look.sidebar), "listed band styles");
+    if (look.header === "custom") assert.deepEqual(coop.checkBand(t.headerBand), []);
+    if (look.sidebar === "custom") assert.deepEqual(coop.checkBand(t.sidebarBand), []);
+    assert.ok(coop.INKS.some((i) => i.id === look.inkId), "a ready-made ink");
+    assert.ok(coop.GROUNDS.some((g) => g.id === look.groundId), "a ready-made page");
+    assert.ok(look.nightId === coop.NIGHT_FROM_INK || coop.NIGHTS.some((n) => n.id === look.nightId), "a ready-made dark theme");
+    if (t.ink) assert.deepEqual(coop.checkInk(t.ink), []);
+    if (t.ground) assert.deepEqual(coop.checkGround(t.ground), []);
+    if (t.night) assert.deepEqual(coop.checkNight(t.night), []);
+    assert.deepEqual(coop.parseWhimsy(t.whimsy), t.whimsy, "known small touches");
+    for (const [theme, vars] of themes) assert.deepEqual(failures(theme, withPage(withAccent(vars, t.accent), t)), [], theme);
+  });
+}
+
+test("the looks have distinct names", () => {
+  assert.equal(new Set(looks.LOOKS.map((l) => l.id)).size, looks.LOOKS.length);
+  assert.equal(new Set(looks.LOOKS.map((l) => l.label)).size, looks.LOOKS.length);
 });
