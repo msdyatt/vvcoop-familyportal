@@ -53,3 +53,33 @@ test("the stylesheet shows the bar in the installed apps and hides it only for t
   assert.deepEqual(hiding.sort(), [".app-tabbar", "html[data-app][data-kb] .app-tabbar", "html[data-frame] .app-tabbar"].sort());
   assert.match(css, /html\[data-app\] \.app-tabbar\s*\{[^}]*display:\s*flex/);
 });
+
+// ---- Messages on a desktop browser (app/messages-desktop.css) ----
+// Messages on a desktop browser fills the content area (app/messages-desktop.css). The phone, the installed web app
+// and the native apps keep their own Messages layout, so every rule here must stay inside the desktop media query
+// and skip html[data-app] and html[data-frame]; and the file must load last to win over globals.css.
+
+const messagesCss = await readFile(new URL("../app/messages-desktop.css", import.meta.url), "utf8");
+const rootLayout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const messagesBody = messagesCss.replace(/\/\*[\s\S]*?\*\//g, "");
+
+test("every rule is for desktop browsers only", () => {
+  const open = messagesBody.indexOf("@media (min-width:1024px)");
+  assert.ok(open >= 0, "the desktop media query is missing");
+  assert.equal(messagesBody.slice(0, open).trim(), "", "a rule sits outside the desktop media query");
+  const inner = messagesBody.slice(messagesBody.indexOf("{", open) + 1, messagesBody.lastIndexOf("}"));
+  const selectors = [...inner.matchAll(/([^{}]+)\{[^{}]*\}/g)].flatMap((m) => m[1].split(",").map((s) => s.trim()));
+  assert.ok(selectors.length > 5);
+  for (const selector of selectors) {
+    assert.ok(selector.startsWith("html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell)"), selector);
+  }
+});
+
+test("the stylesheet loads after globals.css and the other layout sheets", () => {
+  const imports = [...rootLayout.matchAll(/^import "\.\/([^"]+\.css)";$/gm)].map((m) => m[1]);
+  assert.equal(imports.at(-1), "messages-desktop.css");
+});
+
+test("no raw colours: role tokens only", () => {
+  assert.doesNotMatch(messagesBody, /#[0-9a-f]{3,8}\b|rgb\(\s*\d/i);
+});

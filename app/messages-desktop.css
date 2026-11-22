@@ -1,0 +1,68 @@
+/* ==========================================================================
+   Messages on a desktop browser: the whole content area, like a mail or chat
+   app. The conversation list on the left and the thread on the right run edge
+   to edge under the header and beside the sidebar, the window does not scroll,
+   the thread scrolls on its own and the box to write in stays at the bottom.
+
+   Desktop browsers only (the sidebar layout, 1024px and up). Phones, narrow
+   windows, the installed web app, Android and the iPhone app keep their own
+   Messages layout and bottom bar. Loaded last, so it wins over globals.css
+   without !important. Colours are role tokens only (docs/theming.md).
+   ========================================================================== */
+
+@media (min-width:1024px) {
+  /* The page is exactly the window's height and never scrolls; the header keeps its place at the top. */
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) {
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    height:100dvh;
+    min-height:0;
+    padding-bottom:0;
+    overflow:hidden;
+  }
+
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) > .app-header {
+    flex:none;
+    margin-bottom:0;
+  }
+
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) > :not(.messages-shell) { flex:none; }
+
+  /* No card: the list and the thread fill the rest, out to the window's right and bottom edges and the sidebar. */
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) > .messages-shell {
+    flex:1 1 auto;
+    height:auto;
+    min-height:0;
+    margin:0 calc(-1 * var(--portal-pad)) 0 calc(-1 * var(--portal-pad));
+    grid-template-columns:minmax(280px,360px) minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr);
+    border:0;
+    border-radius:0;
+    box-shadow:none;
+  }
+
+  /* Each side scrolls by itself. */
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) .messages-list {
+    min-height:0;
+    overflow-y:auto;
+    border-right:1px solid rgba(var(--fg-rgb),.12);
+  }
+
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) .messages-thread-pane,
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) .messages-thread {
+    height:100%;
+    min-height:0;
+  }
+
+  /* position:relative keeps the hidden reaction bars (1px boxes placed absolutely, globals.css) inside this
+     scroller; without it they hang below the window and give the page a scrollbar of its own. */
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) .messages-scroll {
+    position:relative;
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+  }
+
+  html:not([data-app]):not([data-frame]) main.messages-page:has(> .side-nav-shell) .messages-composer { flex:none; }
+}
