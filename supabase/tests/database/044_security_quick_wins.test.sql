@@ -34,8 +34,8 @@ insert into public.notifications (id, recipient_user_id, kind, title, body) valu
   ('00000000-0000-0000-0000-00000000aa01', '00000000-0000-0000-0000-0000000000b1', 'message', 'admin.one', 'A private message to the parent'),
   ('00000000-0000-0000-0000-00000000aa02', '00000000-0000-0000-0000-0000000000a1', 'message', 'parent.one', 'A reply to the admin');
 
-select policies_are('public', 'notifications', array['notifications_read', 'notifications_self_update'],
-  'notifications_admin_all is gone; only the recipient policies remain');
+select policies_are('public', 'notifications', array['aal2_required', 'notifications_read', 'notifications_self_update'],
+  'notifications_admin_all is gone; only the recipient policies and the two-factor guard remain');
 
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
