@@ -5,6 +5,10 @@ import hostingConfig from "./.openai/hosting.json";
 
 const { r2 } = hostingConfig;
 
+// One name for this build, baked into the browser code and the Worker alike (lib/build-id.ts). An open portal tab
+// compares it with what the Worker reports, so it can load fresh after a deploy instead of running old code.
+const BUILD_ID = (process.env.GITHUB_SHA ?? "").slice(0, 12) || `local-${Date.now().toString(36)}`;
+
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
@@ -32,6 +36,7 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    define: { __VV_BUILD_ID__: JSON.stringify(BUILD_ID) },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
