@@ -332,5 +332,6 @@ Deno.test("checkout: the app replaces its own sheet when the amount asked for ch
   }, [{ id: "pay-1", stripe_payment_intent_id: "pi_app" }]);
   const result = await createDuesCheckout(deps, { ...input, native: true, payAll: true });
   assertEquals(result.ok && result.kind === "native" && result.paymentIntentClientSecret, "pi_new_secret");
+  assertEquals(stripe.requests.some((r) => r.path === "/v1/payment_intents/pi_app/cancel"), true, "the old sheet's PaymentIntent is canceled");
   assertEquals(admin.called("billing_cancel_payment")[0].args.p_payment, "pay-1");
 });
