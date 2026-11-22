@@ -34,8 +34,9 @@ import { teachesThisYear } from "../../lib/teaching-access";
  */
 export function AppShell({ current, roles: held, title, subtitle }: { current: PortalKey; roles: string[]; title: string; subtitle?: string }) {
   // Teaching shows for anyone with a class this year, not by role alone (lib/teaching-access.ts). The last answer is
-  // kept on the device so it is right from the first paint, then confirmed once the person is known.
-  const [teaches, setTeaches] = useState(() => (typeof window === "undefined" ? false : readCachedTeaches()));
+  // kept on the device so it is right straight after hydration, then confirmed once the person is known. It is not
+  // read in the first render: that has to match the server's HTML, or React rebuilds <html> (issue #111).
+  const [teaches, setTeaches] = useState(false);
   const roles = withTeaching(held, teaches);
   const [email, setEmail] = useState("");
   const [initial, setInitial] = useState("");
@@ -72,6 +73,9 @@ export function AppShell({ current, roles: held, title, subtitle }: { current: P
     setTourOpen(false);
     await getSupabaseBrowserClient()?.rpc("complete_onboarding", { p_version: TOUR_VERSION });
   }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- device-only value, read once after hydration
+  useEffect(() => { setTeaches(readCachedTeaches()); }, []);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { loadProfile(); }, []);

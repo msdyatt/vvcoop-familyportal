@@ -61,16 +61,21 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   const unread = useUnreadCount();
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [prefs, setPrefs] = useState<NavPrefs>(() => (typeof window === "undefined" ? {} : readCachedPrefs()));
+  // The first render must match the server's HTML, which knows nothing of this device: a mismatch makes React rebuild
+  // the page, <html> included, and that took the head script's data-app with it and hid this bar (issue #111). So
+  // the saved bar, the last section, the query and the #section are read from the device after hydration.
+  const [prefs, setPrefs] = useState<NavPrefs>({});
+  const [fromDevice, setFromDevice] = useState(false);
+  const [lastSection, setLastSection] = useState<Section>("home");
   const [userId, setUserId] = useState<string | null>(null);
   // Where we are. The bar stays mounted from page to page (portal-frame.tsx), so the path comes from the router
   // and follows each move; the query and #section are re-read on vv-locationchange.
   const path = usePathname() ?? "";
-  const [hash, setHash] = useState(() => (typeof window === "undefined" ? "" : window.location.hash));
-  const [search, setSearch] = useState(() => (typeof window === "undefined" ? "" : window.location.search));
+  const [hash, setHash] = useState("");
+  const [search, setSearch] = useState("");
 
   const crossSection = /^\/family-village\/(messages|photos)(\/|$)/.test(path);
-  const wanted: Section = crossSection ? readLastSection() : sectionOf(current);
+  const wanted: Section = crossSection ? lastSection : sectionOf(current);
   const section: Section = wanted === "admin" && !roles.includes("admin") ? "home" : wanted;
 
   async function loadPrefs() {
@@ -92,10 +97,26 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
     }
   }
 
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- device-only values, read once after hydration */
+    setPrefs(readCachedPrefs());
+    setLastSection(readLastSection());
+    setHash(window.location.hash);
+    setSearch(window.location.search);
+    setFromDevice(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
   useEffect(() => { void loadPrefs(); }, []);
 
-  useEffect(() => { if (!crossSection) writeLastSection(sectionOf(current)); }, [crossSection, current]);
+  useEffect(() => {
+    if (crossSection) return;
+    const own = sectionOf(current);
+    writeLastSection(own);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the bar stays mounted from page to page; keep it in step
+    setLastSection(own);
+  }, [crossSection, current]);
 
   useEffect(() => {
     const onChange = () => { setHash(window.location.hash); setSearch(window.location.search); };
@@ -156,9 +177,11 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   // Inside the iPhone app's native frame, the frame draws the tab bar. Tell it what the person has chosen
   // (resolved here, so the choices have one definition) and the unread count. Nothing happens elsewhere.
   const rolesKey = roles.join(",");
+  // Not before the saved bar has been read, so the frame never shows the default bar for a moment.
   useEffect(() => {
+    if (!fromDevice) return;
     nativeFrame()?.post("state", buildFrameState({ prefs, roles: rolesKey ? rolesKey.split(",") : [], unread }));
-  }, [prefs, rolesKey, unread]);
+  }, [fromDevice, prefs, rolesKey, unread]);
 
   // Menu actions the frame cannot do itself run on the existing web screens.
   const actions = useRef({ onOpenAccount, onTour, onSignOut });
