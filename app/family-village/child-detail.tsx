@@ -7,6 +7,7 @@ import Avatar from "./avatar";
 import DetailModal from "./detail-modal";
 import { EditableSection, Field, GRADES } from "./admin/admin-ui";
 import { ClassSchedule, SCHEDULE_SELECT, describeSchedule } from "../../lib/schedule";
+import { goTo } from "../../lib/portal-chrome";
 
 type Teacher = { id: string; name: string };
 type ClassInfo = { id: string; title: string; schedule: string; teachers: Teacher[] };
@@ -189,7 +190,7 @@ export default function ChildDetail({ childId, onClose }: { childId: string; onC
       setMessagingTeacherId(null);
       return;
     }
-    window.location.assign(`/family-village/messages?c=${data}`);
+    goTo(`/family-village/messages?c=${data}`);
   }
 
   /**

@@ -8,7 +8,8 @@ import DocumentViewer from "../document-viewer";
 import ChildDetail from "../child-detail";
 import Avatar from "../avatar";
 import DetailModal from "../detail-modal";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
+import { VIEW_HEADERS, type PortalView } from "../../../lib/portal-chrome";
 import RichText, { stripRichText } from "../../../lib/rich-text";
 import MfaChallengeScreen from "../mfa-challenge";
 import { ComplianceBanner, CompliancePanel, ComplianceItem, SigningInfo } from "../compliance-panel";
@@ -47,15 +48,7 @@ function toComplianceItems(rows: unknown): ComplianceItem[] {
 }
 
 /** Home shows everything; each section also has a page of its own, which shows only that section. */
-export type PortalView = "home" | "children" | "news" | "classes" | "documents";
-
-const VIEW_HEADERS: Record<PortalView, { title: string; subtitle: string }> = {
-  home: { title: "Today", subtitle: "Your household\u2019s week, gathered in one place." },
-  children: { title: "Your children", subtitle: "Profiles, classes and enrollment." },
-  news: { title: "News & notices", subtitle: "From the co-op." },
-  classes: { title: "Classes", subtitle: "Dates and prep for your children\u2019s classes." },
-  documents: { title: "Documents", subtitle: "Forms to sign, dues, and files shared with your household." },
-};
+export type { PortalView };
 
 export default function PortalGate({ view = "home" }: { view?: PortalView }) {
   // Today and the section pages share these blocks; these say which page is showing them.
@@ -162,11 +155,11 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
   }
 
   // The header and bar stay put while the page fills in; only the content area is a placeholder.
-  if (state === "loading") return <main className="live-portal"><AppHeader current="home" roles={portal?.roles ?? []} title={VIEW_HEADERS[view].title} subtitle={VIEW_HEADERS[view].subtitle} /><PageSkeleton /></main>;
-  if (state === "signed-out") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><p>Your Family Village session has ended.</p><a href="/family-village">Return to sign in →</a></main>;
+  if (state === "loading") return <PortalPage className="live-portal" current="home" roles={portal?.roles ?? []} title={VIEW_HEADERS[view].title} subtitle={VIEW_HEADERS[view].subtitle}><PageSkeleton /></PortalPage>;
+  if (state === "signed-out") return <PortalPage className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><p>Your Family Village session has ended.</p><a href="/family-village">Return to sign in →</a></PortalPage>;
   if (state === "mfa-challenge") return <MfaChallengeScreen onVerified={load} onCancel={signOut} />;
-  if (state === "error") return <main className="portal-state"><p className="eyebrow">Family Village</p><h1>We could not open your village.</h1><p>No private information was shown. Please try signing in again or contact a Village administrator.</p><a href="/family-village">Return to sign in →</a></main>;
-  if (state === "pending") return <main className="portal-state"><p className="eyebrow">Approval required</p><h1>Welcome to the doorway.</h1><p>Your identity has been verified, but a Village administrator must connect <b>{profile?.email}</b> to the correct household and roles before any family information appears.</p><button onClick={signOut}>Sign out</button></main>;
+  if (state === "error") return <PortalPage className="portal-state"><p className="eyebrow">Family Village</p><h1>We could not open your village.</h1><p>No private information was shown. Please try signing in again or contact a Village administrator.</p><a href="/family-village">Return to sign in →</a></PortalPage>;
+  if (state === "pending") return <PortalPage className="portal-state"><p className="eyebrow">Approval required</p><h1>Welcome to the doorway.</h1><p>Your identity has been verified, but a Village administrator must connect <b>{profile?.email}</b> to the correct household and roles before any family information appears.</p><button onClick={signOut}>Sign out</button></PortalPage>;
 
   const empty = (copy: string) => <p className="portal-empty">{copy}</p>;
   const openPost = portal?.posts.find((post) => post.id === openPostId);
@@ -188,8 +181,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
   );
   const otherDocuments = (portal?.documents ?? []).filter((document) => !complianceDocumentIds.has(document.id));
 
-  return <main className="live-portal">
-    <AppHeader current="home" roles={portal?.roles ?? []} title={VIEW_HEADERS[view].title} subtitle={VIEW_HEADERS[view].subtitle} />
+  return <PortalPage className="live-portal" current="home" roles={portal?.roles ?? []} title={VIEW_HEADERS[view].title} subtitle={VIEW_HEADERS[view].subtitle}>
     {view === "home" && <ComplianceBanner items={portal?.compliance ?? []} />}
     {(view === "home" || view === "children") && portal?.enrollmentPeriod && <aside className="compliance-banner" role="status">
       <span className="compliance-banner-count">✓</span>
@@ -289,7 +281,7 @@ export default function PortalGate({ view = "home" }: { view?: PortalView }) {
       <p className="portal-empty" style={{ marginBottom: 16 }}>{openDocument_.kind}{openDocument_.signature_status ? ` · ${openDocument_.signature_status}` : ""}</p>
       {openDocument_.storage_path ? <DocumentViewer path={openDocument_.storage_path} title={openDocument_.title} /> : <p className="portal-empty">No file is attached to this record yet.</p>}
     </DetailModal>}
-  </main>;
+  </PortalPage>;
 }
 
 /**

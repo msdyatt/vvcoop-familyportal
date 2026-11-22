@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ADMIN_PATH, ADMIN_TAB_EVENT, jumpEntries, searchJump, type JumpEntry } from "../../lib/desktop-nav";
+import { goTo } from "../../lib/portal-chrome";
 
 const EXAMPLES = ["dues", "waiver", "photos", "print", "calendar"];
 
@@ -56,7 +57,8 @@ export default function JumpTo({ roles }: { roles: string[] }) {
       close();
       return;
     }
-    window.location.assign(entry.href);
+    goTo(entry.href);
+    close();
   }
 
   function onKeyDown(event: React.KeyboardEvent) {

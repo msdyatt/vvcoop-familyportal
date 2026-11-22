@@ -6,11 +6,12 @@ import { formatDayShort } from "../../../lib/schedule";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import PageSkeleton from "../page-skeleton";
 import MfaChallengeScreen from "../mfa-challenge";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
 import { ClassPageData, gradesLabel, loadClassPage, openClassChat } from "./class-data";
 import ClassDocuments from "./class-documents";
 import ClassDates from "./class-dates";
 import ClassPeople from "./class-people";
+import { goTo } from "../../../lib/portal-chrome";
 
 type Tab = "documents" | "dates" | "people";
 const TABS: { id: Tab; label: string }[] = [
@@ -81,13 +82,12 @@ export default function ClassPage() {
   const current = onTeam && (data.isLead || data.isAssistant) ? "teacher" : "home";
   const back = onTeam ? { href: "/family-village/teacher/classes", label: "My classes" } : { href: "/family-village/classes", label: "Classes" };
 
-  if (access === "loading") return <main className="workspace-preview cls-page"><AppHeader current="home" roles={roles} title="Class" /><PageSkeleton /></main>;
+  if (access === "loading") return <PortalPage className="workspace-preview cls-page" current="home" roles={roles} title="Class"><PageSkeleton /></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
-  if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></main>;
+  if (access === "denied") return <PortalPage className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></PortalPage>;
 
   if (!classId || data === null || failed) {
-    return <main className="workspace-preview cls-page">
-      <AppHeader current="home" roles={roles} title="Class" />
+    return <PortalPage className="workspace-preview cls-page" current="home" roles={roles} title="Class">
       <div className="cls-wrap">
         <a className="cls-back" href="/family-village/classes">← Classes</a>
         <p className="cls-empty" role={failed ? "alert" : undefined}>
@@ -95,9 +95,9 @@ export default function ClassPage() {
           {failed ? "Check your connection and try again." : "Classes are shown to their teachers and to the families of enrolled children."}
         </p>
       </div>
-    </main>;
+    </PortalPage>;
   }
-  if (!data) return <main className="workspace-preview cls-page"><AppHeader current="home" roles={roles} title="Class" /><PageSkeleton /></main>;
+  if (!data) return <PortalPage className="workspace-preview cls-page" current="home" roles={roles} title="Class"><PageSkeleton /></PortalPage>;
 
   const { klass } = data;
   const canStartChat = onTeam;
@@ -108,7 +108,7 @@ export default function ClassPage() {
     setChatBusy(true); setChatProblem("");
     const result = await openClassChat(supabase, klass.id, data.chatId);
     if ("error" in result) { setChatProblem(result.error); setChatBusy(false); return; }
-    window.location.assign(result.href);
+    goTo(result.href);
   }
 
   const counts: Record<Tab, number | null> = {
@@ -117,8 +117,7 @@ export default function ClassPage() {
     people: onTeam ? data.roster.length : null,
   };
 
-  return <main className="workspace-preview cls-page">
-    <AppHeader current={current} roles={roles} title="Class" subtitle={klass.title} />
+  return <PortalPage className="workspace-preview cls-page" current={current} roles={roles} title="Class" subtitle={klass.title}>
     <div className="cls-wrap">
       <a className="cls-back" href={back.href}>← {back.label}</a>
 
@@ -162,7 +161,7 @@ export default function ClassPage() {
         {tab === "people" && <ClassPeople data={data} />}
       </div>
     </div>
-  </main>;
+  </PortalPage>;
 }
 
 function todayDay() {

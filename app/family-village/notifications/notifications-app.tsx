@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { timeAgo } from "../notification-bell";
 import UrgentBanner from "../urgent-banner";
+import { goTo } from "../../../lib/portal-chrome";
 
 type Notification = {
   id: string; kind: string; title: string; body: string | null;
@@ -30,7 +31,7 @@ export default function NotificationsApp() {
     const supabase = getSupabaseBrowserClient();
     // Awaited: the navigation below can cancel a request still in flight.
     if (!item.read_at && supabase) await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", item.id);
-    if (item.link_path) window.location.assign(item.link_path);
+    if (item.link_path) goTo(item.link_path);
     else setItems((current) => current?.map((row) => (row.id === item.id ? { ...row, read_at: row.read_at ?? new Date().toISOString() } : row)) ?? null);
   }
 

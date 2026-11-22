@@ -137,7 +137,9 @@ export default function SideNav({ current, roles, name }: { current: PortalKey; 
   }
 
   useEffect(() => {
-    const sync = () => setWhere(readLocation());
+    // The sidebar stays mounted from page to page (portal-frame.tsx): follow the address, and put the drawer away
+    // once a link in it has been followed.
+    const sync = () => { setWhere(readLocation()); setDrawer(false); };
     sync();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only values, read once after hydration
     setBoot({ now: new Date(), collapsed: document.documentElement.dataset.sidenav === "collapsed" });

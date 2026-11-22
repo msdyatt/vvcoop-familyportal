@@ -5,6 +5,7 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { getSignedFileUrls } from "../../../lib/storage";
 import Avatar from "../avatar";
 import { ClassPageData, Kid, Teacher, openChildThread } from "./class-data";
+import { goTo } from "../../../lib/portal-chrome";
 
 /**
  * Who is in the class.
@@ -37,7 +38,7 @@ export default function ClassPeople({ data }: { data: ClassPageData }) {
     setBusy(key); setProblem("");
     const result = await openChildThread(supabase, childId, teacherId);
     if ("error" in result) { setProblem(result.error); setBusy(null); return; }
-    window.location.assign(result.href);
+    goTo(result.href);
   }
 
   return <>

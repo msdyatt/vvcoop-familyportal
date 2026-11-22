@@ -7,7 +7,8 @@ import { uploadPrivateFile } from "../../../lib/storage";
 import { queueFilePrintJob } from "../../../lib/print-jobs";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
+import { TEACHER_HEADERS, type TeacherView } from "../../../lib/portal-chrome";
 import NewsSection from "./news-section";
 import TeacherNav from "./teacher-nav";
 import { ClassesSection } from "../classes/class-cards";
@@ -30,13 +31,7 @@ function formatDay(value: string) {
  * news and print also have pages of their own. The class list and the class page
  * live in ../classes, because a parent opens the same class page.
  */
-export type TeacherView = "home" | "news" | "print";
-
-const TEACHER_HEADERS: Record<TeacherView, { title: string; subtitle: string }> = {
-  home: { title: "Teacher\u2019s Lounge", subtitle: "Your classes, team news and printing in one place." },
-  news: { title: "Teaching team news", subtitle: "Announcements for the teaching team." },
-  print: { title: "Print queue", subtitle: "Handouts waiting for the office printer." },
-};
+export type { TeacherView };
 
 export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView }) {
   const show = (part: string) => view === "home" || view === part;
@@ -63,14 +58,13 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
   useEffect(() => { if (access === "ready" && userId) loadAll(userId); }, [access, userId]);
 
   // The header and bar stay put while the page fills in; only the content area is a placeholder.
-  if (access === "loading") return <main className="workspace-preview"><AppHeader current="teacher" roles={roles} title={TEACHER_HEADERS[view].title} subtitle={TEACHER_HEADERS[view].subtitle} /><PageSkeleton /></main>;
+  if (access === "loading") return <PortalPage className="workspace-preview" current="teacher" roles={roles} title={TEACHER_HEADERS[view].title} subtitle={TEACHER_HEADERS[view].subtitle}><PageSkeleton /></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
-  if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private teacher workspace</p><h1>Teacher access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
+  if (access === "denied") return <PortalPage className="portal-state"><p className="eyebrow">Private teacher workspace</p><h1>Teacher access is required.</h1><a href="/family-village">Return to Family Village →</a></PortalPage>;
 
   const reload = () => loadAll(userId);
 
-  return <main className="workspace-preview cls-page">
-    <AppHeader current="teacher" roles={roles} title={TEACHER_HEADERS[view].title} subtitle={TEACHER_HEADERS[view].subtitle} />
+  return <PortalPage className="workspace-preview cls-page" current="teacher" roles={roles} title={TEACHER_HEADERS[view].title} subtitle={TEACHER_HEADERS[view].subtitle}>
     <section className="workspace-grid">
       <TeacherNav active={view} />
 
@@ -85,7 +79,7 @@ export default function TeacherWorkspace({ view = "home" }: { view?: TeacherView
         {show("print") && <PrintSection classes={classes} roleByClass={roleByClass} userId={userId} queue={printQueue} onSaved={reload} />}
       </div>
     </section>
-  </main>;
+  </PortalPage>;
 }
 
 /**

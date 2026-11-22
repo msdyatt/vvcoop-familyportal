@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase";
+import PortalPage from "./portal-page";
 
 /**
  * Second-factor prompt shown when the session's authenticator assurance level
@@ -30,7 +31,7 @@ export default function MfaChallengeScreen({ onVerified, onCancel }: { onVerifie
     onVerified();
   }
 
-  return <main className="portal-state">
+  return <PortalPage className="portal-state">
     <p className="eyebrow">Two-factor authentication</p>
     <h1>Enter your verification code.</h1>
     <form onSubmit={submit} className="household-form mfa-form">
@@ -39,5 +40,5 @@ export default function MfaChallengeScreen({ onVerified, onCancel }: { onVerifie
     </form>
     <p className="setup-note" role="status">{message}</p>
     <button className="mode-switch" onClick={onCancel}>Sign out instead</button>
-  </main>;
+  </PortalPage>;
 }
