@@ -16,7 +16,7 @@ export const LOGO_VARIANT_COLUMNS =
   "id,name,starts_on,ends_on,yearly,override,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,updated_at";
 
 export const COOP_SETTINGS_COLUMNS =
-  "name,palette_id,accent,heading_font,body_font,header_style,sidebar_style,whimsy,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,support_email,support_phone,personal_palettes,updated_at";
+  "name,palette_id,accent,heading_font,body_font,header_style,sidebar_style,header_band,sidebar_band,whimsy,logo_light_path,logo_dark_path,mark_light_path,mark_dark_path,logo_ratio,support_email,support_phone,personal_palettes,updated_at";
 
 let current: CoopTheme | null = null;
 const listeners = new Set<() => void>();

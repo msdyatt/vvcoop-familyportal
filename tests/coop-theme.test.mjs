@@ -352,3 +352,13 @@ test("the database checks a band with the same rules", () => {
   assert.match(bandsSql, /v_day \+ 1e-9 < 4\.5/);
   assert.match(bandsSql, /v_night \+ 1e-9 < 4\.5/);
 });
+
+test("the settings fetch asks for every column the theme is built from", async () => {
+  const lib = await readFile(new URL("../lib/coop-theme.ts", import.meta.url), "utf8");
+  const body = lib.slice(lib.indexOf("export function themeFromRow"), lib.indexOf("\n}\n", lib.indexOf("export function themeFromRow")));
+  const used = new Set([...body.matchAll(/\brow\.([a-z_]+)/g)].map((m) => m[1]));
+  for (const slot of coop.LOGO_SLOTS) used.add(`${slot}_path`);
+  const settings = await readFile(new URL("../lib/coop-settings.ts", import.meta.url), "utf8");
+  const columns = new Set(settings.match(/COOP_SETTINGS_COLUMNS =\s*"([^"]+)"/)[1].split(","));
+  for (const column of used) assert.ok(columns.has(column), `${column} is fetched`);
+});
