@@ -49,6 +49,7 @@ Deno.test("sync: asks Stripe about each pending payment and refund, and reports 
   const result = await syncPendingPayments({ admin: withPay.client, stripe: stripe.stripe });
   assertEquals([result.checked, result.changed, result.notes], [3, 3, []]);
   assertEquals(withPay.called("billing_cancel_payment")[0].args.p_payment, "p2");
+  assertEquals(withPay.called("billing_apply_refund")[0].args.p_refund_id, "r1", "a refund is checked against our own row");
 });
 
 Deno.test("cancel: only an unstarted payment can be canceled, and its Checkout page is closed", async () => {

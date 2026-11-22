@@ -26,11 +26,23 @@ export function methodLabel(p: { method: string | null; wallet: string | null; b
   }
 }
 
-export function receiptNumber(p: { id: string; direction: string; receipt_no: number | null; occurred_at: string | null }): string {
+/** The calendar year in the co-op's time zone, the same zone the receipt date is printed in (#208). */
+export function coopYear(iso: string): number {
+  return Number(new Date(iso).toLocaleDateString("en-US", { year: "numeric", timeZone: "America/Chicago" }));
+}
+
+export function receiptNumber(p: { id: string; direction: string; receipt_no: number | null; occurred_at: string | null }, now: Date = new Date()): string {
   if (p.direction === "refund") return `VV-R-${p.id.slice(0, 8).toUpperCase()}`;
   if (p.receipt_no === null) return `VV-${p.id.slice(0, 8).toUpperCase()}`;
-  const year = p.occurred_at ? new Date(p.occurred_at).getUTCFullYear() : new Date().getUTCFullYear();
+  const year = coopYear(p.occurred_at ?? now.toISOString());
   return `VV-${year}-${String(p.receipt_no).padStart(5, "0")}`;
+}
+
+const OFFLINE_METHODS = ["cash", "check", "crowded", "other"];
+
+/** Only Stripe test-mode activity is a rehearsal. Money an administrator recorded by hand is real (#170). */
+export function isTestReceipt(p: { livemode: boolean | null; method: string | null }): boolean {
+  return p.livemode === false && !OFFLINE_METHODS.includes(p.method ?? "");
 }
 
 /**
@@ -66,6 +78,6 @@ export async function loadReceipt(client: SupabaseClient<any, "public", any>, pa
     method: methodLabel(p),
     reference: p.direction === "refund" ? (p.reason ?? null) : (p.note ?? null),
     // Test-mode rows are marked so a rehearsal receipt cannot pass for a real one.
-    testMode: p.livemode === false && p.method !== "cash" && p.method !== "check",
+    testMode: isTestReceipt(p),
   };
 }
