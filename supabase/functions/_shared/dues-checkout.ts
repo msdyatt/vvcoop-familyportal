@@ -77,26 +77,23 @@ export async function createDuesCheckout(deps: Deps, input: CheckoutInput): Prom
 
     // Something is already in flight for this charge.
     if (started.status === "processing") {
-      return { ok: false, status: 409, code: "processing", error: "A payment is already being processed. Bank transfers take 1–4 business days to clear." };
+      return { ok: false, status: 409, code: "processing", error: IN_PROGRESS };
     }
-    if (!started.checkout_session_id) {
-      return { ok: false, status: 409, code: "starting", error: "A payment is already starting. Give it a moment, then try again." };
+    if (started.checkout_session_id && !started.amount_mismatch) {
+      const session = await stripe.get(`/v1/checkout/sessions/${started.checkout_session_id}`);
+      const sameKind = (session.ui_mode === "embedded") === embedded;
+      if (session.status === "open" && sameKind) {
+        if (embedded && session.client_secret) return { ok: true, kind: "embedded", clientSecret: session.client_secret, publishableKey: deps.config.publishableKey!, paymentId: started.payment_id };
+        if (!embedded && session.url) return { ok: true, kind: "hosted", url: session.url, paymentId: started.payment_id };
+      }
+      // Open but started the other way (say in the app, now on the website), expired, or complete.
+      const released = await releaseAttempt(deps, started, session);
+      if (released !== "released") return blocked(released);
+    } else {
+      // A different amount, or an attempt from the app's payment sheet: close it so there is one.
+      const released = await releaseAttempt(deps, started);
+      if (released !== "released") return blocked(released);
     }
-    const session = await stripe.get(`/v1/checkout/sessions/${started.checkout_session_id}`);
-    const sameKind = (session.ui_mode === "embedded") === embedded;
-    if (session.status === "open" && sameKind) {
-      if (embedded && session.client_secret) return { ok: true, kind: "embedded", clientSecret: session.client_secret, publishableKey: deps.config.publishableKey!, paymentId: started.payment_id };
-      if (!embedded && session.url) return { ok: true, kind: "hosted", url: session.url, paymentId: started.payment_id };
-    }
-    // Open, but started the other way (say on the website, now in the app): close it so there is one page.
-    if (session.status === "open") {
-      await stripe.post(`/v1/checkout/sessions/${started.checkout_session_id}/expire`, {}).catch(() => undefined);
-    }
-    if (session.status === "complete") {
-      return { ok: false, status: 409, code: "processing", error: "Your payment was submitted and is being confirmed. Check back shortly." };
-    }
-    // Expired or abandoned: clear it and start fresh.
-    await admin.rpc("billing_cancel_payment", { p_payment: started.payment_id, p_reason: "The checkout page expired." });
     attempt = await begin(admin, input);
   }
   return { ok: false, status: 409, code: "busy", error: "Could not start a payment right now. Please try again." };
@@ -191,6 +188,76 @@ async function ensureCustomer(deps: Deps, familyId: string, familyName: string, 
 
 const IN_PROGRESS = "A payment is already being processed. Bank transfers take 1–4 business days to clear.";
 
+/** PaymentIntent states in which nothing has been charged yet and the intent can still be canceled. */
+const UNCONFIRMED = ["requires_payment_method", "requires_confirmation", "requires_action"];
+
+type Release = "released" | "paid" | "starting";
+
+function blocked(why: Exclude<Release, "released">): CheckoutResult {
+  if (why === "paid") return { ok: false, status: 409, code: "processing", error: "Your payment was submitted and is being confirmed. Check back shortly." };
+  return { ok: false, status: 409, code: "starting", error: "A payment is already starting. Give it a moment, then try again." };
+}
+
+/** The PaymentIntent behind an attempt, from the database row (older begin results do not carry it). */
+async function attemptPaymentIntent(admin: AdminClient, started: any): Promise<string | null> {
+  if (started.payment_intent_id) return started.payment_intent_id;
+  const { data: row } = await admin.from("dues_payments").select("stripe_payment_intent_id").eq("id", started.payment_id).maybeSingle();
+  return row?.stripe_payment_intent_id ?? null;
+}
+
+/**
+ * Closes a Checkout page and reports how it ended. Expiring a page the family has
+ * just completed fails, so the answer is always read back from Stripe rather than
+ * assumed: "complete" means the money is on its way and the attempt must stay.
+ */
+export async function closeCheckoutSession(stripe: StripeClient, sessionId: string, known?: any): Promise<string> {
+  const session = known ?? await stripe.get(`/v1/checkout/sessions/${sessionId}`);
+  if (session.status !== "open") return session.status;
+  try {
+    const expired = await stripe.post(`/v1/checkout/sessions/${sessionId}/expire`, {});
+    if (expired?.status) return expired.status;
+  } catch { /* completed or expired in the meantime: ask again */ }
+  return (await stripe.get(`/v1/checkout/sessions/${sessionId}`)).status;
+}
+
+/**
+ * Cancels an app payment sheet's PaymentIntent if nothing was charged, and reports
+ * how it ended. As with Checkout, the final state is read back from Stripe.
+ */
+export async function cancelUnconfirmedPaymentIntent(stripe: StripeClient, paymentIntentId: string, known?: any): Promise<string> {
+  const pi = known ?? await stripe.get(`/v1/payment_intents/${paymentIntentId}`);
+  if (!UNCONFIRMED.includes(pi.status)) return pi.status;
+  try {
+    const canceled = await stripe.post(`/v1/payment_intents/${paymentIntentId}/cancel`, {});
+    if (canceled?.status) return canceled.status;
+  } catch { /* confirmed in the meantime: ask again */ }
+  return (await stripe.get(`/v1/payment_intents/${paymentIntentId}`)).status;
+}
+
+/**
+ * Frees the charge for a new attempt by closing the one in flight at Stripe, then
+ * canceling its row. Never cancels a row whose money Stripe has taken (#169).
+ */
+async function releaseAttempt(deps: Deps, started: any, session?: any, paymentIntent?: any): Promise<Release> {
+  const { admin, stripe } = deps;
+  let reason: string;
+  if (started.checkout_session_id) {
+    const status = await closeCheckoutSession(stripe, started.checkout_session_id, session);
+    if (status === "complete") return "paid";
+    if (status !== "expired") return "starting";
+    reason = started.amount_mismatch ? "Replaced by a payment for a different amount." : "The checkout page was closed or expired.";
+  } else {
+    const paymentIntentId = paymentIntent?.id ?? await attemptPaymentIntent(admin, started);
+    if (!paymentIntentId) return "starting";   // the row exists but Stripe has not been asked yet
+    const status = await cancelUnconfirmedPaymentIntent(stripe, paymentIntentId, paymentIntent);
+    if (status !== "canceled") return "paid";
+    reason = started.amount_mismatch ? "Replaced by a payment for a different amount." : "The app's payment sheet was closed without paying.";
+  }
+  const canceled = await admin.rpc("billing_cancel_payment", { p_payment: started.payment_id, p_reason: reason });
+  if (canceled.error) throw new Error(`billing_cancel_payment: ${canceled.error.message}`);
+  return "released";
+}
+
 /**
  * The native app pays with a PaymentIntent and Stripe's native payment sheet, which
  * is what lets Apple Pay and Google Pay appear inside the app. The webhook handles
@@ -203,25 +270,19 @@ async function nativeFlow(deps: Deps, input: CheckoutInput, started: any): Promi
 
   if (started.existing) {
     if (started.status === "processing") return { ok: false, status: 409, code: "processing", error: IN_PROGRESS };
-    const { data: row } = await admin.from("dues_payments").select("stripe_payment_intent_id").eq("id", paymentId).maybeSingle();
-    if (row?.stripe_payment_intent_id) {
-      const pi = await stripe.get(`/v1/payment_intents/${row.stripe_payment_intent_id}`);
-      if (["requires_payment_method", "requires_confirmation", "requires_action"].includes(pi.status) && pi.client_secret) {
+    const paymentIntentId = await attemptPaymentIntent(admin, started);
+    if (paymentIntentId && !started.checkout_session_id && !started.amount_mismatch) {
+      const pi = await stripe.get(`/v1/payment_intents/${paymentIntentId}`);
+      if (UNCONFIRMED.includes(pi.status) && pi.client_secret) {
         return { ok: true, kind: "native", paymentIntentClientSecret: pi.client_secret, publishableKey, customerId: pi.customer, merchantDisplayName: "Veritas Village", amountCents: started.amount_cents, paymentId };
       }
-      if (pi.status === "canceled") {
-        await admin.rpc("billing_cancel_payment", { p_payment: paymentId, p_reason: "The payment was canceled." });
-        return "retry";
-      }
-      return { ok: false, status: 409, code: "processing", error: IN_PROGRESS };
+      const released = await releaseAttempt(deps, started, undefined, pi);
+      return released === "released" ? "retry" : blocked(released);
     }
-    if (started.checkout_session_id) {
-      // Opened as a Checkout page earlier (say on the website): close it and start the native way.
-      await stripe.post(`/v1/checkout/sessions/${started.checkout_session_id}/expire`, {}).catch(() => undefined);
-      await admin.rpc("billing_cancel_payment", { p_payment: paymentId, p_reason: "Switched to the app's payment sheet." });
-      return "retry";
-    }
-    return { ok: false, status: 409, code: "starting", error: "A payment is already starting. Give it a moment, then try again." };
+    // Opened as a Checkout page earlier (say on the website), or for another amount:
+    // close it, unless the family already paid there, and start the native way.
+    const released = await releaseAttempt(deps, started);
+    return released === "released" ? "retry" : blocked(released);
   }
 
   try {

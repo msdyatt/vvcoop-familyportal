@@ -230,10 +230,107 @@ Deno.test("checkout: a Checkout page opened on the website is closed when the ap
     },
   });
   const stripe = fakeStripe({
+    "GET /v1/checkout/sessions/cs_web": { id: "cs_web", status: "open", ui_mode: "embedded" },
     "POST /v1/checkout/sessions/cs_web/expire": { id: "cs_web", status: "expired" },
     "POST /v1/customers": { id: "cus_1" }, "POST /v1/payment_intents": { id: "pi_n", client_secret: "pi_n_secret" },
   });
   const result = await createDuesCheckout({ admin: admin.client, stripe: stripe.stripe, config: embeddedConfig }, { ...input, native: true });
   assertEquals(result.ok && result.paymentId, "pay-2");
+  assertEquals(admin.called("billing_cancel_payment")[0].args.p_payment, "pay-1");
+});
+
+// ---- #169: never cancel an attempt Stripe has already been paid for --------------------------------
+
+Deno.test("checkout: the app does not cancel a Checkout page the family already completed on the website (#169)", async () => {
+  const admin = fakeAdmin({
+    tables: { ...tables, dues_payments: [] } as never,
+    rpc: { billing_begin_payment: () => ({ data: { ...started, existing: true, checkout_session_id: "cs_web" } }), billing_cancel_payment: () => ({ data: null }) },
+  });
+  const stripe = fakeStripe({ "GET /v1/checkout/sessions/cs_web": { id: "cs_web", status: "complete", ui_mode: "embedded" } });
+  const result = await createDuesCheckout({ admin: admin.client, stripe: stripe.stripe, config: embeddedConfig }, { ...input, native: true });
+  assertEquals(!result.ok && result.code, "processing");
+  assertEquals(admin.called("billing_cancel_payment").length, 0, "the paid attempt stays, so the webhook can credit it");
+  assertEquals(stripe.requests.some((r) => r.path.endsWith("/expire")), false);
+});
+
+Deno.test("checkout: if the page is completed while the app is closing it, the attempt is kept (#169)", async () => {
+  let reads = 0;
+  const admin = fakeAdmin({
+    tables: { ...tables, dues_payments: [] } as never,
+    rpc: { billing_begin_payment: () => ({ data: { ...started, existing: true, checkout_session_id: "cs_web" } }), billing_cancel_payment: () => ({ data: null }) },
+  });
+  const stripe = fakeStripe({
+    "GET /v1/checkout/sessions/cs_web": () => ({ body: { id: "cs_web", status: ++reads === 1 ? "open" : "complete", ui_mode: "embedded" } }),
+    "POST /v1/checkout/sessions/cs_web/expire": () => ({ status: 400, body: { error: { message: "Only Checkout Sessions with a status in [\"open\"] can be expired." } } }),
+  });
+  const result = await createDuesCheckout({ admin: admin.client, stripe: stripe.stripe, config: embeddedConfig }, { ...input, native: true });
+  assertEquals(!result.ok && result.code, "processing");
+  assertEquals(admin.called("billing_cancel_payment").length, 0);
+});
+
+// ---- #186: an earlier attempt no longer blocks or replaces a new payment ----------------------------
+
+function resumeSetup(first: Record<string, unknown>, routes: Record<string, unknown>, rows: unknown[] = []) {
+  let calls = 0;
+  const admin = fakeAdmin({
+    tables: { ...tables, dues_payments: rows } as never,
+    rpc: {
+      billing_begin_payment: () => (++calls === 1 ? { data: { ...started, existing: true, ...first } } : { data: { ...started, payment_id: "pay-2" } }),
+      billing_attach_checkout: () => ({ data: null }), billing_set_customer: () => ({ data: null }), billing_cancel_payment: () => ({ data: null }),
+      billing_apply_payment_update: () => ({ data: "applied" }),
+    },
+  });
+  const stripe = fakeStripe({ "POST /v1/customers": { id: "cus_1" }, "POST /v1/checkout/sessions": { id: "cs_new", client_secret: "cs_new_secret", url: "https://checkout.stripe.com/c/pay/cs_new" }, ...routes });
+  return { admin, stripe, deps: { admin: admin.client, stripe: stripe.stripe, config: embeddedConfig } };
+}
+
+Deno.test("checkout: an abandoned app payment sheet is canceled at Stripe so the website can take payment (#186)", async () => {
+  const { admin, stripe, deps } = resumeSetup({ checkout_session_id: null }, {
+    "GET /v1/payment_intents/pi_app": { id: "pi_app", status: "requires_payment_method" },
+    "POST /v1/payment_intents/pi_app/cancel": { id: "pi_app", status: "canceled" },
+  }, [{ id: "pay-1", stripe_payment_intent_id: "pi_app" }]);
+  const result = await createDuesCheckout(deps, { ...input, embedded: true });
+  assertEquals(result.ok && result.kind === "embedded" && result.paymentId, "pay-2");
+  assertEquals(stripe.requests.some((r) => r.path === "/v1/payment_intents/pi_app/cancel"), true);
+  assertEquals(admin.called("billing_cancel_payment")[0].args.p_payment, "pay-1");
+});
+
+Deno.test("checkout: an app payment already confirmed is not canceled from the website", async () => {
+  const { admin, stripe, deps } = resumeSetup({ checkout_session_id: null }, {
+    "GET /v1/payment_intents/pi_app": { id: "pi_app", status: "processing" },
+  }, [{ id: "pay-1", stripe_payment_intent_id: "pi_app" }]);
+  const result = await createDuesCheckout(deps, { ...input, embedded: true });
+  assertEquals(!result.ok && result.code, "processing");
+  assertEquals(admin.called("billing_cancel_payment").length, 0);
+  assertEquals(stripe.requests.some((r) => r.method === "POST"), false);
+});
+
+Deno.test("checkout: a row that has not reached Stripe yet still says a payment is starting", async () => {
+  const { admin, deps } = resumeSetup({ checkout_session_id: null }, {}, [{ id: "pay-1", stripe_payment_intent_id: null }]);
+  const result = await createDuesCheckout(deps, { ...input, embedded: true });
+  assertEquals(!result.ok && result.code, "starting");
+  assertEquals(admin.called("billing_cancel_payment").length, 0);
+});
+
+Deno.test("checkout: 'Pay the full balance' closes an open installment-sized page instead of reopening it (#186)", async () => {
+  const { admin, stripe, deps } = resumeSetup({ checkout_session_id: "cs_inst", amount_cents: 15000, amount_mismatch: true, wanted_amount_cents: 60000 }, {
+    "GET /v1/checkout/sessions/cs_inst": { id: "cs_inst", status: "open", ui_mode: "embedded", client_secret: "cs_inst_secret" },
+    "POST /v1/checkout/sessions/cs_inst/expire": { id: "cs_inst", status: "expired" },
+  });
+  const result = await createDuesCheckout(deps, { ...input, embedded: true, payAll: true });
+  assertEquals(result.ok && result.kind === "embedded" && result.clientSecret, "cs_new_secret", "a new page, not the installment one");
+  assertEquals(stripe.requests.some((r) => r.path === "/v1/checkout/sessions/cs_inst/expire"), true);
+  assertEquals(admin.called("billing_cancel_payment")[0].args.p_payment, "pay-1");
+  assertEquals(admin.called("billing_begin_payment").every((c) => c.args.p_pay_all === true), true);
+});
+
+Deno.test("checkout: the app replaces its own sheet when the amount asked for changed (#186)", async () => {
+  const { admin, stripe, deps } = resumeSetup({ checkout_session_id: null, amount_cents: 15000, amount_mismatch: true }, {
+    "GET /v1/payment_intents/pi_app": { id: "pi_app", status: "requires_payment_method", client_secret: "old_secret", customer: "cus_1" },
+    "POST /v1/payment_intents/pi_app/cancel": { id: "pi_app", status: "canceled" },
+    "POST /v1/payment_intents": { id: "pi_new", client_secret: "pi_new_secret" },
+  }, [{ id: "pay-1", stripe_payment_intent_id: "pi_app" }]);
+  const result = await createDuesCheckout(deps, { ...input, native: true, payAll: true });
+  assertEquals(result.ok && result.kind === "native" && result.paymentIntentClientSecret, "pi_new_secret");
   assertEquals(admin.called("billing_cancel_payment")[0].args.p_payment, "pay-1");
 });

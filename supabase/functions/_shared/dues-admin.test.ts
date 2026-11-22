@@ -54,9 +54,9 @@ Deno.test("sync: asks Stripe about each pending payment and refund, and reports 
 
 Deno.test("cancel: only an unstarted payment can be canceled, and its Checkout page is closed", async () => {
   const admin = fakeAdmin({ tables: { dues_payments: [{ id: "p1", status: "pending", direction: "charge", stripe_checkout_session_id: "cs_1" }, { id: "p2", status: "processing", direction: "charge", stripe_checkout_session_id: null }] }, rpc: { billing_cancel_payment: () => ({ data: null }) } });
-  const stripe = fakeStripe({ "POST /v1/checkout/sessions/cs_1/expire": { id: "cs_1", status: "expired" } });
+  const stripe = fakeStripe({ "GET /v1/checkout/sessions/cs_1": { id: "cs_1", status: "open" }, "POST /v1/checkout/sessions/cs_1/expire": { id: "cs_1", status: "expired" } });
   assertEquals((await cancelPendingPayment({ admin: admin.client, stripe: stripe.stripe }, "p1")).ok, true);
-  assertEquals(stripe.requests.length, 1);
+  assertEquals(stripe.requests.filter((r) => r.method === "POST").length, 1);
   const blocked = await cancelPendingPayment({ admin: admin.client, stripe: stripe.stripe }, "p2");
   assertEquals(!blocked.ok && blocked.status, 409);
 });
@@ -69,4 +69,28 @@ Deno.test("reconcile: lists settled payments that Stripe does not agree are sett
   const stripe = fakeStripe({ "GET /v1/payment_intents/pi_1": { status: "succeeded" }, "GET /v1/payment_intents/pi_2": { status: "canceled" } });
   const result = await reconcileWithStripe({ admin: admin.client, stripe: stripe.stripe });
   assertEquals(result, { checked: 2, mismatches: [{ paymentId: "p2", local: "succeeded", stripe: "canceled" }] });
+});
+
+Deno.test("cancel: a Checkout page Stripe says was completed is not canceled (#169)", async () => {
+  const admin = fakeAdmin({ tables: { dues_payments: [{ id: "p1", status: "pending", direction: "charge", stripe_checkout_session_id: "cs_1", stripe_payment_intent_id: null }] }, rpc: { billing_cancel_payment: () => ({ data: null }) } });
+  const stripe = fakeStripe({ "GET /v1/checkout/sessions/cs_1": { id: "cs_1", status: "complete" } });
+  const result = await cancelPendingPayment({ admin: admin.client, stripe: stripe.stripe }, "p1");
+  assertEquals(!result.ok && result.status, 409);
+  assertStringIncludes(!result.ok ? result.error : "", "Check with Stripe");
+  assertEquals(admin.called("billing_cancel_payment").length, 0);
+});
+
+Deno.test("cancel: an app payment is canceled at Stripe first, and only then in the books (#169)", async () => {
+  const rows = [{ id: "p1", status: "pending", direction: "charge", stripe_checkout_session_id: null, stripe_payment_intent_id: "pi_app" }];
+  const admin = fakeAdmin({ tables: { dues_payments: rows }, rpc: { billing_cancel_payment: () => ({ data: null }) } });
+  const stripe = fakeStripe({ "GET /v1/payment_intents/pi_app": { id: "pi_app", status: "requires_payment_method" }, "POST /v1/payment_intents/pi_app/cancel": { id: "pi_app", status: "canceled" } });
+  assertEquals((await cancelPendingPayment({ admin: admin.client, stripe: stripe.stripe }, "p1")).ok, true);
+  assertEquals(stripe.requests.some((r) => r.path === "/v1/payment_intents/pi_app/cancel"), true);
+  assertEquals(admin.called("billing_cancel_payment").length, 1);
+
+  const paid = fakeAdmin({ tables: { dues_payments: rows }, rpc: { billing_cancel_payment: () => ({ data: null }) } });
+  const confirmed = fakeStripe({ "GET /v1/payment_intents/pi_app": { id: "pi_app", status: "succeeded" } });
+  const refused = await cancelPendingPayment({ admin: paid.client, stripe: confirmed.stripe }, "p1");
+  assertEquals(!refused.ok && refused.status, 409, "a confirmed app payment is left for the webhook to credit");
+  assertEquals(paid.called("billing_cancel_payment").length, 0);
 });

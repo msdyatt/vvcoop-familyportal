@@ -38,7 +38,13 @@ background job to monitor before the first live year.
 - The payment ledger (`dues_payments`) is append-only: no deletes, no edits to amount,
   family, direction, source or mode, and status only moves forward (`pending` →
   `processing` → `succeeded` → `failed` for a late ACH return). A failed payment is never
-  revived; the family pays again and gets a new row.
+  revived; the family pays again and gets a new row. The one exception is a
+  **canceled** attempt (an admin cancel, the app replacing a Checkout page, the
+  two-day cleanup) that Stripe then reports as paid: Stripe's word wins, the row
+  moves to `succeeded` (or `processing` for a bank transfer), the household is
+  credited, and administrators are told to check for a second payment. Before
+  canceling an attempt, the checkout and admin functions ask Stripe whether it was
+  already paid.
 - Adjustments and discount lines are append-only. An adjustment is undone with a
   reversing entry, never edited.
 - At most one payment attempt is in flight per charge (partial unique index), and the

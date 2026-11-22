@@ -7,8 +7,8 @@ import { usePortalAccess } from "../../../lib/use-portal-access";
 import { downloadReceipt, startCheckout, type EmbedInfo } from "../../../lib/dues-api";
 import { mountEmbeddedCheckout } from "../../../lib/stripe-embed";
 import {
-  CHARGE_COLUMNS, PAYMENT_COLUMNS, describeInstallments, formatCents, formatDueDate, formatWhen, methodLabel, monthlyPreview,
-  nextPaymentCents, paymentStatusLabel, savedMethodLabel,
+  CHARGE_COLUMNS, PAYMENT_COLUMNS, currentSavedMethod, describeInstallments, formatCents, formatDueDate, formatWhen, methodLabel, monthlyPreview,
+  nextPaymentCents, payButtonKind, paymentStatusLabel, savedMethodLabel,
   type Adjustment, type BillingSettings, type DiscountLine, type DuesCharge, type Installment, type Payment, type Plan,
   type RequirementOptions, type SavedMethod,
 } from "../../../lib/dues";
@@ -51,7 +51,7 @@ export default function DuesApp() {
       supabase.from("billing_settings").select("provider,reminder_days_before,retry_after_days,max_attempts,receipt_org_name,receipt_ein,receipt_address,receipt_note").eq("id", "dues").maybeSingle(),
       supabase.from("dues_ledger").select(CHARGE_COLUMNS).in("family_id", familyIds).order("due_on", { ascending: false, nullsFirst: false }),
       supabase.from("school_years").select("id,label"),
-      supabase.from("billing_customers").select("default_pm_type,default_pm_brand,default_pm_last4,default_pm_bank_name,autopay").in("family_id", familyIds),
+      supabase.from("billing_customers").select("default_pm_type,default_pm_brand,default_pm_last4,default_pm_bank_name,autopay,livemode").in("family_id", familyIds),
       supabase.from("dues_payments").select(PAYMENT_COLUMNS).in("family_id", familyIds).order("created_at", { ascending: false }),
     ]);
     if (charges.error) { setError(charges.error.message); return; }
@@ -66,7 +66,7 @@ export default function DuesApp() {
       supabase.from("dues_requirement_options").select("requirement_id,monthly_enabled,monthly_count,monthly_first_due_on").in("requirement_id", requirementIds),
     ]) : [null, null, null, null, null];
 
-    const savedRows = (customers.data ?? []) as unknown as SavedMethod[];
+    const savedRows = (customers.data ?? []) as unknown as (SavedMethod & { livemode: boolean })[];
     setData({
       settings: (settings.data as BillingSettings | null) ?? null,
       charges: chargeRows,
@@ -77,7 +77,8 @@ export default function DuesApp() {
       installments: (installments?.data ?? []) as unknown as Installment[],
       payments: (payments.data ?? []) as unknown as Payment[],
       options: (options?.data ?? []) as unknown as RequirementOptions[],
-      saved: savedRows.find((row) => row.autopay) ?? savedRows[0] ?? null,
+      // One billing customer per Stripe mode; only the current mode's counts (#187).
+      saved: currentSavedMethod(savedRows, (settings.data as BillingSettings | null)?.provider),
     });
   }, [userId]);
 
@@ -139,19 +140,23 @@ function ChargeCard({ charge, data, onChanged, onEmbed, onPaid }: { charge: Dues
   const views = describeInstallments(installments.filter((i) => plan && i.plan_id === plan.id));
   const nextCents = nextPaymentCents(charge, installments.filter((i) => plan && i.plan_id === plan.id), plan);
 
+  // Choosing Monthly creates the plan just before paying, so the first payment is
+  // the first installment, not the whole balance (#168).
+  const startingMonthly = !plan && choice === "monthly" && monthlyOffered;
+
   async function pay(kind: "next" | "all") {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     setBusy(true); setMessage("");
     let autopay = false;
-    if (!plan && choice === "monthly" && monthlyOffered) {
+    if (startingMonthly) {
       const { error } = await supabase.rpc("family_choose_plan", { p_charge: charge.id, p_kind: "monthly" });
       if (error) { setBusy(false); setMessage(error.message); return; }
       autopay = true;
     } else if (plan?.kind === "monthly" && !autopayOn && autopayAgree) {
       autopay = true;
     }
-    const result = await startCheckout(supabase, { chargeId: charge.id, payAll: kind === "all" || (!plan && choice === "full"), autopay });
+    const result = await startCheckout(supabase, { chargeId: charge.id, payAll: kind === "all", autopay });
     setBusy(false);
     if (result.error) { setMessage(result.error); void onChanged(); return; }
     if (result.embed) onEmbed(result.embed);
@@ -246,8 +251,8 @@ function ChargeCard({ charge, data, onChanged, onEmbed, onPaid }: { charge: Dues
       : inFlight?.status === "processing"
         ? null
         : <div className="dues-actions">
-            <button type="button" className="compliance-cta" disabled={busy} onClick={() => pay(plan ? "next" : "all")}>
-              {busy ? "Opening…" : inFlight ? "Continue to payment" : plan ? `Pay ${formatCents(nextCents)} now` : choice === "monthly" && monthlyOffered ? `Start monthly payments · ${formatCents(preview!.each)} today` : `Pay ${formatCents(charge.balance_cents)} now`}
+            <button type="button" className="compliance-cta" disabled={busy} onClick={() => pay(payButtonKind(Boolean(plan), startingMonthly))}>
+              {busy ? "Opening…" : inFlight ? "Continue to payment" : plan ? `Pay ${formatCents(nextCents)} now` : startingMonthly ? `Start monthly payments · ${formatCents(preview!.each)} today` : `Pay ${formatCents(charge.balance_cents)} now`}
             </button>
             {plan && nextCents < charge.balance_cents && !inFlight && <button type="button" className="compliance-cta ghost" disabled={busy} onClick={() => pay("all")}>Pay the full balance ({formatCents(charge.balance_cents)})</button>}
             {plan?.kind === "monthly" && !inFlight && <button type="button" className="link" disabled={busy} onClick={backToFull}>Pay the rest in one payment instead</button>}

@@ -1,7 +1,7 @@
 /// <reference lib="deno.ns" />
 import { assertEquals } from "jsr:@std/assert@1";
 import {
-  describeInstallments, formatCents, formatDueDate, methodLabel, monthlyPreview, nextPaymentCents, parseDollars, paymentStatusLabel,
+  currentSavedMethod, describeInstallments, formatCents, formatDueDate, methodLabel, monthlyPreview, nextPaymentCents, parseDollars, paymentStatusLabel, payButtonKind,
   type DuesCharge, type Installment, type Plan,
 } from "./dues.ts";
 
@@ -73,4 +73,19 @@ Deno.test("what Pay now collects: the next installment, or the whole balance wit
 Deno.test("monthly split puts the rounding on the last payment", () => {
   assertEquals(monthlyPreview(60000, 9), { each: 6666, last: 6666 + 6 });
   assertEquals(monthlyPreview(60000, 10), { each: 6000, last: 6000 });
+});
+
+Deno.test("choosing Monthly pays the first installment, not the whole balance (#168)", () => {
+  assertEquals(payButtonKind(false, true), "next", "monthly just chosen: the plan exists by the time checkout starts");
+  assertEquals(payButtonKind(true, false), "next");
+  assertEquals(payButtonKind(false, false), "all", "pay in full");
+});
+
+Deno.test("only the current Stripe mode's saved method is shown (#187)", () => {
+  const method = (livemode: boolean, autopay: boolean, last4: string) => ({ default_pm_type: "card", default_pm_brand: "visa", default_pm_last4: last4, default_pm_bank_name: null, autopay, livemode });
+  const rows = [method(false, true, "4242"), method(true, false, "1881")];
+  assertEquals(currentSavedMethod(rows, "stripe_live")?.default_pm_last4, "1881", "live mode never shows the test card");
+  assertEquals(currentSavedMethod(rows, "stripe_live")?.autopay, false, "so automatic payments read as off");
+  assertEquals(currentSavedMethod(rows, "stripe_test")?.default_pm_last4, "4242");
+  assertEquals(currentSavedMethod([method(false, true, "4242")], "stripe_live"), null, "no live customer yet: nothing saved");
 });
