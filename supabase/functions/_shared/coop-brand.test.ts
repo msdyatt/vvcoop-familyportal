@@ -57,3 +57,12 @@ Deno.test("invitations and notices use the co-op's name", () => {
   assertStringIncludes(notice.html, "A note from Riverbend Co-op");
   assertStringIncludes(notice.html, "because you are part of Riverbend Co-op.");
 });
+
+Deno.test("the email's frame and heading take the co-op's ink", () => {
+  const brand = brandFromRow({ name: "Riverbend", accent: meadow, ink: "#3d1220" }, URL_);
+  assertEquals(brand.ink, "#3d1220");
+  const html = renderEmail({ eyebrow: "E", heading: "H", bodyHtml: "<p>B</p>", brand });
+  assertStringIncludes(html, "max-width:480px;background:#3d1220;");
+  assertStringIncludes(html, "color:#3d1220;font-family:Georgia");
+  assertEquals(brandFromRow({ name: "X", ink: "red" }, URL_).ink, "#0b2a3d");
+});

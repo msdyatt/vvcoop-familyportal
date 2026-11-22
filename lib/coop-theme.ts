@@ -423,6 +423,104 @@ export function isBandStyle(value: unknown): value is BandStyle {
   return BAND_STYLES.some((b) => b.id === value);
 }
 
+// ---- The page's colours: ink, ground and the dark theme --------------------------------------------------------------
+// The ink (navy: text, primary buttons, selected tabs, the Admin band), the light theme's grounds (page, cards, inputs,
+// panels) and the dark theme's grounds. The rule that keeps every combination readable: the ink is at least as deep as
+// navy, the light grounds at least as light as the Veritas ones, and the dark grounds at least as deep as the Veritas
+// night. Every contrast check is a dark colour against a light one, so moving them further apart only adds contrast,
+// for any palette (tests/theme-contrast.test.mjs runs the full pair list over the combinations to make sure).
+// Checked again in the database (private.coop_page_problems).
+
+export const VERITAS_INK = "#0b2a3d";
+export const GROUND_KEYS = ["ground", "surface", "sunken", "panel"] as const;
+export type GroundTokens = Record<(typeof GROUND_KEYS)[number], string>;
+export const VERITAS_GROUND: GroundTokens = { ground: "#faf7f1", surface: "#fffdf9", sunken: "#f2eee5", panel: "#e6e9e2" };
+export const GROUND_VARS: Record<keyof GroundTokens, string> = { ground: "--ground", surface: "--ground-surface", sunken: "--ground-sunken", panel: "--ground-panel" };
+export const NIGHT_KEYS = ["canvas", "surface", "sunken", "panel", "band", "field"] as const;
+export type NightTokens = Record<(typeof NIGHT_KEYS)[number], string>;
+export const VERITAS_NIGHT: NightTokens = { canvas: "#08202f", surface: "#0e3045", sunken: "#061a27", panel: "#143a45", band: "#0d3a57", field: "#0b2a3d" };
+export const NIGHT_VARS: Record<keyof NightTokens, string> = {
+  canvas: "--night-canvas", surface: "--night-surface", sunken: "--night-sunken", panel: "--night-panel", band: "--night-band", field: "--night-field",
+};
+/** "r,g,b" for the custom properties that tints are made from. */
+export function rgbTriplet(hex: string): string { return hexToRgb(hex).join(","); }
+
+const GROUND_WORDS: Record<keyof GroundTokens, string> = { ground: "page", surface: "card", sunken: "input", panel: "panel" };
+const NIGHT_WORDS: Record<keyof NightTokens, string> = { canvas: "page", surface: "card", sunken: "input", panel: "panel", band: "band", field: "field" };
+
+/** Why an ink cannot be used; empty when it can. */
+export function checkInk(ink: unknown): string[] {
+  if (!isHex(ink)) return ["Choose a colour."];
+  return luminance(ink) <= luminance(VERITAS_INK) + 1e-9 ? []
+    : ["This colour is too light for text and buttons: it needs to be at least as deep as the portal's navy. Choose a darker shade."];
+}
+/** The shade of this hue nearest in lightness that is deep enough for ink; null if none. */
+export function nearestUsableInk(base: string): string | null {
+  const { l, c, h } = hexToOklch(base);
+  return nearestLightness(h, c, l, (x) => checkInk(x).length === 0);
+}
+
+export function checkGround(t: unknown): string[] {
+  if (!t || typeof t !== "object" || !GROUND_KEYS.every((k) => isHex((t as Record<string, unknown>)[k]))) return ["Choose a page colour."];
+  const g = t as GroundTokens;
+  return GROUND_KEYS.filter((k) => luminance(g[k]) + 1e-9 < luminance(VERITAS_GROUND[k]))
+    .map((k) => `The ${GROUND_WORDS[k]} colour is too dark for the light theme: text needs it at least as light as the portal's own. Choose a paler tint.`);
+}
+export function checkNight(t: unknown): string[] {
+  if (!t || typeof t !== "object" || !NIGHT_KEYS.every((k) => isHex((t as Record<string, unknown>)[k]))) return ["Choose a dark theme."];
+  const n = t as NightTokens;
+  return NIGHT_KEYS.filter((k) => luminance(n[k]) > luminance(VERITAS_NIGHT[k]) + 1e-9)
+    .map((k) => `The dark theme's ${NIGHT_WORDS[k]} colour is too light: light text needs it at least as deep as the portal's own night.`);
+}
+
+/** Light grounds with a hint of a colour's hue: as near as allowed to the Veritas lightness of each role. */
+export function groundFamily(tint: string): GroundTokens {
+  const { c, h } = hexToOklch(tint);
+  const chroma = Math.min(c, 0.018);
+  const at = (k: keyof GroundTokens, target: number) =>
+    nearestLightness(h, chroma, target, (x) => luminance(x) >= luminance(VERITAS_GROUND[k]) + 0.002) ?? VERITAS_GROUND[k];
+  return { ground: at("ground", 0.975), surface: at("surface", 0.993), sunken: at("sunken", 0.945), panel: at("panel", 0.925) };
+}
+/** Dark grounds from a colour's hue: as near as allowed to the Veritas night's lightness of each role. */
+export function nightFamily(seed: string, chromaCap = 0.045): NightTokens {
+  const { c, h } = hexToOklch(seed);
+  const chroma = Math.min(c, chromaCap);
+  const at = (k: keyof NightTokens, target: number) =>
+    nearestLightness(h, chroma, target, (x) => luminance(x) <= luminance(VERITAS_NIGHT[k]) - 0.0005) ?? VERITAS_NIGHT[k];
+  return { canvas: at("canvas", 0.2), surface: at("surface", 0.25), sunken: at("sunken", 0.16), panel: at("panel", 0.28), band: at("band", 0.32), field: at("field", 0.24) };
+}
+
+export type Choice<T> = { id: string; label: string; value: T };
+export const INKS: Choice<string>[] = [
+  { id: "navy", label: "Ink navy", value: VERITAS_INK },
+  { id: "forest", label: "Forest", value: "#082d1f" },
+  { id: "burgundy", label: "Burgundy", value: "#3d1220" },
+  { id: "plum", label: "Plum", value: "#2b1638" },
+  { id: "teal", label: "Deep teal", value: "#062c30" },
+  { id: "espresso", label: "Espresso", value: "#2e1d14" },
+  { id: "charcoal", label: "Charcoal", value: "#1f2328" },
+];
+export const GROUNDS: Choice<GroundTokens>[] = [
+  { id: "parchment", label: "Parchment", value: VERITAS_GROUND },
+  { id: "white", label: "Clean white", value: { ground: "#ffffff", surface: "#ffffff", sunken: "#f4f5f6", panel: "#eceff1" } },
+  { id: "snow", label: "Cool snow", value: groundFamily("#6b8fb5") },
+  { id: "sage", label: "Sage mist", value: groundFamily("#6f9a6c") },
+  { id: "sky", label: "Sky mist", value: groundFamily("#4a90c8") },
+  { id: "blush", label: "Blush", value: groundFamily("#c77b86") },
+  { id: "lavender", label: "Lavender mist", value: groundFamily("#8a72b8") },
+];
+export const NIGHTS: Choice<NightTokens>[] = [
+  { id: "navy-night", label: "Navy night", value: VERITAS_NIGHT },
+  { id: "charcoal", label: "Charcoal", value: nightFamily("#2a2e35", 0.012) },
+  { id: "forest-night", label: "Forest night", value: nightFamily("#1d5a40") },
+  { id: "plum-night", label: "Plum night", value: nightFamily("#4a2a5c") },
+  { id: "espresso-night", label: "Espresso", value: nightFamily("#5a3a28") },
+  { id: "black", label: "True black", value: { canvas: "#000000", surface: "#121212", sunken: "#000000", panel: "#1c1c1c", band: "#1f1f1f", field: "#121212" } },
+];
+export const CUSTOM_CHOICE = "custom";
+/** The dark theme built from the co-op's ink colour. */
+export const NIGHT_FROM_INK = "from-ink";
+
 // ---- The small touches ------------------------------------------------------------------------------------------
 
 export const WHIMSY_SEASONS = ["auto", "autumn", "winter", "spring", "summer", "none"] as const;
@@ -495,6 +593,13 @@ export type CoopTheme = {
   bodyFont: BodyFontId;
   header: BandStyle;
   sidebar: BandStyle;
+  /** The page's colours (null: the Veritas Village ones, from the stylesheet). */
+  inkId: string;
+  ink: string | null;
+  groundId: string;
+  ground: GroundTokens | null;
+  nightId: string;
+  night: NightTokens | null;
   /** The colours of "Your own colour" for each band (null until one is chosen). */
   headerBand: BandTokens | null;
   sidebarBand: BandTokens | null;
@@ -518,6 +623,7 @@ export const DEFAULT_TIME_ZONE = "America/Chicago";
 export const DEFAULT_THEME: CoopTheme = {
   v: 1, name: DEFAULT_COOP_NAME, paletteId: DEFAULT_PALETTE_ID, accent: VERITAS_ACCENT, font: DEFAULT_HEADING_FONT,
   bodyFont: DEFAULT_BODY_FONT, header: "plain", sidebar: "plain", headerBand: null, sidebarBand: null, whimsy: DEFAULT_WHIMSY,
+  inkId: "navy", ink: null, groundId: "parchment", ground: null, nightId: "navy-night", night: null,
   logos: {}, ratio: null, supportEmail: null, supportPhone: null, personalPalettes: DEFAULT_PERSONAL_PALETTES,
   seasonal: [], timeZone: DEFAULT_TIME_ZONE,
 };
@@ -602,6 +708,18 @@ export function themeVars(theme: CoopTheme, today: string = coopToday(theme.time
   for (const key of ACCENT_KEYS) vars[ACCENT_VARS[key]] = theme.accent[key];
   vars["--serif"] = HEADING_FONTS.find((f) => f.id === theme.font)?.stack ?? HEADING_FONTS[0].stack;
   vars["--sans"] = BODY_FONTS.find((f) => f.id === theme.bodyFont)?.stack ?? BODY_FONTS[0].stack;
+  if (theme.ink) { vars["--navy"] = theme.ink; vars["--navy-rgb"] = rgbTriplet(theme.ink); }
+  if (theme.ground) {
+    for (const k of GROUND_KEYS) vars[GROUND_VARS[k]] = theme.ground[k];
+    vars["--ground-rgb"] = rgbTriplet(theme.ground.ground);
+    vars["--ground-panel-rgb"] = rgbTriplet(theme.ground.panel);
+  }
+  if (theme.night) {
+    for (const k of NIGHT_KEYS) vars[NIGHT_VARS[k]] = theme.night[k];
+    vars["--night-canvas-rgb"] = rgbTriplet(theme.night.canvas);
+    vars["--night-panel-rgb"] = rgbTriplet(theme.night.panel);
+    vars["--night-band-rgb"] = rgbTriplet(theme.night.band);
+  }
   for (const [which, band] of [["header", theme.header === "custom" ? theme.headerBand : null], ["sidebar", theme.sidebar === "custom" ? theme.sidebarBand : null]] as const) {
     if (!band) continue;
     vars[`--coop-${which}-bg`] = band.bg;
@@ -640,7 +758,9 @@ export function themeDataset(theme: CoopTheme): Record<string, string> {
 export const THEME_DATASET_KEYS = ["coopHeader", "coopSidebar", "coopHeaderTone", "coopSidebarTone", "coopMarker", "coopGreeting", "coopVillage", "coopQuill", "coopMotion"];
 
 /** Every custom property a theme may set, so a change of theme can clear what the new one leaves out. */
-export const THEME_VAR_NAMES = [...ACCENT_KEYS.map((k) => ACCENT_VARS[k]), "--serif", "--sans",
+export const THEME_VAR_NAMES = [...ACCENT_KEYS.map((k) => ACCENT_VARS[k]), "--serif", "--sans", "--navy", "--navy-rgb",
+  ...GROUND_KEYS.map((k) => GROUND_VARS[k]), "--ground-rgb", "--ground-panel-rgb",
+  ...NIGHT_KEYS.map((k) => NIGHT_VARS[k]), "--night-canvas-rgb", "--night-panel-rgb", "--night-band-rgb",
   ...["header", "sidebar"].flatMap((w) => [`--coop-${w}-bg`, `--coop-${w}-fg`, `--coop-${w}-bg-night`, `--coop-${w}-fg-night`]),
   ...LOGO_SLOTS.map((s) => LOGO_VARS[s]), "--coop-lockup-ratio"];
 
@@ -672,6 +792,7 @@ export function parseTheme(value: unknown): CoopTheme {
     sidebar: isBandStyle(t.sidebar) && (t.sidebar !== "custom" || parseBand(t.sidebarBand)) ? t.sidebar : "plain",
     headerBand: parseBand(t.headerBand),
     sidebarBand: parseBand(t.sidebarBand),
+    ...parsePage(t),
     whimsy: parseWhimsy(t.whimsy),
     logos,
     ratio,
@@ -682,6 +803,19 @@ export function parseTheme(value: unknown): CoopTheme {
       : DEFAULT_PERSONAL_PALETTES,
     seasonal: Array.isArray(t.seasonal) ? t.seasonal.map(parseVariant).filter((v): v is LogoVariant => v !== null).slice(0, 24) : [],
     timeZone: typeof t.timeZone === "string" && /^[A-Za-z_]+(\/[A-Za-z_+-]+)*$/.test(t.timeZone) ? t.timeZone : DEFAULT_TIME_ZONE,
+  };
+}
+
+/** The page's colours from a cached or stored theme: each taken only if it passes, else the Veritas one. */
+function parsePage(t: Record<string, unknown>): Pick<CoopTheme, "inkId" | "ink" | "groundId" | "ground" | "nightId" | "night"> {
+  const id = (v: unknown, fallback: string) => (typeof v === "string" && /^[a-z][a-z0-9-]{1,30}$/.test(v) ? v : fallback);
+  const ink = isHex(t.ink) && checkInk(t.ink).length === 0 ? t.ink : null;
+  const ground = checkGround(t.ground).length === 0 ? Object.fromEntries(GROUND_KEYS.map((k) => [k, (t.ground as GroundTokens)[k]])) as GroundTokens : null;
+  const night = checkNight(t.night).length === 0 ? Object.fromEntries(NIGHT_KEYS.map((k) => [k, (t.night as NightTokens)[k]])) as NightTokens : null;
+  return {
+    inkId: ink ? id(t.inkId, CUSTOM_CHOICE) : "navy", ink,
+    groundId: ground ? id(t.groundId, CUSTOM_CHOICE) : "parchment", ground,
+    nightId: night ? id(t.nightId, CUSTOM_CHOICE) : "navy-night", night,
   };
 }
 
@@ -721,6 +855,7 @@ export function themeFromRow(row: Record<string, unknown> | null | undefined, pu
     name: row.name, paletteId: row.palette_id, accent: row.accent, font: row.heading_font,
     bodyFont: row.body_font, header: row.header_style, sidebar: row.sidebar_style,
     headerBand: row.header_band, sidebarBand: row.sidebar_band, whimsy: row.whimsy, logos,
+    inkId: row.ink_id, ink: row.ink, groundId: row.ground_id, ground: row.ground, nightId: row.night_id, night: row.night,
     ratio: typeof row.logo_ratio === "number" ? row.logo_ratio : row.logo_ratio == null ? null : Number(row.logo_ratio),
     supportEmail: row.support_email, supportPhone: row.support_phone,
     personalPalettes: Array.isArray(row.personal_palettes) ? row.personal_palettes : undefined,
@@ -749,6 +884,12 @@ var fonts=${JSON.stringify(Object.fromEntries(HEADING_FONTS.map((f) => [f.id, f.
 if(typeof t.font==='string'&&fonts.hasOwnProperty(t.font))s.setProperty('--serif',fonts[t.font]);
 var bodies=${JSON.stringify(Object.fromEntries(BODY_FONTS.map((f) => [f.id, f.stack])))};
 if(typeof t.bodyFont==='string'&&bodies.hasOwnProperty(t.bodyFont))s.setProperty('--sans',bodies[t.bodyFont]);
+function rgb(x){return parseInt(x.slice(1,3),16)+','+parseInt(x.slice(3,5),16)+','+parseInt(x.slice(5,7),16)}
+function all(o,ks){if(!o)return false;for(var j=0;j<ks.length;j++)if(typeof o[ks[j]]!=='string'||!hex.test(o[ks[j]]))return false;return true}
+if(typeof t.ink==='string'&&hex.test(t.ink)){s.setProperty('--navy',t.ink);s.setProperty('--navy-rgb',rgb(t.ink))}
+var GK=${JSON.stringify(GROUND_KEYS)},GV=${JSON.stringify(GROUND_KEYS.map((k) => GROUND_VARS[k]))},NK=${JSON.stringify(NIGHT_KEYS)},NV=${JSON.stringify(NIGHT_KEYS.map((k) => NIGHT_VARS[k]))};
+if(all(t.ground,GK)){for(i=0;i<GK.length;i++)s.setProperty(GV[i],t.ground[GK[i]]);s.setProperty('--ground-rgb',rgb(t.ground.ground));s.setProperty('--ground-panel-rgb',rgb(t.ground.panel))}
+if(all(t.night,NK)){for(i=0;i<NK.length;i++)s.setProperty(NV[i],t.night[NK[i]]);s.setProperty('--night-canvas-rgb',rgb(t.night.canvas));s.setProperty('--night-panel-rgb',rgb(t.night.panel));s.setProperty('--night-band-rgb',rgb(t.night.band))}
 var d=document.documentElement.dataset,bands=${JSON.stringify(BAND_STYLES.map((b) => b.id))},marks=${JSON.stringify(WHIMSY_MARKERS)},w=t.whimsy||{};
 var BK=${JSON.stringify(BAND_KEYS)},INK=${JSON.stringify(Object.values(BAND_INKS))};
 function band(b){if(!b)return null;for(var j=0;j<BK.length;j++)if(typeof b[BK[j]]!=='string'||!hex.test(b[BK[j]]))return null;return INK.indexOf(b.fg)>=0&&b.fg_night===INK[0]?b:null}

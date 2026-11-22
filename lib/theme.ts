@@ -93,13 +93,31 @@ export function currentChoice(): ThemeChoice {
   return readStoredChoice() ?? "system";
 }
 
+/**
+ * The bar colour for a theme: the co-op's ink by day and its night band by night (Admin, Appearance; the custom
+ * properties --navy and --night-band, lib/coop-theme.ts), else the bundled ones.
+ */
+function chromeColour(theme: ResolvedTheme): string {
+  try {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(theme === "dark" ? "--night-band" : "--navy").trim();
+    if (/^#[0-9a-f]{6}$/i.test(value)) return value;
+  } catch { /* not in a browser */ }
+  return THEME_COLORS[theme];
+}
+
+/** Puts the browser's bars back in step after the co-op's colours change (lib/coop-settings.ts). */
+export function repaintChrome() {
+  if (typeof document === "undefined") return;
+  paintChrome(currentChoice(), currentTheme());
+}
+
 /** Puts the browser's chrome (address bar, installed app strip) and the Android status bar in step with a theme. */
 function paintChrome(choice: ThemeChoice, theme: ResolvedTheme) {
   // Explicit choice: both tags carry the chosen colour. System: each tag keeps the colour for its own media query.
   for (const meta of Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))) {
     const media = meta.getAttribute("media") ?? "";
     const own: ResolvedTheme = /dark/.test(media) ? "dark" : "light";
-    meta.setAttribute("content", THEME_COLORS[choice === "system" && media ? own : theme]);
+    meta.setAttribute("content", chromeColour(choice === "system" && media ? own : theme));
   }
   // The Android app's status bar is native; the Capacitor StatusBar plugin is part of that build. The strip is
   // dark in both themes (navy / the dark theme's ink), so the icons stay light and only the colour follows.
@@ -109,7 +127,7 @@ function paintChrome(choice: ThemeChoice, theme: ResolvedTheme) {
     if (capacitor?.isNativePlatform?.()) {
       const bar = capacitor.Plugins?.StatusBar;
       void bar?.setStyle?.({ style: "DARK" });
-      void bar?.setBackgroundColor?.({ color: THEME_COLORS[theme] });
+      void bar?.setBackgroundColor?.({ color: chromeColour(theme) });
     }
   } catch { /* not in the app */ }
 }

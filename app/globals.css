@@ -64,10 +64,29 @@
   --cream-rgb:250,247,241;
 
   /* Surfaces, all derived from cream and sage so they stay in-palette. */
-  --surface:#fffdf9;          /* raised cards sitting above the canvas */
-  --surface-sunken:#f2eee5;   /* inset fields: inputs, selects, textareas */
-  --panel:#e6e9e2;
-  --panel-rgb:230,233,226;            /* sage-tinted panel, replaces Morning Mist */
+  /* The page's grounds. A co-op can choose others (Admin, Appearance; lib/coop-theme.ts GROUND_VARS and NIGHT_VARS),
+     only ever at least as light as these by day and at least as deep as the night ones, so every contrast check
+     that passes here passes there. The ink (--navy above) can likewise be any colour at least as deep as navy. */
+  --ground:#faf7f1;
+  --ground-rgb:250,247,241;
+  --ground-surface:#fffdf9;
+  --ground-sunken:#f2eee5;
+  --ground-panel:#e6e9e2;
+  --ground-panel-rgb:230,233,226;
+  --night-canvas:#08202f;
+  --night-canvas-rgb:8,32,47;
+  --night-surface:#0e3045;
+  --night-sunken:#061a27;
+  --night-panel:#143a45;
+  --night-panel-rgb:20,58,69;
+  --night-band:#0d3a57;
+  --night-band-rgb:13,58,87;
+  --night-field:#0b2a3d;
+
+  --surface:var(--ground-surface);    /* raised cards sitting above the canvas */
+  --surface-sunken:var(--ground-sunken);  /* inset fields: inputs, selects, textareas */
+  --panel:var(--ground-panel);
+  --panel-rgb:var(--ground-panel-rgb);    /* sage-tinted panel, replaces Morning Mist */
   --terracotta-wash:#f4e4dc;  /* the light terracotta wash; constant, for fills that stay light in both themes */
   --warm-tint:var(--terracotta-wash);  /* terracotta wash, for pills and soft callouts (themed) */
 
@@ -126,8 +145,8 @@
   --danger-text:var(--terracotta-deep);   /* text on a warm tint, and alert text */
 
   /* Surfaces */
-  --canvas:var(--cream);                  /* the page itself */
-  --canvas-rgb:var(--cream-rgb);
+  --canvas:var(--ground);                 /* the page itself */
+  --canvas-rgb:var(--ground-rgb);
   --field-bg:white;                       /* sign-in fields and buttons that were pure white */
   --ink-surface:var(--navy);              /* solid dark bands: sidebar, Admin menu, hero panels, toasts */
   --ink-surface-rgb:var(--navy-rgb);
@@ -154,8 +173,8 @@
   --scrim-rgb:var(--navy-rgb);            /* the dimmed layer behind a dialog */
 
   /* Translucent glass for the iOS tab bar (platform.css) */
-  --glass-bg:rgba(250,247,241,.82);
-  --glass-bg-thin:rgba(250,247,241,.58);
+  --glass-bg:rgba(var(--ground-rgb),.82);
+  --glass-bg-thin:rgba(var(--ground-rgb),.58);
   --glass-edge:rgba(255,255,255,.6);
   --glass-highlight:rgba(255,255,255,.75);
   --glass-lens:rgba(255,255,255,.62);

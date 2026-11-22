@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import {
   BAND_STYLES, BODY_FONTS, CUSTOM_PALETTE_ID, DEFAULT_THEME, DEFAULT_WHIMSY, HEADING_FONTS, LOGO_BUCKET, LOGO_SLOTS, LOGO_TYPES, LOGO_VARS, PALETTES,
-  WHIMSY_MARKERS, bandFamily, bandTone, checkAccent, checkBand, generateAccent, nearestUsableBand, parseBand, isBandStyle, isBodyFont, isHeadingFont, nearestUsableAccent, normalizeHex, paletteById, parseWhimsy, themeVars,
-  type AccentTokens, type BandStyle, type BandTokens, type BodyFontId, type CoopTheme, type HeadingFontId, type LogoSlot, type Whimsy, type WhimsyMarker, type WhimsySeason,
+  WHIMSY_MARKERS, CUSTOM_CHOICE, GROUNDS, INKS, NIGHTS, NIGHT_FROM_INK, VERITAS_INK, checkInk, groundFamily, nearestUsableInk, nightFamily, bandFamily, bandTone, checkAccent, checkBand, generateAccent, nearestUsableBand, parseBand, isBandStyle, isBodyFont, isHeadingFont, nearestUsableAccent, normalizeHex, paletteById, parseWhimsy, themeVars,
+  type AccentTokens, type BandStyle, type BandTokens, type GroundTokens, type NightTokens, type BodyFontId, type CoopTheme, type HeadingFontId, type LogoSlot, type Whimsy, type WhimsyMarker, type WhimsySeason,
 } from "../../../lib/coop-theme";
 import { COOP_SETTINGS_COLUMNS, brandFileUrl, fetchCoopTheme, setCoopTheme } from "../../../lib/coop-settings";
 import { logoProblem } from "../../../lib/logo-files";
@@ -21,6 +21,7 @@ type Row = {
   name: string; palette_id: string; accent: AccentTokens; heading_font: string;
   body_font: string | null; header_style: string | null; sidebar_style: string | null; whimsy: unknown;
   header_band: unknown; sidebar_band: unknown;
+  ink: string | null; ink_id: string | null; ground: GroundTokens | null; ground_id: string | null; night: NightTokens | null; night_id: string | null;
   logo_light_path: string | null; logo_dark_path: string | null; mark_light_path: string | null; mark_dark_path: string | null;
   logo_ratio: number | null; support_email: string | null; support_phone: string | null;
   personal_palettes: string[] | null;
@@ -51,6 +52,13 @@ export default function AppearanceTab() {
   // "Your own colour" for each band, as typed (the rest of its colours are worked out from it).
   const [headerHex, setHeaderHex] = useState("#2e6b4f");
   const [sidebarHex, setSidebarHex] = useState("#2e6b4f");
+  // The page's colours: a ready-made choice or your own (ink as typed; page and dark theme from a colour's hue).
+  const [inkId, setInkId] = useState("navy");
+  const [inkHex, setInkHex] = useState(VERITAS_INK);
+  const [groundId, setGroundId] = useState("parchment");
+  const [groundHex, setGroundHex] = useState("#6f9a6c");
+  const [nightId, setNightId] = useState("navy-night");
+  const [nightHex, setNightHex] = useState("#1d5a40");
   const [whimsy, setWhimsy] = useState<Whimsy>(DEFAULT_WHIMSY);
   const [logos, setLogos] = useState<Record<LogoSlot, LogoDraft>>({ logo_light: { kind: "keep" }, logo_dark: { kind: "keep" }, mark_light: { kind: "keep" }, mark_dark: { kind: "keep" } });
   const [logoErrors, setLogoErrors] = useState<Partial<Record<LogoSlot, string>>>({});
@@ -77,6 +85,12 @@ export default function AppearanceTab() {
     setSidebar(isBandStyle(r.sidebar_style) ? r.sidebar_style : "plain");
     setHeaderHex(parseBand(r.header_band)?.bg ?? "#2e6b4f");
     setSidebarHex(parseBand(r.sidebar_band)?.bg ?? "#2e6b4f");
+    setInkId(r.ink ? r.ink_id ?? CUSTOM_CHOICE : "navy");
+    setInkHex(r.ink ?? VERITAS_INK);
+    setGroundId(r.ground ? r.ground_id ?? CUSTOM_CHOICE : "parchment");
+    if (r.ground) setGroundHex(r.ground.sunken);
+    setNightId(r.night ? r.night_id ?? CUSTOM_CHOICE : "navy-night");
+    if (r.night) setNightHex(r.night.band);
     setWhimsy(parseWhimsy(r.whimsy));
     setLogos({ logo_light: { kind: "keep" }, logo_dark: { kind: "keep" }, mark_light: { kind: "keep" }, mark_dark: { kind: "keep" } });
     setLogoErrors({});
@@ -94,6 +108,17 @@ export default function AppearanceTab() {
   }, [paletteId, customBase, row]);
   const problems = accent ? checkAccent(accent) : [];
   const nearest = paletteId === CUSTOM_PALETTE_ID && customBase && problems.length ? nearestUsableAccent(customBase) : null;
+  // The page's colours as they would be saved (null: the Veritas one).
+  const inkBase = normalizeHex(inkHex);
+  const ink: string | null = inkId === CUSTOM_CHOICE ? inkBase : inkId === "navy" ? null : INKS.find((i) => i.id === inkId)?.value ?? null;
+  const inkProblems = inkId === CUSTOM_CHOICE ? (inkBase ? checkInk(inkBase) : ["Type a colour as six hex digits, like #3d1220."]) : [];
+  const groundBase = normalizeHex(groundHex), nightBase = normalizeHex(nightHex);
+  const ground: GroundTokens | null = useMemo(() => groundId === CUSTOM_CHOICE ? (groundBase ? groundFamily(groundBase) : null)
+    : groundId === "parchment" ? null : GROUNDS.find((g) => g.id === groundId)?.value ?? null, [groundId, groundBase]);
+  const usableInk = inkProblems.length ? null : ink;
+  const night: NightTokens | null = useMemo(() => nightId === NIGHT_FROM_INK ? nightFamily(usableInk ?? VERITAS_INK)
+    : nightId === CUSTOM_CHOICE ? (nightBase ? nightFamily(nightBase) : null)
+    : nightId === "navy-night" ? null : NIGHTS.find((n) => n.id === nightId)?.value ?? null, [nightId, nightBase, usableInk]);
   const headerBase = normalizeHex(headerHex), sidebarBase = normalizeHex(sidebarHex);
   const headerBand: BandTokens | null = useMemo(() => (headerBase ? bandFamily(headerBase) : null), [headerBase]);
   const sidebarBand: BandTokens | null = useMemo(() => (sidebarBase ? bandFamily(sidebarBase) : null), [sidebarBase]);
@@ -118,11 +143,12 @@ export default function AppearanceTab() {
     const okBand = (b: BandTokens | null) => (b && checkBand(b).length === 0 ? b : null);
     return {
       ...DEFAULT_THEME, name: name.trim() || row.name, paletteId, accent, font, bodyFont, whimsy, logos: current, ratio,
+      inkId, ink: usableInk, groundId, ground, nightId, night,
       // A band whose colour does not pass is previewed as Plain, which is what the page would fall back to.
       header: header === "custom" && !okBand(headerBand) ? "plain" : header, headerBand: okBand(headerBand),
       sidebar: sidebar === "custom" && !okBand(sidebarBand) ? "plain" : sidebar, sidebarBand: okBand(sidebarBand),
     };
-  }, [row, accent, logos, name, paletteId, font, bodyFont, header, sidebar, headerBand, sidebarBand, whimsy]);
+  }, [row, accent, logos, name, paletteId, font, bodyFont, header, sidebar, headerBand, sidebarBand, whimsy, inkId, usableInk, groundId, ground, nightId, night]);
 
   async function pickLogo(slot: LogoSlot, file: File | undefined) {
     if (!file) return;
@@ -142,6 +168,7 @@ export default function AppearanceTab() {
     if (!supabase || !row || !accent) return;
     if (problems.length) { setStatus("This palette cannot be saved yet: fix the contrast problems listed under it."); return; }
     if (!name.trim()) { setStatus("Give the co-op a name."); return; }
+    if (inkProblems.length) { setStatus("The ink colour cannot be saved yet: see the note under it."); return; }
     if (headerProblems.length || sidebarProblems.length) { setStatus("A header or sidebar colour cannot be saved yet: see the note under it."); return; }
     setBusy(true);
     setStatus("Saving…");
@@ -172,6 +199,10 @@ export default function AppearanceTab() {
         p_header_band: storedBand(headerBand, row.header_band), p_sidebar_band: storedBand(sidebarBand, row.sidebar_band),
       });
       if (styleError) throw new Error(styleError.message);
+      const { error: pageError } = await supabase.rpc("admin_save_coop_page", {
+        p_ink_id: inkId, p_ink: ink, p_ground_id: groundId, p_ground: ground, p_night_id: nightId, p_night: night,
+      });
+      if (pageError) throw new Error(pageError.message);
       const personalNow = PALETTES.map((p) => p.id).filter((id) => personal.includes(id));
       if (JSON.stringify(personalNow) !== JSON.stringify(row.personal_palettes ?? PALETTES.map((p) => p.id))) {
         const { error: personalError } = await supabase.rpc("admin_set_personal_palettes", { p_ids: personalNow });
@@ -273,6 +304,24 @@ export default function AppearanceTab() {
       </section>
 
       <section className="appearance-card">
+        <p className="card-kicker">Page colours</p>
+        <p className="field-note">The ink is the deep colour of text, primary buttons, selected tabs and the Admin band. It can be any colour at least as deep as navy; the page can be any colour at least as light as parchment, and the dark theme any ground at least as deep as navy night. That rule keeps every palette readable with every choice.</p>
+        <PageChoice label="Ink" value={inkId} onChange={setInkId} disabled={busy}
+          options={INKS.map((i) => ({ id: i.id, label: i.label, swatch: i.value }))}
+          custom={{ hex: inkHex, setHex: setInkHex, problems: inkProblems, nearest: inkBase && inkProblems.length ? nearestUsableInk(inkBase) : null,
+            note: "Any colour at least as deep as navy." }} />
+        <PageChoice label="Page background" value={groundId} onChange={setGroundId} disabled={busy}
+          options={GROUNDS.map((g) => ({ id: g.id, label: g.label, swatch: `linear-gradient(135deg, ${g.value.ground} 55%, ${g.value.panel} 55%)` }))}
+          custom={{ hex: groundHex, setHex: setGroundHex, problems: [], nearest: null, label: "Your own tint",
+            note: "A pale tint of this colour's hue, as light as the portal needs." }} />
+        <PageChoice label="Dark theme" value={nightId} onChange={setNightId} disabled={busy}
+          options={[...NIGHTS.map((n) => ({ id: n.id, label: n.label, swatch: `linear-gradient(135deg, ${n.value.canvas} 55%, ${n.value.band} 55%)` })),
+            { id: NIGHT_FROM_INK, label: "From the ink", swatch: (() => { const n = nightFamily(usableInk ?? VERITAS_INK); return `linear-gradient(135deg, ${n.canvas} 55%, ${n.band} 55%)`; })() }]}
+          custom={{ hex: nightHex, setHex: setNightHex, problems: [], nearest: null, label: "Your own night",
+            note: "A deep ground in this colour's hue, as deep as the portal needs." }} />
+      </section>
+
+      <section className="appearance-card">
         <p className="card-kicker">Header and sidebar</p>
         <p className="field-note">The ready styles only use colour pairs that are already checked. With your own colour, the text on it is cream or navy, whichever reads better, and it is checked before saving; in the dark theme a light colour becomes a deep version of itself. Admin keeps its navy band.</p>
         <BandPicker which="header" label="Header" value={header} onChange={setHeader} disabled={busy} swatchStyle={draft ? themeVarsStyle(draft) : undefined}
@@ -346,7 +395,7 @@ export default function AppearanceTab() {
         <Preview theme={draft} mode="dark" />
       </div>}
       <div className="appearance-actions">
-        <button type="button" onClick={save} disabled={busy || !accent || problems.length > 0 || headerProblems.length > 0 || sidebarProblems.length > 0}>{busy ? "Working…" : "Save appearance"}</button>
+        <button type="button" onClick={save} disabled={busy || !accent || problems.length > 0 || headerProblems.length > 0 || sidebarProblems.length > 0 || inkProblems.length > 0}>{busy ? "Working…" : "Save appearance"}</button>
         {!confirmReset
           ? <button type="button" className="ghost" disabled={busy} onClick={() => setConfirmReset(true)}>Reset to default</button>
           : <span className="appearance-confirm">Go back to the Veritas palette, fonts, styles, small touches and logos?
@@ -412,6 +461,38 @@ function BandPicker({ which, label, value, onChange, disabled, swatchStyle, hex,
       {problems.length > 0 && <div className="appearance-problems" role="alert">
         <ul>{problems.map((p) => <li key={p}>{p}</li>)}</ul>
         {nearest && <button type="button" className="ghost" onClick={() => setHex(nearest)}>Use the nearest shade that works ({nearest})</button>}
+      </div>}
+    </div>}
+  </fieldset>;
+}
+
+/** Ready-made choices for one of the page's colours, and "your own" with a colour picker. */
+function PageChoice({ label, value, onChange, disabled, options, custom }: {
+  label: string; value: string; onChange: (id: string) => void; disabled: boolean;
+  options: { id: string; label: string; swatch: string }[];
+  custom: { hex: string; setHex: (h: string) => void; problems: string[]; nearest: string | null; note: string; label?: string };
+}) {
+  const base = normalizeHex(custom.hex);
+  return <fieldset className="appearance-bands">
+    <legend>{label}</legend>
+    <div role="radiogroup" aria-label={label}>
+      {options.map((o) => <button type="button" key={o.id} role="radio" aria-checked={value === o.id} disabled={disabled}
+        className="appearance-band" onClick={() => onChange(o.id)}>
+        <span className="appearance-page-swatch" style={{ background: o.swatch }} aria-hidden="true" />
+        <span><b>{o.label}</b></span>
+      </button>)}
+      <button type="button" role="radio" aria-checked={value === CUSTOM_CHOICE} disabled={disabled} className="appearance-band" onClick={() => onChange(CUSTOM_CHOICE)}>
+        <span className="appearance-page-swatch" style={{ background: base ?? "transparent" }} aria-hidden="true" />
+        <span><b>{custom.label ?? "Your own colour"}</b></span>
+      </button>
+    </div>
+    {value === CUSTOM_CHOICE && <div className="appearance-custom appearance-band-colour">
+      <label>Colour<input type="color" value={base ?? "#000000"} onChange={(e) => custom.setHex(e.target.value)} disabled={disabled} /></label>
+      <label>Hex<input value={custom.hex} onChange={(e) => custom.setHex(e.target.value)} spellCheck={false} disabled={disabled} /></label>
+      <p className="field-note">{custom.note}</p>
+      {custom.problems.length > 0 && <div className="appearance-problems" role="alert">
+        <ul>{custom.problems.map((p) => <li key={p}>{p}</li>)}</ul>
+        {custom.nearest && <button type="button" className="ghost" onClick={() => custom.setHex(custom.nearest!)}>Use the nearest shade that works ({custom.nearest})</button>}
       </div>}
     </div>}
   </fieldset>;
