@@ -14,6 +14,17 @@ type Notification = {
 
 const POLL_MS = 60_000;
 
+/**
+ * The signed-in person's id, read from the local session (no network). Every
+ * notifications query filters on it: row-level security already limits rows
+ * to the recipient, and the filter keeps the bell to "mine" even if a broader
+ * policy is ever added again (issue #126).
+ */
+export async function myUserId(supabase: NonNullable<ReturnType<typeof getSupabaseBrowserClient>>): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
+}
+
 export function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(ms / 60_000);
@@ -56,9 +67,12 @@ export default function NotificationBell() {
   async function load() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
+    const userId = await myUserId(supabase);
+    if (!userId) return;
     const { data } = await supabase
       .from("notifications")
       .select("id,kind,title,body,link_path,read_at,created_at")
+      .eq("recipient_user_id", userId)
       .order("created_at", { ascending: false })
       .limit(20);
     setItems((data ?? []) as Notification[]);
@@ -93,7 +107,9 @@ export default function NotificationBell() {
   async function markRead(id: string) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+    const userId = await myUserId(supabase);
+    if (!userId) return;
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id).eq("recipient_user_id", userId);
     setItems((current) => current.map((item) => (item.id === id ? { ...item, read_at: new Date().toISOString() } : item)));
   }
 
@@ -102,7 +118,9 @@ export default function NotificationBell() {
     if (!supabase) return;
     const unreadIds = items.filter((item) => !item.read_at).map((item) => item.id);
     if (!unreadIds.length) return;
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", unreadIds);
+    const userId = await myUserId(supabase);
+    if (!userId) return;
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", unreadIds).eq("recipient_user_id", userId);
     setItems((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })));
   }
 

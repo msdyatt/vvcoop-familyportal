@@ -3,7 +3,7 @@
 -- once on every allowed channel, a double click sends once, rate limits, the family-side "Got it", and
 -- the delivery report.
 begin;
-select plan(101);
+select plan(103);
 
 -- Admins A1, A2. Parents B1 (class C1, device), B2 (withdrawn from C1, no device), B3 (email off, no
 -- device), B4 (device, agreed to texts), B5 (device, blocked A1), Q (device, only-urgent mode), D (demo),
@@ -94,6 +94,10 @@ select is(pg_temp.audience('{"type":"people","user_ids":["00000000-0000-0000-000
 select ok(pg_temp.audience('{"type":"everyone"}', 'notice') not like '%d,%' and pg_temp.audience('{"type":"everyone"}', 'notice') not like '%s%@%', 'everyone leaves out reviewer and suspended profiles');
 select ok(pg_temp.audience('{"type":"everyone"}', 'notice') not like '%b5%', 'below urgent, someone who blocked the sender is left out');
 select ok(pg_temp.audience('{"type":"everyone"}', 'urgent') like '%b5%', 'an urgent alert reaches them anyway');
+select ok(pg_temp.audience('{"type":"everyone"}', 'urgent') not like '%a1%' and pg_temp.audience('{"type":"everyone"}', 'urgent') like '%a2%',
+  'the sender is never in their own audience (issue #126); other administrators are');
+select is(pg_temp.audience('{"type":"people","user_ids":["00000000-0000-0000-0000-0000000000a1","00000000-0000-0000-0000-0000000000b1"]}', 'urgent'), 'b1',
+  'even when they pick themselves');
 select throws_ok($$select * from private.broadcast_audience('{"type":"nobody"}', null, 'notice')$$, 'P0001', 'Choose who should receive this.', 'an unknown audience is refused');
 
 -- ---- the preview -----------------------------------------------------------------------------------------
@@ -102,12 +106,12 @@ set local role authenticated;
 create temp table pv_notice as select public.admin_broadcast_preview('{"type":"everyone"}', 'notice') as j;
 create temp table pv_urgent as select public.admin_broadcast_preview('{"type":"everyone"}', 'urgent') as j;
 reset role;
-select is((select j ->> 'total' from pv_notice), '9', 'a notice to everyone reaches 9 people (the one who blocked the sender is left out)');
+select is((select j ->> 'total' from pv_notice), '8', 'a notice to everyone reaches 8 people (not the sender, and not the one who blocked the sender)');
 select is((select j ->> 'push' from pv_notice), '3', 'three by push');
-select is((select j ->> 'email_only' from pv_notice), '4', 'four by email only (no app)');
+select is((select j ->> 'email_only' from pv_notice), '3', 'three by email only (no app)');
 select is((select j ->> 'unreachable' from pv_notice), '2', 'two unreachable: no way to reach one, the other only wants urgent things');
 select is((select j ->> 'quiet_held' from pv_notice), '1', 'the preview says one is held back by only-urgent mode');
-select is((select j ->> 'total' from pv_urgent), '10', 'an urgent alert reaches 10: blocks do not apply');
+select is((select j ->> 'total' from pv_urgent), '9', 'an urgent alert reaches 9: blocks do not apply, and the sender is still left out');
 select is((select j ->> 'push' from pv_urgent), '5', 'five by push, including the only-urgent person');
 select is((select j ->> 'unreachable' from pv_urgent), '1', 'one unreachable');
 select is((select j ->> 'immediate' from pv_urgent), 'true', 'and it says the alert goes out immediately');
