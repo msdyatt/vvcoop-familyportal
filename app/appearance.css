@@ -302,3 +302,22 @@ html[data-text-size="large"] { --text-scale:1.15; }
 .appearance-band-colour { margin-top:10px; }
 .appearance-chip-swatch { display:inline-block; width:12px; height:12px; vertical-align:-1px; border-radius:50%; border:1px solid rgba(var(--fg-rgb),.25); }
 .appearance-page-swatch { flex:none; width:34px; height:34px; border-radius:4px; border:1px solid rgba(var(--fg-rgb),.25); }
+
+/* ---- Ready-made looks (Admin, Appearance; lib/coop-looks.ts) ------------------------------------------------------- */
+.appearance-looks { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px; }
+.appearance-look {
+  display:grid;
+  gap:8px;
+  padding:10px;
+  color:var(--text);
+  background:transparent;
+  text-align:left;
+  border:1px solid rgba(var(--fg-rgb),.25);
+  border-radius:4px;
+  cursor:pointer;
+}
+.appearance-look:hover { background:var(--panel); }
+.appearance-look:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+.appearance-look b { display:block; font:700 14px var(--sans); }
+.appearance-look small { display:block; color:var(--text-muted); font:400 12px/1.35 var(--sans); }
+.appearance-look-swatch { display:grid; grid-template-columns:2fr 3fr 1fr 1fr; height:22px; overflow:hidden; border-radius:3px; border:1px solid rgba(var(--fg-rgb),.2); }

@@ -10,6 +10,7 @@ import {
 import { COOP_SETTINGS_COLUMNS, brandFileUrl, fetchCoopTheme, setCoopTheme } from "../../../lib/coop-settings";
 import { logoProblem } from "../../../lib/logo-files";
 import SeasonalLogosCard from "./seasonal-logos-card";
+import { LOOKS, lookTheme, type Look } from "../../../lib/coop-looks";
 
 /**
  * Admin, Appearance: the co-op's name, support contact, accent palette, fonts, header and sidebar, small touches and logos (issue #140,
@@ -150,6 +151,22 @@ export default function AppearanceTab() {
     };
   }, [row, accent, logos, name, paletteId, font, bodyFont, header, sidebar, headerBand, sidebarBand, whimsy, inkId, usableInk, groundId, ground, nightId, night]);
 
+  /** Fills the draft with a ready-made look. The name, contact and logos stay; nothing is saved until Save. */
+  function applyLook(look: Look) {
+    setPaletteId(look.paletteId);
+    setFont(look.font);
+    setBodyFont(look.bodyFont);
+    setHeader(look.header);
+    setSidebar(look.sidebar);
+    if (look.headerHex) setHeaderHex(look.headerHex);
+    if (look.sidebarHex) setSidebarHex(look.sidebarHex);
+    setInkId(look.inkId);
+    setGroundId(look.groundId);
+    setNightId(look.nightId);
+    setWhimsy({ ...DEFAULT_WHIMSY, ...look.whimsy });
+    setStatus(`The ${look.label} look is in the preview. Adjust anything below, then Save. Your name, contact and logos are unchanged.`);
+  }
+
   async function pickLogo(slot: LogoSlot, file: File | undefined) {
     if (!file) return;
     const result = await logoProblem(slot, file).catch((e: Error) => e.message);
@@ -243,6 +260,17 @@ export default function AppearanceTab() {
 
   return <section className="appearance">
     <div className="appearance-editor">
+      <section className="appearance-card">
+        <p className="card-kicker">Ready-made looks</p>
+        <p className="field-note">A whole look in one click: palette, fonts, header and sidebar, page colours and small touches. It fills in everything below for you to adjust; nothing changes for anyone until you save.</p>
+        <div className="appearance-looks">
+          {LOOKS.map((look) => <button type="button" key={look.id} className="appearance-look" disabled={busy} onClick={() => applyLook(look)}>
+            <LookSwatch look={look} />
+            <span><b>{look.label}</b><small>{look.hint}</small></span>
+          </button>)}
+        </div>
+      </section>
+
       <section className="appearance-card">
         <p className="card-kicker">The co-op</p>
         <label>Name<input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} disabled={busy} /></label>
@@ -464,6 +492,17 @@ function BandPicker({ which, label, value, onChange, disabled, swatchStyle, hex,
       </div>}
     </div>}
   </fieldset>;
+}
+
+/** A look's colours in a strip: header, page, ink and accent. */
+function LookSwatch({ look }: { look: Look }) {
+  const t = lookTheme(look);
+  const ground = t.ground?.ground ?? "#faf7f1", ink = t.ink ?? "#0b2a3d";
+  const header = t.header === "tint" ? t.accent.accent_tint : t.header === "ink" ? ink : t.header === "accent" ? t.accent.night_fill
+    : t.header === "custom" && t.headerBand ? t.headerBand.bg : ground;
+  return <span className="appearance-look-swatch" aria-hidden="true">
+    <span style={{ background: header }} /><span style={{ background: ground }} /><span style={{ background: ink }} /><span style={{ background: t.accent.accent }} />
+  </span>;
 }
 
 /** Ready-made choices for one of the page's colours, and "your own" with a colour picker. */
