@@ -115,3 +115,21 @@ Deno.test("event types the app does not use are acknowledged and ignored", async
   const { deps } = setup();
   assertEquals(await processStripeEvent(deps, event("customer.created", { id: "cus_1" })), "ignored");
 });
+
+Deno.test("refunds: the portal's refund id travels with the refund, so an early webhook matches the admin's refund (#185)", async () => {
+  const { admin, deps } = setup();
+  await processStripeEvent(deps, event("refund.created", {
+    id: "re_9", amount: 1000, status: "succeeded", payment_intent: "pi_1", charge: "ch_1",
+    metadata: { refund_id: "11111111-2222-3333-4444-555555555555", payment_id: "pay-1" },
+  }));
+  assertEquals(admin.called("billing_apply_refund")[0].args.p_refund_id, "11111111-2222-3333-4444-555555555555");
+  await processStripeEvent(deps, event("refund.created", { id: "re_10", amount: 1000, status: "succeeded", payment_intent: "pi_1", metadata: { refund_id: "not-a-uuid" } }));
+  assertEquals(admin.called("billing_apply_refund")[1].args.p_refund_id, null, "anything else in metadata is ignored");
+});
+
+Deno.test("refunds: a refund on a charge that is not a dues payment is acknowledged, not retried (#185)", async () => {
+  const admin = fakeAdmin({ tables: { dues_payments: [] }, rpc: { billing_apply_refund: () => ({ data: "not_ours" }) } });
+  const stripe = fakeStripe({});
+  const result = await processStripeEvent({ admin: admin.client, stripe: stripe.stripe }, event("refund.created", { id: "re_x", amount: 500, status: "succeeded", payment_intent: "pi_donation" }));
+  assertEquals(result, "not_ours", "a 200, so Stripe stops redelivering");
+});

@@ -87,13 +87,23 @@ export async function applyFetchedPaymentIntent(deps: EventDeps, pi: any, eventI
   return `${status}:${result}`;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The portal's own refund row, which refundDuesPayment names in the refund's metadata. */
+export function portalRefundId(refund: any): string | null {
+  const id = refund?.metadata?.refund_id;
+  return typeof id === "string" && UUID.test(id) ? id : null;
+}
+
 async function applyRefund(deps: EventDeps, refund: any, eventId: string): Promise<string> {
   const paymentIntent = typeof refund.payment_intent === "string" ? refund.payment_intent : refund.payment_intent?.id ?? null;
   const charge = typeof refund.charge === "string" ? refund.charge : refund.charge?.id ?? null;
+  // Passing our row's id lets a webhook that beats billing_attach_refund find the
+  // refund the admin started, instead of recording a second one (#185).
   return await rpc(deps.admin, "billing_apply_refund", {
     p_stripe_refund_id: refund.id, p_payment_intent: paymentIntent, p_stripe_charge: charge,
     p_amount_cents: refund.amount, p_status: refund.status, p_event_id: eventId,
-    p_failure: refund.failure_reason ? String(refund.failure_reason) : null,
+    p_failure: refund.failure_reason ? String(refund.failure_reason) : null, p_refund_id: portalRefundId(refund),
   }) as string;
 }
 

@@ -59,6 +59,7 @@ export async function syncPendingPayments(deps: Deps): Promise<{ checked: number
         const result = await admin.rpc("billing_apply_refund", {
           p_stripe_refund_id: refund.id, p_payment_intent: refund.payment_intent ?? null, p_stripe_charge: refund.charge ?? null,
           p_amount_cents: refund.amount, p_status: refund.status, p_event_id: null, p_failure: refund.failure_reason ?? null,
+          p_refund_id: row.id,
         });
         if (result.data === "applied") changed++;
         continue;
