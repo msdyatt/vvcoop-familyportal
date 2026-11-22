@@ -14,6 +14,7 @@ import { applyPersonalAccent, applyTextSize, isAccentChoice, readStoredAccent, r
 import BarCustomizer from "./bar-customizer";
 import ThemeChoiceControl from "./theme-choice";
 import DetailModal from "./detail-modal";
+import { usePathname } from "next/navigation";
 
 type Props = {
   /** The page's own area. The Teacher pages are part of the main portal; Messages, Photos and Calendar belong to whichever bar was visited last. */
@@ -62,8 +63,9 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
   const [editing, setEditing] = useState(false);
   const [prefs, setPrefs] = useState<NavPrefs>(() => (typeof window === "undefined" ? {} : readCachedPrefs()));
   const [userId, setUserId] = useState<string | null>(null);
-  // Where we are, read once per page; every destination is a full page load (or a same-page anchor).
-  const [path] = useState(() => (typeof window === "undefined" ? "" : window.location.pathname));
+  // Where we are. The bar stays mounted from page to page (portal-frame.tsx), so the path comes from the router
+  // and follows each move; the query and #section are re-read on vv-locationchange.
+  const path = usePathname() ?? "";
   const [hash, setHash] = useState(() => (typeof window === "undefined" ? "" : window.location.hash));
   const [search, setSearch] = useState(() => (typeof window === "undefined" ? "" : window.location.search));
 
@@ -186,7 +188,7 @@ export default function AppTabBar({ current, roles, onOpenAccount, onTour, onSig
 
     {menuOpen && <DetailModal title="Menu" backLayer={false} onClose={() => setMenuOpen(false)}>
       <ul className="app-menu">
-        <PortalMenuItems roles={roles} />
+        <PortalMenuItems roles={roles} onNavigate={() => setMenuOpen(false)} />
         <li><button type="button" onClick={() => { setMenuOpen(false); setEditing(true); }}>Customize bottom bar</button></li>
         <li><button type="button" onClick={() => { setMenuOpen(false); onOpenAccount(); }}>Account &amp; security</button></li>
         <li className="app-menu-theme"><p className="app-menu-theme-label">Appearance</p><ThemeChoiceControl compact /></li>

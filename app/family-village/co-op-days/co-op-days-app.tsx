@@ -5,7 +5,8 @@ import { getSupabaseBrowserClient } from "../../../lib/supabase";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import { dayLabel, shiftLabel, type MyCoopDay, type MyCoopDays } from "../../../lib/teaching-commitment";
 import PageSkeleton from "../page-skeleton";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
+import { COOP_DAYS_HEADER } from "../../../lib/portal-chrome";
 import MfaChallengeScreen from "../mfa-challenge";
 
 /**
@@ -15,8 +16,8 @@ import MfaChallengeScreen from "../mfa-challenge";
  * who did not come. The database decides what is allowed (public.my_coop_days and the functions beside it).
  */
 
-const TITLE = "Co-op days";
-const SUBTITLE = "Your teaching and assisting shifts, days you can't make it, and shifts to cover.";
+const TITLE = COOP_DAYS_HEADER.title;
+const SUBTITLE = COOP_DAYS_HEADER.subtitle;
 
 async function signOutToEntry() {
   await getSupabaseBrowserClient()?.auth.signOut();
@@ -51,14 +52,13 @@ export default function CoopDaysApp() {
     await load();
   }
 
-  if (access === "loading") return <main className="workspace-preview coop-days-page"><AppHeader current="home" roles={roles} title={TITLE} subtitle={SUBTITLE} /><PageSkeleton /></main>;
+  if (access === "loading") return <PortalPage className="workspace-preview coop-days-page" current="home" roles={roles} title={TITLE} subtitle={SUBTITLE}><PageSkeleton /></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
-  if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></main>;
+  if (access === "denied") return <PortalPage className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></PortalPage>;
 
   const upcoming = (data?.days ?? []).filter((day) => day.day >= (data?.today ?? ""));
   const recent = (data?.days ?? []).filter((day) => day.day < (data?.today ?? "")).reverse();
-  return <main className="workspace-preview coop-days-page">
-    <AppHeader current="home" roles={roles} title={TITLE} subtitle={SUBTITLE} />
+  return <PortalPage className="workspace-preview coop-days-page" current="home" roles={roles} title={TITLE} subtitle={SUBTITLE}>
     <p className="field-note">
       Your classes and hall monitor periods are counted on every co-op day without you doing anything. If you can&rsquo;t
       come, say so here as early as you can: your shifts open up for someone else to take. If you covered for someone,
@@ -74,7 +74,7 @@ export default function CoopDaysApp() {
       <p className="field-note">Covered for someone who didn&rsquo;t come? Log it here so it counts.</p>
       {recent.map((day) => <DayCard key={day.id} day={day} today={data!.today} household={data!.household?.name ?? null} busy={busy} call={call} />)}
     </>}
-  </main>;
+  </PortalPage>;
 }
 
 function DayCard({ day, today, household, busy, call }: {

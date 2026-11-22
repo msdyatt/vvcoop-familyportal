@@ -12,7 +12,7 @@ import {
   type Adjustment, type BillingSettings, type DiscountLine, type DuesCharge, type Installment, type Payment, type Plan,
   type RequirementOptions, type SavedMethod,
 } from "../../../lib/dues";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
 import MfaChallengeScreen from "../mfa-challenge";
 
 type Loaded = {
@@ -96,13 +96,12 @@ export default function DuesApp() {
   }, [access, load, returned]);
 
   // The header and bar stay put while the page fills in; only the content area is a placeholder.
-  if (access === "loading") return <main className="workspace-preview dues-page"><AppHeader current="home" roles={roles} title={"Dues"} subtitle={"What you owe, what you have paid, and receipts."} /><PageSkeleton /></main>;
+  if (access === "loading") return <PortalPage className="workspace-preview dues-page" current="home" roles={roles} title={"Dues"} subtitle={"What you owe, what you have paid, and receipts."}><PageSkeleton /></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
-  if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></main>;
+  if (access === "denied") return <PortalPage className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></PortalPage>;
 
   const provider = data?.settings?.provider ?? "off";
-  return <main className="workspace-preview dues-page">
-    <AppHeader current="home" roles={roles} title="Dues" subtitle="What you owe, what you have paid, and receipts." />
+  return <PortalPage className="workspace-preview dues-page" current="home" roles={roles} title="Dues" subtitle="What you owe, what you have paid, and receipts.">
     {provider === "stripe_test" && <p className="dues-test-banner" role="status"><b>Test mode.</b> Payments here are practice only. No real money moves and receipts are marked as tests.</p>}
     {returned === "success" && <p className="dues-flash" role="status">Thank you. Your payment is being confirmed. Card payments show up within a minute; bank transfers take 1–4 business days to clear.</p>}
     {returned === "canceled" && <p className="dues-flash" role="status">You left the payment page before paying, so nothing was charged.</p>}
@@ -112,7 +111,7 @@ export default function DuesApp() {
     {embed && <EmbeddedPayment info={embed} onClose={() => { setEmbed(null); void load(); }} />}
     {data && data.charges.map((charge) => <ChargeCard key={charge.id} charge={charge} data={data} onChanged={load} onEmbed={setEmbed} onPaid={() => setReturned("success")} />)}
     <p className="dues-footnote">Questions about a charge? Message an administrator from Messages. Your card or bank details are entered on Stripe&rsquo;s secure page and are never stored by the co-op.</p>
-  </main>;
+  </PortalPage>;
 }
 
 function ChargeCard({ charge, data, onChanged, onEmbed, onPaid }: { charge: DuesCharge; data: Loaded; onChanged: () => Promise<void>; onEmbed: (info: EmbedInfo) => void; onPaid: () => void }) {

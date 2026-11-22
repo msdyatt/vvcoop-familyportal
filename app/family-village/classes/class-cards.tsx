@@ -6,24 +6,21 @@ import { formatDayShort } from "../../../lib/schedule";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import PageSkeleton from "../page-skeleton";
 import MfaChallengeScreen from "../mfa-challenge";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
+import { CLASSES_HEADERS, type ClassesScope, goTo } from "../../../lib/portal-chrome";
 import TeacherNav from "../teacher/teacher-nav";
 import {
   ClassCardData, Overview, classHref, gradesLabel, isCurrent, loadOverview, openClassChat,
 } from "./class-data";
 
-export type ClassesScope = "teaching" | "family" | "both";
+export type { ClassesScope };
 
 async function signOutToEntry() {
   await getSupabaseBrowserClient()?.auth.signOut();
   window.location.assign("/family-village");
 }
 
-const TITLES: Record<ClassesScope, { title: string; subtitle: string }> = {
-  teaching: { title: "My classes", subtitle: "The classes you teach this year." },
-  family: { title: "Classes", subtitle: "Your children’s classes, dates and files." },
-  both: { title: "Classes", subtitle: "Classes you teach and your children’s classes." },
-};
+const TITLES = CLASSES_HEADERS;
 
 /**
  * The classes page. A teacher's route shows the classes they teach, a family's route
@@ -33,25 +30,23 @@ export default function ClassesOverview({ scope }: { scope: ClassesScope }) {
   const { state: access, userId, roles, recheck } = usePortalAccess(scope === "teaching" ? "teacher" : "member");
   const head = TITLES[scope];
 
-  if (access === "loading") return <main className="workspace-preview cls-page"><AppHeader current={scope === "teaching" ? "teacher" : "home"} roles={roles} title={head.title} subtitle={head.subtitle} /><PageSkeleton /></main>;
+  if (access === "loading") return <PortalPage className="workspace-preview cls-page" current={scope === "teaching" ? "teacher" : "home"} roles={roles} title={head.title} subtitle={head.subtitle}><PageSkeleton /></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
-  if (access === "denied") return <main className="portal-state"><p className="eyebrow">{scope === "teaching" ? "Private teacher workspace" : "Private family portal"}</p><h1>{scope === "teaching" ? "Teacher access is required." : "Please sign in."}</h1><a href="/family-village">Return to Family Village →</a></main>;
+  if (access === "denied") return <PortalPage className="portal-state"><p className="eyebrow">{scope === "teaching" ? "Private teacher workspace" : "Private family portal"}</p><h1>{scope === "teaching" ? "Teacher access is required." : "Please sign in."}</h1><a href="/family-village">Return to Family Village →</a></PortalPage>;
 
-  const header = <AppHeader current={scope === "teaching" ? "teacher" : "home"} roles={roles} title={head.title} subtitle={head.subtitle} />;
+  const header = { current: scope === "teaching" ? "teacher" as const : "home" as const, roles, title: head.title, subtitle: head.subtitle };
 
   // The teacher section keeps its side links on a wide screen.
-  if (scope === "teaching") return <main className="workspace-preview cls-page">
-    {header}
+  if (scope === "teaching") return <PortalPage className="workspace-preview cls-page" {...header}>
     <section className="workspace-grid">
       <TeacherNav active="classes" />
       <div className="cls-wrap wide"><ClassesSection userId={userId} scope={scope} /></div>
     </section>
-  </main>;
+  </PortalPage>;
 
-  return <main className="workspace-preview cls-page">
-    {header}
+  return <PortalPage className="workspace-preview cls-page" {...header}>
     <div className="cls-wrap"><ClassesSection userId={userId} scope={scope} /></div>
-  </main>;
+  </PortalPage>;
 }
 
 /** The cards on their own, for a page that already has its own header (the Teacher home). */
@@ -123,7 +118,7 @@ function ClassCard({ item }: { item: ClassCardData }) {
     setBusy(true); setProblem("");
     const result = await openClassChat(supabase, item.id, item.chatId);
     if ("error" in result) { setProblem(result.error); setBusy(false); return; }
-    window.location.assign(result.href);
+    goTo(result.href);
   }
 
   const seats = item.capacity ? ` of ${item.capacity} seats` : "";

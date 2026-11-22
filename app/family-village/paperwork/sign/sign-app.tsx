@@ -9,7 +9,7 @@ import {
   requestSeal, requestStatusLabel, signerStatusLabel, statusTone,
   type Mark, type SignField, type SignRequest, type SignSigner, type SignValue,
 } from "../../../../lib/sign";
-import AppHeader from "../../app-header";
+import PortalPage from "../../portal-page";
 import MfaChallengeScreen from "../../mfa-challenge";
 import PdfPages from "../../pdf-pages";
 import SignatureDialog from "./signature-dialog";
@@ -153,8 +153,8 @@ export default function SignApp() {
     document.getElementById(`field-${target.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  if (access === "loading") return <main className="workspace-preview"><p className="portal-empty">Loading…</p></main>;
-  if (access === "denied") return <main className="workspace-preview"><p className="portal-empty">Sign in to your Family Village account to sign this document.</p><p><a href="/family-village">Go to sign in</a></p></main>;
+  if (access === "loading") return <PortalPage className="workspace-preview"><p className="portal-empty">Loading…</p></PortalPage>;
+  if (access === "denied") return <PortalPage className="workspace-preview"><p className="portal-empty">Sign in to your Family Village account to sign this document.</p><p><a href="/family-village">Go to sign in</a></p></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={() => { window.location.href = "/family-village"; }} />;
 
   const nameOf = (slot: number) => loaded?.signers.find((s) => s.slot === slot)?.display_name ?? `Signer ${slot}`;
@@ -202,8 +202,7 @@ export default function SignApp() {
     });
   }
 
-  return <main className="workspace-preview sign-page">
-    <AppHeader current="home" roles={roles} title="Sign a document" subtitle="Read it, then sign it here." />
+  return <PortalPage className="workspace-preview sign-page" current="home" roles={roles} title="Sign a document" subtitle="Read it, then sign it here.">
     <p><a className="sign-back" href="/family-village/documents">← Back to documents</a></p>
     {problem && <p className="portal-empty" role="alert">{problem}</p>}
     {!problem && !loaded && <p className="portal-empty">Loading…</p>}
@@ -266,5 +265,5 @@ export default function SignApp() {
         setDialog(null);
       }}
     />}
-  </main>;
+  </PortalPage>;
 }

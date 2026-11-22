@@ -8,7 +8,7 @@ import PageSkeleton from "../page-skeleton";
 import { useBackLayer } from "../../../lib/use-back-layer";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import MfaChallengeScreen from "../mfa-challenge";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
 import AdminDashboard from "./dashboard";
 import { ADMIN_TAB_EVENT } from "../../../lib/desktop-nav";
 import { useAdminAccess } from "../../../lib/admin-access";
@@ -104,11 +104,10 @@ export default function AdminWorkspace() {
   }
   async function invite(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const supabase = getSupabaseBrowserClient(); if (!supabase) return; setBusy(true); setMessage(""); const { data, error } = await supabase.functions.invoke("invite-family-admin", { body: { familyName, adminName, email, note } }); setBusy(false); if (error || data?.error) { setMessage(await functionErrorMessage(error, data, "The invitation could not be sent. Check the email service configuration and try again.")); return; } setMessage(data?.warning ?? `Invitation sent to ${email}. The link expires in 24 hours.`); setFamilyName(""); setAdminName(""); setEmail(""); setNote(""); await loadInvitations(); }
   // The header and bar stay put while the page fills in; only the content area is a placeholder.
-  if (access === "loading") return <main className="admin-live"><AppHeader current="admin" roles={roles} title={"Village administration"} subtitle={"Invite families, manage rosters, and publish news."} /><PageSkeleton /></main>;
+  if (access === "loading") return <PortalPage className="admin-live" current="admin" roles={roles} title={"Village administration"} subtitle={"Invite families, manage rosters, and publish news."}><PageSkeleton /></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
-  if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private administrator workspace</p><h1>Administrator access is required.</h1><a href="/family-village">Return to Family Village →</a></main>;
-  return <main className="admin-live">
-    <AppHeader current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news." />
+  if (access === "denied") return <PortalPage className="portal-state"><p className="eyebrow">Private administrator workspace</p><h1>Administrator access is required.</h1><a href="/family-village">Return to Family Village →</a></PortalPage>;
+  return <PortalPage className="admin-live" current="admin" roles={roles} title="Village administration" subtitle="Invite families, manage rosters, and publish news.">
     <label className="admin-mobile-nav"><span>Admin section</span><select value={tab} onChange={(event) => setTab(event.target.value as Tab)}>
       <option value="dashboard">Overview</option><option value="inbox">Office inbox</option><option value="invitations">Invitations</option><option value="families">Families</option><option value="classes">Classes</option><option value="commitment">Teaching commitment</option><option value="documents">Documents</option><option value="dues">Dues</option><option value="expenses">Expenses</option><option value="tax-summary">Year-end tax summary</option><option value="news">News &amp; calendar</option><option value="broadcasts">Broadcasts</option><option value="reports">Reports</option><option value="vault">Records vault</option><option value="deadlines">Compliance</option><option value="activity">Activity</option><option value="message-reports">Reported messages</option><option value="appearance">Appearance</option><option value="integrations">Integrations</option><option value="permissions">Admin permissions</option>
     </select></label>
@@ -165,5 +164,5 @@ export default function AdminWorkspace() {
     {tab === "permissions" && <PermissionsTab />}
     </div>
     </div>
-  </main>;
+  </PortalPage>;
 }

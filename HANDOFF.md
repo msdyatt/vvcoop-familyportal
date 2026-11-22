@@ -132,6 +132,7 @@ Known open problems:
 - **Stacked PRs** that target a non-`main` base do not start CI. Open each PR against `main`, one at a time.
 - **GitHub Actions minutes:** the repo is private, so CI draws on a monthly allowance. Check Settings, Billing if checks stop starting.
 - **Server and client date formatting differ.** Use the pinned helpers (`formatDate`, `formatMoney`) to avoid hydration mismatches and day-early dates in Central Time.
+- **Moving between portal pages does not reload the document.** `app/family-village/layout.tsx` draws the header, sidebar, bell and bottom bar once (`portal-frame.tsx`) and a click on any `/family-village/...` link swaps only the page. A new page wraps its content in `<PortalPage className=... title=...>` instead of `<main>` plus a header, and is added to the route list in `lib/portal-chrome.ts`. For a move from code use `goTo()` from the same file, not `window.location`. The iPhone app is left out on purpose: it opens every link as its own native screen. `tests/portal-navigation.test.mjs` guards this.
 - **Migrations do not remove deployed edge functions.** Deleting a function folder does not delete it from Supabase.
 
 ## 10. Making a change (checklist)

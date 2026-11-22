@@ -7,7 +7,7 @@ import { getSignedFileUrls } from "../../../lib/storage";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import { useBackLayer } from "../../../lib/use-back-layer";
 import { conversationTitle, isChannel, shortTime, type ConversationRow } from "../../../lib/messages";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
 import ConversationAvatar from "./conversation-avatar";
 import { conversationFlavour, conversationTone } from "../../../lib/message-colors";
 import MfaChallengeScreen from "../mfa-challenge";
@@ -77,9 +77,9 @@ export default function MessagesApp() {
   }
 
   // The header and bar stay put while the page fills in; only the content area is a placeholder.
-  if (access === "loading") return <main className="workspace-preview messages-page"><AppHeader current="home" roles={roles} title={"Messages"} subtitle={"Talk with teachers and other families."} /><PageSkeleton /></main>;
+  if (access === "loading") return <PortalPage className="workspace-preview messages-page" current="home" roles={roles} title={"Messages"} subtitle={"Talk with teachers and other families."}><PageSkeleton /></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
-  if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></main>;
+  if (access === "denied") return <PortalPage className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></PortalPage>;
 
   const selected = conversations.find((row) => row.id === selectedId) ?? null;
 
@@ -113,8 +113,7 @@ export default function MessagesApp() {
     { key: "archived", label: "Archived", rows: conversations.filter((row) => !!row.archived_at) },
   ];
 
-  return <main className="workspace-preview messages-page">
-    <AppHeader current="home" roles={roles} title="Messages" subtitle="Talk with teachers and other families." />
+  return <PortalPage className="workspace-preview messages-page" current="home" roles={roles} title="Messages" subtitle="Talk with teachers and other families.">
     <div className="messages-shell" data-view={selected ? "thread" : "list"}>
       <aside className="messages-list" aria-label="Conversations">
         <div className="messages-list-head">
@@ -153,5 +152,5 @@ export default function MessagesApp() {
 
     {creating && <NewConversation roles={roles} userId={userId} canCreateChannel={canCreateChannel} onClose={() => setCreating(false)}
       onOpen={(id) => { setCreating(false); void loadConversations(); select(id); }} />}
-  </main>;
+  </PortalPage>;
 }

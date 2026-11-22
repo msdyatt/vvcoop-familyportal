@@ -28,7 +28,11 @@ import { clearNavCache, readCachedTeaches, sectionOf, withTeaching, writeCachedT
 import { teachesThisYear } from "../../lib/teaching-access";
 
 
-export default function AppHeader({ current, roles: held, title, subtitle }: { current: PortalKey; roles: string[]; title: string; subtitle?: string }) {
+/**
+ * The portal's shell: sidebar, header (logo, title, Jump to, bell, account), tab strip and bottom bar. Drawn once by
+ * the portal frame (portal-frame.tsx) and kept mounted from page to page; pages set its title with <PortalPage>.
+ */
+export function AppShell({ current, roles: held, title, subtitle }: { current: PortalKey; roles: string[]; title: string; subtitle?: string }) {
   // Teaching shows for anyone with a class this year, not by role alone (lib/teaching-access.ts). The last answer is
   // kept on the device so it is right from the first paint, then confirmed once the person is known.
   const [teaches, setTeaches] = useState(() => (typeof window === "undefined" ? false : readCachedTeaches()));

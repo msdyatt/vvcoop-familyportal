@@ -6,7 +6,7 @@ import PageSkeleton from "../page-skeleton";
 import { PRIVATE_BUCKET, getSignedFileUrls } from "../../../lib/storage";
 import { usePortalAccess } from "../../../lib/use-portal-access";
 import { PHOTO_COLUMNS, PHOTO_PAGE, likePattern, photoDate, type Album, type ClassOption, type PhotoRow, type YearOption } from "../../../lib/photos";
-import AppHeader from "../app-header";
+import PortalPage from "../portal-page";
 import MfaChallengeScreen from "../mfa-challenge";
 import PhotoUpload from "./photo-upload";
 import PhotoViewer from "./photo-viewer";
@@ -147,9 +147,9 @@ export default function PhotosApp() {
   }
 
   // The header and bar stay put while the page fills in; only the content area is a placeholder.
-  if (access === "loading") return <main className="workspace-preview photos-page"><AppHeader current="home" roles={roles} title={"Photos"} subtitle={"The co-op's shared library, kept here."} /><PageSkeleton /></main>;
+  if (access === "loading") return <PortalPage className="workspace-preview photos-page" current="home" roles={roles} title={"Photos"} subtitle={"The co-op's shared library, kept here."}><PageSkeleton /></PortalPage>;
   if (access === "mfa-challenge") return <MfaChallengeScreen onVerified={recheck} onCancel={signOutToEntry} />;
-  if (access === "denied") return <main className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></main>;
+  if (access === "denied") return <PortalPage className="portal-state"><p className="eyebrow">Private family portal</p><h1>Please sign in.</h1><a href="/family-village">Return to sign in →</a></PortalPage>;
 
   const canReview = (photo: PhotoRow) => roles.includes("admin") || (photo.class_id !== null && teachingIds.has(photo.class_id));
   const open = [...photos, ...pending].find((row) => row.id === openId) ?? null;
@@ -167,8 +167,7 @@ export default function PhotosApp() {
     {extra}
   </li>;
 
-  return <main className="workspace-preview photos-page">
-    <AppHeader current="home" roles={roles} title="Photos" subtitle="The co-op's shared library, kept here." />
+  return <PortalPage className="workspace-preview photos-page" current="home" roles={roles} title="Photos" subtitle="The co-op's shared library, kept here.">
 
     <div className="photos-toolbar">
       <div className="photos-filters">
@@ -223,5 +222,5 @@ export default function PhotosApp() {
     {open && <PhotoViewer photo={open} userId={userId} onReported={() => setStatus("Thank you. That photo is hidden until an administrator has reviewed it.")} isAdmin={roles.includes("admin")} teachingIds={teachingIds}
       albums={albums} classes={classes} onClose={() => setOpenId(null)} onChanged={afterChange} />}
     <p className="portal-empty photos-note">Photos here are for the co-op&rsquo;s families only. {photos[0] ? `Most recent: ${photoDate(photos[0])}.` : ""}</p>
-  </main>;
+  </PortalPage>;
 }

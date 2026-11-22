@@ -5,6 +5,7 @@ import { getSupabaseBrowserClient } from "../../lib/supabase";
 import { useOutsideClick } from "../../lib/use-outside-click";
 import { nativeFrame } from "../../lib/native-frame";
 import { recordOpenFromAddress } from "../../lib/notification-open";
+import { goTo } from "../../lib/portal-chrome";
 
 type Notification = {
   id: string; kind: string; title: string; body: string | null;
@@ -106,13 +107,13 @@ export default function NotificationBell() {
   }
 
   async function openItem(item: Notification) {
-    // Awaited, not fire-and-forget: window.location.assign() below is a real
+    // Awaited, not fire-and-forget: goTo() below can be a real
     // navigation, and browsers abort in-flight requests on navigate -- firing
     // markRead without waiting for it raced the read-receipt write against
     // the page unload often enough that a clicked notification stayed
     // "unread" the next time the bell reloaded.
     if (!item.read_at) await markRead(item.id);
-    if (item.link_path) window.location.assign(item.link_path);
+    if (item.link_path) goTo(item.link_path);
     setOpen(false);
   }
 
