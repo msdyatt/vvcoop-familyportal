@@ -238,3 +238,28 @@ and lighten a light one, so they only ever add contrast.
 Ready-made palettes: fourteen now (Veritas first, then meadow, harbor, plum, teal, ochre, berry, rose, lavender,
 indigo, sky, slate, olive, marigold). Each passes every check; the database's list of palettes members may be offered
 is the same (the test checks).
+
+## The page's colours: ink, page background, dark theme
+
+Admin, Appearance, "Page colours" has three choices, each with ready-made options and "your own":
+
+- **Ink**: the deep colour of text, primary buttons, selected tabs, the Admin band, emails' frame and headings, and the
+  browser's bar by day (navy, forest, burgundy, plum, deep teal, espresso, charcoal, or any colour). It replaces
+  `--navy` / `--navy-rgb`.
+- **Page background**: the light theme's page, cards, inputs and panels (parchment, clean white, cool snow, sage mist,
+  sky mist, blush, lavender mist, or a pale tint of any colour's hue; `groundFamily`). It sets `--ground`,
+  `--ground-surface`, `--ground-sunken`, `--ground-panel` and their `-rgb`. Paper (PDFs, report sheets, the email
+  preview) keeps the bundled cream.
+- **Dark theme**: the dark theme's page, cards, inputs, panels, bands and fields (navy night, charcoal, forest night,
+  plum night, espresso, true black, one built from the ink, or one from any colour's hue; `nightFamily`). It sets
+  the `--night-*` properties, which the dark blocks in `app/theme.css` read, and the browser's bar at night.
+
+**The rule that keeps every combination readable.** The ink must be at least as deep as navy; each light ground at
+least as light as the Veritas one; each dark ground at least as deep as the Veritas night (`checkInk`, `checkGround`,
+`checkNight`; the database's `private.coop_page_problems`). Every contrast check in the portal pairs a dark colour
+with a light one, so moving them further apart can only add contrast, for every palette, header and sidebar colour
+and personal accent. `tests/theme-contrast.test.mjs` runs the full pair list over every ready-made combination and
+over custom colours from twelve hues to confirm it. A custom ink that is too light is refused, with the nearest
+shade that works; page tints and dark themes are generated within the rule, so they always pass.
+
+Not themed: the iPhone app's native bars and screens keep their navy and cream (they take the accent only).

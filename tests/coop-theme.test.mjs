@@ -353,6 +353,36 @@ test("the database checks a band with the same rules", () => {
   assert.match(bandsSql, /v_night \+ 1e-9 < 4\.5/);
 });
 
+// ---- The page's colours --------------------------------------------------------------------------------------------
+
+test("the head script puts the ink, page and dark theme on the page exactly as the page does", () => {
+  const theme = coop.parseTheme({ v: 1, inkId: "burgundy", ink: "#3d1220", groundId: "sage", ground: coop.GROUNDS.find((g) => g.id === "sage").value,
+    nightId: "from-ink", night: coop.nightFamily("#3d1220") });
+  assert.equal(theme.ink, "#3d1220");
+  const vars = runScript(theme);
+  assert.deepEqual(vars, coop.themeVars(theme));
+  assert.equal(vars["--navy"], "#3d1220");
+  assert.equal(vars["--navy-rgb"], "61,18,32");
+  assert.equal(vars["--ground"], theme.ground.ground);
+  assert.equal(vars["--night-band"], theme.night.band);
+});
+
+test("an ink, page or dark theme outside the rule is not worn from a cache: the Veritas one is", () => {
+  const t = coop.parseTheme({ v: 1, ink: "#2f6b8a", ground: { ...coop.VERITAS_GROUND, panel: "#cfd4cc" }, night: { ...coop.VERITAS_NIGHT, band: "#2b6a8f" } });
+  assert.equal(t.ink, null);
+  assert.equal(t.ground, null);
+  assert.equal(t.night, null);
+  assert.equal(t.inkId, "navy");
+  assert.equal(coop.themeVars(t)["--navy"], undefined, "the stylesheet's navy stays");
+});
+
+test("the database holds the page's colours to the same rule", async () => {
+  const sql = await readFile(new URL("../supabase/migrations/20261122100000_page_colours.sql", import.meta.url), "utf8");
+  assert.ok(sql.includes(`private.hex_luminance('${coop.VERITAS_INK}')`), "the ink limit is navy");
+  for (const k of coop.GROUND_KEYS) assert.ok(sql.includes(`('${k}', '${coop.VERITAS_GROUND[k]}'`), `ground ${k}`);
+  for (const k of coop.NIGHT_KEYS) assert.ok(sql.includes(`('${k}', '${coop.VERITAS_NIGHT[k]}'`), `night ${k}`);
+});
+
 test("the settings fetch asks for every column the theme is built from", async () => {
   const lib = await readFile(new URL("../lib/coop-theme.ts", import.meta.url), "utf8");
   const body = lib.slice(lib.indexOf("export function themeFromRow"), lib.indexOf("\n}\n", lib.indexOf("export function themeFromRow")));

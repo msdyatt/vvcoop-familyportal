@@ -292,3 +292,69 @@ test("a cached theme is taken whole or not at all", () => {
   assert.equal(coop.parseTheme({ ...good, font: "comic" }).font, "playfair");
   assert.deepEqual(coop.parseTheme("junk"), coop.DEFAULT_THEME);
 });
+
+// ---- The page's colours: ink, light grounds, dark grounds (lib/coop-theme.ts) -------------------------------------
+
+/** The stylesheet's tokens with a co-op's ink, light grounds and dark grounds in place. */
+function withPage(vars, { ink, ground, night }) {
+  const next = { ...vars };
+  if (ink) { next["--navy"] = ink; next["--navy-rgb"] = coop.rgbTriplet(ink); }
+  if (ground) {
+    for (const k of coop.GROUND_KEYS) next[coop.GROUND_VARS[k]] = ground[k];
+    next["--ground-rgb"] = coop.rgbTriplet(ground.ground);
+    next["--ground-panel-rgb"] = coop.rgbTriplet(ground.panel);
+  }
+  if (night) {
+    for (const k of coop.NIGHT_KEYS) next[coop.NIGHT_VARS[k]] = night[k];
+    next["--night-canvas-rgb"] = coop.rgbTriplet(night.canvas);
+    next["--night-panel-rgb"] = coop.rgbTriplet(night.panel);
+    next["--night-band-rgb"] = coop.rgbTriplet(night.band);
+  }
+  return next;
+}
+
+test("the Veritas ink, grounds and night in lib/coop-theme.ts are exactly the stylesheet's", () => {
+  assert.equal(coop.VERITAS_INK, light["--navy"]);
+  for (const k of coop.GROUND_KEYS) assert.equal(coop.VERITAS_GROUND[k], light[coop.GROUND_VARS[k]], k);
+  for (const k of coop.NIGHT_KEYS) assert.equal(coop.VERITAS_NIGHT[k], light[coop.NIGHT_VARS[k]], k);
+  assert.equal(light["--ground-rgb"], coop.rgbTriplet(coop.VERITAS_GROUND.ground));
+  assert.equal(light["--night-band-rgb"], coop.rgbTriplet(coop.VERITAS_NIGHT.band));
+});
+
+test("every ready-made ink, page and dark theme, with any palette, passes every token pair in both themes", () => {
+  const bad = [];
+  const palettes = ["veritas", "lavender", "marigold", "sky", "berry"].map((id) => coop.paletteById(id).tokens);
+  for (const ink of coop.INKS) for (const ground of coop.GROUNDS) for (const night of coop.NIGHTS) for (const accent of palettes) {
+    for (const [theme, vars] of themes) {
+      for (const f of failures(theme, withPage(withAccent(vars, accent), { ink: ink.value, ground: ground.value, night: night.value }))) {
+        bad.push(`${ink.id}/${ground.id}/${night.id}/${accent.accent} ${theme}: ${f}`);
+      }
+    }
+  }
+  assert.deepEqual(bad.slice(0, 10), []);
+});
+
+test("custom inks, page tints and dark themes from any hue, made usable, pass every token pair in both themes", () => {
+  const bad = [];
+  let tried = 0;
+  for (let hue = 0; hue < 360; hue += 30) {
+    const h = (hue * Math.PI) / 180;
+    const ink = coop.nearestUsableInk(coop.oklchToHex(0.3, 0.08, h));
+    const ground = coop.groundFamily(coop.oklchToHex(0.6, 0.15, h));
+    const night = coop.nightFamily(coop.oklchToHex(0.4, 0.1, h));
+    assert.ok(ink, `an ink near hue ${hue}`);
+    assert.deepEqual([...coop.checkInk(ink), ...coop.checkGround(ground), ...coop.checkNight(night)], [], `hue ${hue}`);
+    for (const accent of [coop.VERITAS_ACCENT, coop.generateAccent(coop.nearestUsableAccent(coop.oklchToHex(0.55, 0.14, h)))]) {
+      tried++;
+      for (const [theme, vars] of themes) for (const f of failures(theme, withPage(withAccent(vars, accent), { ink, ground, night }))) bad.push(`hue ${hue} ${theme}: ${f}`);
+    }
+  }
+  assert.ok(tried >= 24);
+  assert.deepEqual(bad.slice(0, 10), []);
+});
+
+test("an ink, page or dark theme outside the rule is refused in plain words", () => {
+  assert.match(coop.checkInk("#2f6b8a")[0], /too light for text and buttons/);
+  assert.match(coop.checkGround({ ...coop.VERITAS_GROUND, panel: "#cfd4cc" })[0], /panel colour is too dark/);
+  assert.match(coop.checkNight({ ...coop.VERITAS_NIGHT, band: "#2b6a8f" })[0], /band colour is too light/);
+});

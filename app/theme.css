@@ -14,16 +14,16 @@
 html[data-theme="dark"],
 .theme-preview-dark {
   /* Ground: Ink Navy, deepened toward night, never neutral grey */
-  --canvas:#08202f;
-  --canvas-rgb:8,32,47;
-  --surface:#0e3045;                     /* raised cards */
-  --surface-sunken:#061a27;              /* inputs and inset areas */
-  --panel:#143a45;                       /* the sage panel, as a deep sage-teal */
-  --panel-rgb:20,58,69;
+  --canvas:var(--night-canvas);
+  --canvas-rgb:var(--night-canvas-rgb);
+  --surface:var(--night-surface);                     /* raised cards */
+  --surface-sunken:var(--night-sunken);              /* inputs and inset areas */
+  --panel:var(--night-panel);                       /* the sage panel, as a deep sage-teal */
+  --panel-rgb:var(--night-panel-rgb);
   --warm-tint:#3a2730;                   /* terracotta wash, as a warm dusk */
-  --field-bg:#0b2a3d;
-  --ink-surface:#0d3a57;                 /* bands: a lit lantern-blue, clearly above the canvas */
-  --ink-surface-rgb:13,58,87;
+  --field-bg:var(--night-field);
+  --ink-surface:var(--night-band);                 /* bands: a lit lantern-blue, clearly above the canvas */
+  --ink-surface-rgb:var(--night-band-rgb);
 
   /* Text: Parchment Cream, with the on-navy variants for secondary and accent */
   --text:var(--cream);
@@ -55,8 +55,8 @@ html[data-theme="dark"],
   --shadow-rgb:2,10,16;
   --scrim-rgb:2,10,16;
 
-  --glass-bg:rgba(8,32,47,.78);
-  --glass-bg-thin:rgba(8,32,47,.55);
+  --glass-bg:rgba(var(--night-canvas-rgb),.78);
+  --glass-bg-thin:rgba(var(--night-canvas-rgb),.55);
   --glass-edge:rgba(255,255,255,.14);
   --glass-highlight:rgba(255,255,255,.12);
   --glass-lens:rgba(255,255,255,.14);
@@ -72,16 +72,16 @@ html[data-theme="dark"],
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) {
     /* Ground: Ink Navy, deepened toward night, never neutral grey */
-    --canvas:#08202f;
-    --canvas-rgb:8,32,47;
-    --surface:#0e3045;                     /* raised cards */
-    --surface-sunken:#061a27;              /* inputs and inset areas */
-    --panel:#143a45;                       /* the sage panel, as a deep sage-teal */
-    --panel-rgb:20,58,69;
+    --canvas:var(--night-canvas);
+    --canvas-rgb:var(--night-canvas-rgb);
+    --surface:var(--night-surface);                     /* raised cards */
+    --surface-sunken:var(--night-sunken);              /* inputs and inset areas */
+    --panel:var(--night-panel);                       /* the sage panel, as a deep sage-teal */
+    --panel-rgb:var(--night-panel-rgb);
     --warm-tint:#3a2730;                   /* terracotta wash, as a warm dusk */
-    --field-bg:#0b2a3d;
-    --ink-surface:#0d3a57;                 /* bands: a lit lantern-blue, clearly above the canvas */
-    --ink-surface-rgb:13,58,87;
+    --field-bg:var(--night-field);
+    --ink-surface:var(--night-band);                 /* bands: a lit lantern-blue, clearly above the canvas */
+    --ink-surface-rgb:var(--night-band-rgb);
 
     /* Text: Parchment Cream, with the on-navy variants for secondary and accent */
     --text:var(--cream);
@@ -113,8 +113,8 @@ html[data-theme="dark"],
     --shadow-rgb:2,10,16;
     --scrim-rgb:2,10,16;
 
-    --glass-bg:rgba(8,32,47,.78);
-    --glass-bg-thin:rgba(8,32,47,.55);
+    --glass-bg:rgba(var(--night-canvas-rgb),.78);
+    --glass-bg-thin:rgba(var(--night-canvas-rgb),.55);
     --glass-edge:rgba(255,255,255,.14);
     --glass-highlight:rgba(255,255,255,.12);
     --glass-lens:rgba(255,255,255,.14);
@@ -168,6 +168,13 @@ html[data-theme="dark"],
 
 /* Admin, Appearance's light preview pane (app/appearance.css) shows a few band and accent roles paper never needs. */
 .theme-preview-light {
+  /* Paper keeps the bundled cream; the preview shows the co-op's own grounds. */
+  --canvas:var(--ground);
+  --canvas-rgb:var(--ground-rgb);
+  --surface:var(--ground-surface);
+  --surface-sunken:var(--ground-sunken);
+  --panel:var(--ground-panel);
+  --panel-rgb:var(--ground-panel-rgb);
   --ink-surface:var(--navy);
   --ink-surface-rgb:var(--navy-rgb);
   --accent-on-action:var(--terracotta-on-navy);

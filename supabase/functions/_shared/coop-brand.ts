@@ -22,6 +22,8 @@ export function brandFromRow(row: Record<string, unknown> | null, supabaseUrl: s
     logoHeight: path && ratio >= 1 && ratio <= 6 ? Math.round(160 / ratio) : DEFAULT_EMAIL_BRAND.logoHeight,
     accent: both ? String(accent.accent) : DEFAULT_EMAIL_BRAND.accent,
     accentText: both ? String(accent.accent_text) : DEFAULT_EMAIL_BRAND.accentText,
+    // The database only stores an ink at least as deep as navy (private.coop_page_problems).
+    ink: typeof row.ink === "string" && HEX.test(row.ink) ? row.ink : DEFAULT_EMAIL_BRAND.ink,
     supportEmail: typeof row.support_email === "string" && /^[^@\s"<>]+@[^@\s"<>]+\.[^@\s"<>]+$/.test(row.support_email) ? row.support_email : null,
   };
 }
@@ -29,7 +31,7 @@ export function brandFromRow(row: Record<string, unknown> | null, supabaseUrl: s
 export async function loadEmailBrand(admin: SupabaseClient): Promise<EmailBrand> {
   if (cached && Date.now() - cached.at < 60_000) return cached.brand;
   try {
-    const { data } = await admin.from("coop_settings").select("name,accent,logo_light_path,logo_ratio,support_email").eq("id", "coop").maybeSingle();
+    const { data } = await admin.from("coop_settings").select("name,accent,logo_light_path,logo_ratio,support_email,ink").eq("id", "coop").maybeSingle();
     const brand = brandFromRow(data as Record<string, unknown> | null, Deno.env.get("SUPABASE_URL") ?? "");
     cached = { at: Date.now(), brand };
     return brand;
