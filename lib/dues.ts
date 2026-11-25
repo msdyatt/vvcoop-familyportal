@@ -113,6 +113,26 @@ export function savedMethodLabel(m: SavedMethod | null): string | null {
   return methodLabel({ method: m.default_pm_type as PaymentMethod, wallet: null, brand: m.default_pm_brand, last4: m.default_pm_last4, bank_name: m.default_pm_bank_name });
 }
 
+/**
+ * The saved method the dues page shows. A household has one billing customer per
+ * Stripe mode, and only the current mode's can be charged, so a test-mode card is
+ * never shown as "automatic payments are on" once the co-op is live.
+ */
+export function currentSavedMethod(rows: (SavedMethod & { livemode: boolean })[], provider: string | null | undefined): SavedMethod | null {
+  const live = provider === "stripe_live";
+  const mine = rows.filter((row) => row.livemode === live);
+  return mine.find((row) => row.autopay) ?? mine[0] ?? null;
+}
+
+/**
+ * What the main pay button asks the server for. With a plan, or when the family
+ * has just chosen Monthly (the plan is created a moment before checkout), it is
+ * the next installment; otherwise the whole balance.
+ */
+export function payButtonKind(hasPlan: boolean, startingMonthly: boolean): "next" | "all" {
+  return hasPlan || startingMonthly ? "next" : "all";
+}
+
 /** What the history shows for one row. Refunds are their own rows; the original stays "Paid". */
 export function paymentStatusLabel(p: Pick<Payment, "status" | "direction">): { text: string; tone: "complete" | "pending" | "outstanding" | "waived" } {
   if (p.direction === "refund") {

@@ -133,3 +133,10 @@ Deno.test("refunds: a refund on a charge that is not a dues payment is acknowled
   const result = await processStripeEvent({ admin: admin.client, stripe: stripe.stripe }, event("refund.created", { id: "re_x", amount: 500, status: "succeeded", payment_intent: "pi_donation" }));
   assertEquals(result, "not_ours", "a 200, so Stripe stops redelivering");
 });
+
+Deno.test("a payment the portal had canceled that then succeeds at Stripe is sent to the database as succeeded (#169)", async () => {
+  const { admin, deps } = setup({ payments: [payment({ status: "canceled" })], routes: { "GET /v1/payment_intents/pi_1": pi() } });
+  const result = await processStripeEvent(deps, event("payment_intent.succeeded", { id: "pi_1" }));
+  assertEquals(result, "succeeded:applied");
+  assertEquals(admin.called("billing_apply_payment_update")[0].args.p_status, "succeeded", "the database credits it and tells administrators");
+});

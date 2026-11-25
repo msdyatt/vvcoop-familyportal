@@ -1,3 +1,4 @@
+import { cancelUnconfirmedPaymentIntent, closeCheckoutSession } from "./dues-checkout.ts";
 import { applyFetchedPaymentIntent, applyPaymentIntent } from "./stripe-events.ts";
 import { StripeError, type StripeClient } from "./stripe.ts";
 import type { AdminClient } from "./types.ts";
@@ -84,15 +85,25 @@ export async function syncPendingPayments(deps: Deps): Promise<{ checked: number
   return { checked: rows.length, changed, notes };
 }
 
-/** Admin cancels an attempt that is stuck pending (closes the Checkout page too). */
+/**
+ * Admin cancels an attempt that is stuck pending. The Checkout page or the app's
+ * PaymentIntent is closed at Stripe first, and the row is only canceled once
+ * Stripe confirms nothing was paid (#169): a page that was completed while the
+ * webhook was down is left alone for "Check with Stripe" to pick up.
+ */
 export async function cancelPendingPayment(deps: Deps, paymentId: string): Promise<ActionResult> {
   const { admin, stripe } = deps;
-  const { data } = await admin.from("dues_payments").select("id,status,direction,stripe_checkout_session_id").eq("id", paymentId).maybeSingle();
+  const { data } = await admin.from("dues_payments").select("id,status,direction,stripe_checkout_session_id,stripe_payment_intent_id").eq("id", paymentId).maybeSingle();
   if (!data || data.status !== "pending" || data.direction !== "charge") {
     return { ok: false, status: 409, error: "Only a payment that has not started processing can be canceled." };
   }
+  const paid = { ok: false as const, status: 409, error: "Stripe says this payment was made. Use Check with Stripe to record it instead of canceling it." };
   if (data.stripe_checkout_session_id) {
-    try { await stripe.post(`/v1/checkout/sessions/${data.stripe_checkout_session_id}/expire`, {}); } catch { /* already closed */ }
+    const status = await closeCheckoutSession(stripe, data.stripe_checkout_session_id);
+    if (status === "complete") return paid;
+  } else if (data.stripe_payment_intent_id) {
+    const status = await cancelUnconfirmedPaymentIntent(stripe, data.stripe_payment_intent_id);
+    if (status !== "canceled") return paid;
   }
   await admin.rpc("billing_cancel_payment", { p_payment: paymentId, p_reason: "Canceled by an administrator." });
   return { ok: true };
