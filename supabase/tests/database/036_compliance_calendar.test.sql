@@ -270,6 +270,10 @@ select is((select count(*)::int from public.compliance_deadlines where rule_key 
 
 -- ---- reminders 60, 30 and 7 days before (relative to the real today) ----------------------------------------
 delete from public.notifications;
+-- Only the three deadlines below may be reminded here. The ones the nightly run generated
+-- earlier in this test are real IRS and Texas dates, and depending on today's date one can
+-- land on a 60, 30 or 7-day mark inside the window this section walks through.
+update public.compliance_deadlines set retired_at = now() where retired_at is null;
 insert into public.compliance_deadlines (title, nominal_due_on, due_on) values ('Sixty days out', current_date + 60, current_date + 60);
 insert into public.compliance_deadlines (title, nominal_due_on, due_on, status, filed_on) values ('Already filed', current_date + 30, current_date + 30, 'filed', current_date);
 insert into public.compliance_deadlines (title, nominal_due_on, due_on) values ('Fifty-eight days out', current_date + 58, current_date + 58);
